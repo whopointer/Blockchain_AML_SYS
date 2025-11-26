@@ -4,7 +4,8 @@
 """
 
 import torch
-from torch_geometric.data import Data, Dataset, DataLoader
+from torch_geometric.data import Data, Dataset
+from torch_geometric.loader import DataLoader
 import pandas as pd
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any, Union
@@ -14,6 +15,9 @@ import json
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 import logging
+
+# 创建数据模块专用的logger
+logger = logging.getLogger(__name__)
 
 
 class EllipticDataset(Dataset):
@@ -146,7 +150,9 @@ class EllipticDataset(Dataset):
         # 创建边索引
         edge_index_1 = valid_edges['txId1'].map(self.node_mapping).values
         edge_index_2 = valid_edges['txId2'].map(self.node_mapping).values
-        self.edge_index = torch.tensor([edge_index_1, edge_index_2], dtype=torch.long)
+        # 优化：先转换为numpy数组再创建tensor
+        edge_array = np.array([edge_index_1, edge_index_2], dtype=np.int64)
+        self.edge_index = torch.from_numpy(edge_array)
         
         # 创建节点特征
         feature_cols = [col for col in self.merged_df.columns if col.startswith('feature_')]
@@ -274,19 +280,36 @@ class EllipticDataLoader:
         # 获取所有时间步
         all_time_steps = sorted(self.full_dataset.time_steps.unique())
         
-        # 计算分割点
+        # 计算分割点 - 确保每个集合都有数据
         n_steps = len(all_time_steps)
-        test_start = int(n_steps * (1 - self.test_size))
-        val_start = int(test_start * (1 - self.val_size / (1 - self.test_size)))
+        if n_steps < 3:
+            # 如果时间步太少，使用简单分割
+            train_steps = all_time_steps[:1]
+            val_steps = all_time_steps[1:2] if len(all_time_steps) > 1 else []
+            test_steps = all_time_steps[2:] if len(all_time_steps) > 2 else []
+        else:
+            # 正常分割
+            test_start = max(1, int(n_steps * (1 - self.test_size)))
+            val_start = max(1, int(test_start * (1 - self.val_size / (1 - self.test_size))))
+            
+            train_steps = all_time_steps[:val_start]
+            val_steps = all_time_steps[val_start:test_start]
+            test_steps = all_time_steps[test_start:]
         
-        train_steps = all_time_steps[:val_start]
-        val_steps = all_time_steps[val_start:test_start]
-        test_steps = all_time_steps[test_start:]
+        train_steps_list = [int(t) for t in train_steps]
+        val_steps_list = [int(t) for t in val_steps]
+        test_steps_list = [int(t) for t in test_steps]
+        
+        logger.info(f"时间步分割: 训练({len(train_steps_list)}步)={train_steps_list[:5]}..., "
+                   f"验证({len(val_steps_list)}步)={val_steps_list[:5]}..., "
+                   f"测试({len(test_steps_list)}步)={test_steps_list[:5]}...")
         
         # 创建子数据集
-        self.train_dataset = self._create_subset_by_time(train_steps)
-        self.val_dataset = self._create_subset_by_time(val_steps)
-        self.test_dataset = self._create_subset_by_time(test_steps)
+        self.train_dataset = self._create_subset_by_time(train_steps_list)
+        self.val_dataset = self._create_subset_by_time(val_steps_list)
+        self.test_dataset = self._create_subset_by_time(test_steps_list)
+        
+        
     
     def _split_randomly(self):
         """随机分割数据集"""
@@ -317,8 +340,21 @@ class EllipticDataLoader:
         mask = subset_dataset.merged_df['time_step'].isin(time_steps)
         subset_dataset.merged_df = subset_dataset.merged_df[mask]
         
-        # 重新构建图
-        subset_dataset._build_graph_data()
+        # 检查是否有数据
+        if len(subset_dataset.merged_df) == 0:
+            logger.warning(f"时间步 {time_steps} 没有数据，创建空数据集")
+            # 创建空的图数据
+            subset_dataset.x = torch.empty((0, 165), dtype=torch.float)  # 假设165个特征
+            subset_dataset.edge_index = torch.empty((2, 0), dtype=torch.long)
+            subset_dataset.y = torch.empty(0, dtype=torch.long)
+            subset_dataset.time_steps = torch.empty(0, dtype=torch.long)
+            subset_dataset.scaler = StandardScaler()
+            # 使用虚拟数据拟合scaler
+            dummy_data = np.random.randn(1, 165)
+            subset_dataset.scaler.fit(dummy_data)
+        else:
+            # 重新构建图
+            subset_dataset._build_graph_data()
         
         return subset_dataset
     
