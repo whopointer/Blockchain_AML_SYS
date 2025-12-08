@@ -28,11 +28,12 @@ class DownstreamRandomForest:
                  min_samples_leaf: int = 5,
                  random_state: int = 42,
                  n_jobs: int = -1,
-                 class_weight: str = 'balanced',
+                 class_weight: str = None,  # 移除自动平衡，使用自定义权重
                  **kwargs):
         """
         初始化随机森林分类器
         """
+        # 使用balanced_subsample而不是balanced，以减少对多数类的偏向
         self.classifier = RandomForestClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
@@ -49,6 +50,7 @@ class DownstreamRandomForest:
         self.is_trained = False
         self.feature_importance = None
         self.training_stats = {}
+        self.optimal_threshold = 0.5  # 默认阈值
         
     def extract_embeddings(self, 
                           dgi_model: torch.nn.Module, 
@@ -101,7 +103,8 @@ class DownstreamRandomForest:
               y_train: np.ndarray, 
               X_val: np.ndarray, 
               y_val: np.ndarray,
-              logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+              logger: Optional[logging.Logger] = None,
+              tune_hyperparameters: bool = False) -> Dict[str, Any]:
         """
         训练随机森林分类器
         """
@@ -119,6 +122,32 @@ class DownstreamRandomForest:
         if logger:
             logger.info(f"训练数据类别分布: {np.bincount(y_train)}")
             logger.info(f"验证数据类别分布: {np.bincount(y_val)}")
+        
+        # 超参数调优
+        if tune_hyperparameters:
+            if logger:
+                logger.info("开始随机森林超参数调优...")
+            
+            # 进行超参数调优
+            tuning_results = self._hyperparameter_tuning(X_train, y_train, logger)
+            
+            # 更新分类器参数
+            if 'best_params' in tuning_results:
+                self.classifier.set_params(**tuning_results['best_params'])
+                if logger:
+                    logger.info(f"最佳超参数: {tuning_results['best_params']}")
+        
+        # 计算自定义类别权重以平衡数据
+        from sklearn.utils.class_weight import compute_class_weight
+        classes = np.unique(y_train)
+        class_weights = compute_class_weight('balanced', classes=classes, y=y_train)
+        class_weight_dict = dict(zip(classes, class_weights))
+        
+        # 更新分类器的类别权重
+        self.classifier.class_weight = class_weight_dict
+        
+        if logger:
+            logger.info(f"计算的类别权重: {class_weight_dict}")
         
         # 训练模型
         if logger:
@@ -189,6 +218,81 @@ class DownstreamRandomForest:
         
         return self.classifier.predict_proba(X)
     
+    def find_optimal_threshold(self, 
+                              X_val: np.ndarray, 
+                              y_val: np.ndarray,
+                              metric: str = 'f1',
+                              logger: Optional[logging.Logger] = None) -> float:
+        """
+        寻找最优分类阈值
+        
+        Args:
+            X_val: 验证集特征
+            y_val: 验证集标签
+            metric: 优化指标，可选'f1', 'precision', 'recall'
+            logger: 日志记录器
+            
+        Returns:
+            最优阈值
+        """
+        from sklearn.metrics import f1_score, precision_score, recall_score
+        
+        # 获取预测概率
+        y_proba = self.predict_proba(X_val)[:, 1]
+        
+        # 测试不同阈值，扩大搜索范围并降低步长
+        thresholds = np.arange(0.05, 0.95, 0.02)
+        best_score = 0
+        best_threshold = 0.5
+        
+        for threshold in thresholds:
+            y_pred = (y_proba >= threshold).astype(int)
+            
+            if metric == 'f1':
+                score = f1_score(y_val, y_pred, average='binary', zero_division=0)
+            elif metric == 'precision':
+                score = precision_score(y_val, y_pred, average='binary', zero_division=0)
+            elif metric == 'recall':
+                score = recall_score(y_val, y_pred, average='binary', zero_division=0)
+            else:
+                raise ValueError(f"不支持的指标: {metric}")
+            
+            if score > best_score:
+                best_score = score
+                best_threshold = threshold
+        
+        self.optimal_threshold = best_threshold
+        
+        if logger:
+            logger.info(f"最优阈值: {best_threshold:.3f} (基于{metric}指标: {best_score:.4f})")
+        
+        return best_threshold
+    
+    def predict_with_threshold(self, X: np.ndarray, threshold: Optional[float] = None) -> np.ndarray:
+        """
+        使用指定阈值进行预测
+        
+        Args:
+            X: 输入特征
+            threshold: 分类阈值，如果为None则使用self.optimal_threshold
+            
+        Returns:
+            预测结果
+        """
+        if not self.is_trained:
+            raise ValueError("模型尚未训练，请先调用train方法")
+        
+        if threshold is None:
+            threshold = self.optimal_threshold
+        
+        # 获取预测概率
+        y_proba = self.predict_proba(X)[:, 1]
+        
+        # 应用阈值
+        y_pred = (y_proba >= threshold).astype(int)
+        
+        return y_pred
+    
     def save_model(self, filepath: str):
         """
         保存模型
@@ -258,12 +362,103 @@ class DownstreamRandomForest:
         
         if logger:
             logger.info(f"最佳参数: {grid_search.best_params_}")
+            return grid_search.best_score_
+
+
+def _hyperparameter_tuning(self, 
+                          X_train: np.ndarray, 
+                          y_train: np.ndarray,
+                          logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+    """
+    私有方法：超参数调优
+    """
+    # 定义参数网格
+    param_grid = {
+        'n_estimators': [100, 200],
+        'max_depth': [10, 15, None],
+        'min_samples_split': [10, 20],
+        'min_samples_leaf': [5, 10],
+        'max_features': ['sqrt']
+    }
+    
+    # 创建基础随机森林
+    rf = RandomForestClassifier(
+        random_state=42,
+        n_jobs=-1,
+        class_weight='balanced'
+    )
+    
+    # 使用RandomizedSearchCV
+    from sklearn.model_selection import RandomizedSearchCV
+    grid_search = RandomizedSearchCV(
+        estimator=rf,
+        param_distributions=param_grid,
+        n_iter=20,
+        cv=3,
+        scoring='roc_auc',
+        n_jobs=-1,
+        verbose=1,
+        random_state=42
+    )
+    
+    # 执行搜索
+    grid_search.fit(X_train, y_train)
+    
+    if logger:
+        logger.info(f"最佳参数: {grid_search.best_params_}")
+        logger.info(f"最佳分数: {grid_search.best_score_:.4f}")
+    
+    return {
+        'best_params': grid_search.best_params_,
+        'best_score': grid_search.best_score_
+    }
+    
+    def _hyperparameter_tuning(self, 
+                              X_train: np.ndarray, 
+                              y_train: np.ndarray,
+                              logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+        """
+        私有方法：超参数调优
+        """
+        # 定义参数网格
+        param_grid = {
+            'n_estimators': [100, 200],
+            'max_depth': [10, 15, None],
+            'min_samples_split': [10, 20],
+            'min_samples_leaf': [5, 10],
+            'max_features': ['sqrt']
+        }
+        
+        # 创建基础随机森林
+        rf = RandomForestClassifier(
+            random_state=42,
+            n_jobs=-1,
+            class_weight='balanced'
+        )
+        
+        # 使用RandomizedSearchCV
+        from sklearn.model_selection import RandomizedSearchCV
+        grid_search = RandomizedSearchCV(
+            estimator=rf,
+            param_distributions=param_grid,
+            n_iter=20,
+            cv=3,
+            scoring='roc_auc',
+            n_jobs=-1,
+            verbose=1,
+            random_state=42
+        )
+        
+        # 执行搜索
+        grid_search.fit(X_train, y_train)
+        
+        if logger:
+            logger.info(f"最佳参数: {grid_search.best_params_}")
             logger.info(f"最佳分数: {grid_search.best_score_:.4f}")
         
         return {
             'best_params': grid_search.best_params_,
-            'best_score': grid_search.best_score_,
-            'cv_results': grid_search.cv_results_
+            'best_score': grid_search.best_score_
         }
 
 

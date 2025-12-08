@@ -1,27 +1,20 @@
 """
 Models package for blockchain AML system
+Two-stage DGI+GIN+Random Forest Architecture
 """
 
-from .gnn_model import ImprovedGNNModel, GINLayer, MultiScaleGNN, AttentionPooling
-from .dgi import ImprovedDGI
+from .dgi import DGIWithGIN, create_dgi_with_gin
 from .trainer import ImprovedTrainer, create_trainer
-from .inference import InferenceEngine
-from .evaluator import ModelEvaluator
 from .random_forest_classifier import DownstreamRandomForest, create_random_forest_classifier
-from .gnn_dgi_rf import GNNDGIRandomForest, create_gnn_dgi_rf_model
+from .two_stage_dgi_rf import TwoStageDGIRandomForest, create_two_stage_dgi_rf
 
 __all__ = [
-    'ImprovedGNNModel',
-    'GINLayer', 
-    'MultiScaleGNN',
-    'AttentionPooling',
-    'ImprovedDGI',
+    'DGIWithGIN',
+    'create_dgi_with_gin',
     'ImprovedTrainer',
     'create_trainer',
-    'InferenceEngine',
-    'ModelEvaluator',
     'DownstreamRandomForest',
     'create_random_forest_classifier',
-    'GNNDGIRandomForest',
-    'create_gnn_dgi_rf_model'
+    'TwoStageDGIRandomForest',
+    'create_two_stage_dgi_rf'
 ]

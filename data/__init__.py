@@ -4,6 +4,7 @@
 """
 
 import torch
+from sympy import false
 from torch_geometric.data import Data, Dataset
 from torch_geometric.loader import DataLoader
 import pandas as pd
@@ -175,17 +176,53 @@ class EllipticDataset(Dataset):
         logger.info(f"图构建完成: {self.x.shape[0]} 个节点, {self.edge_index.shape[1]} 条边")
     
     def len(self) -> int:
-        return 1  # 返回单个图
+        """返回时间步数量"""
+        if self.time_step is not None:
+            return 1  # 单一时间步
+        else:
+            return len(self.time_steps.unique())  # 多个时间步
     
     def get(self, idx: int) -> Data:
         """获取图数据"""
-        data = Data(
-            x=self.x,
-            edge_index=self.edge_index,
-            y=self.y,
-            time_steps=self.time_steps,
-            num_nodes=self.x.shape[0]
-        )
+        if self.time_step is not None:
+            # 单一时间步，返回整个图
+            data = Data(
+                x=self.x,
+                edge_index=self.edge_index,
+                y=self.y,
+                time_steps=self.time_steps,
+                num_nodes=self.x.shape[0]
+            )
+        else:
+            # 多个时间步，返回指定时间步的子图
+            target_time_step = self.time_steps.unique()[idx]
+            mask = self.time_steps == target_time_step
+            
+            # 获取该时间步的节点
+            node_indices = torch.nonzero(mask).squeeze()
+            node_to_new_id = {old_id.item(): new_id for new_id, old_id in enumerate(node_indices)}
+            
+            # 创建子图的边索引
+            edges = self.edge_index
+            mask_edges = torch.isin(edges[0], node_indices) & torch.isin(edges[1], node_indices)
+            sub_edges = edges[:, mask_edges]
+            
+            # 重新映射边索引
+            sub_edges[0] = torch.tensor([node_to_new_id[edge.item()] for edge in sub_edges[0]])
+            sub_edges[1] = torch.tensor([node_to_new_id[edge.item()] for edge in sub_edges[1]])
+            
+            # 创建子图数据
+            sub_x = self.x[mask]
+            sub_y = self.y[mask] if self.y is not None else None
+            sub_time_steps = self.time_steps[mask]
+            
+            data = Data(
+                x=sub_x,
+                edge_index=sub_edges,
+                y=sub_y,
+                time_steps=sub_time_steps,
+                num_nodes=sub_x.shape[0]
+            )
         
         if self.transform:
             data = self.transform(data)
@@ -373,17 +410,35 @@ class EllipticDataLoader:
         
         return subset_dataset
     
-    def get_train_loader(self, batch_size: int = 32, shuffle: bool = True) -> DataLoader:
+    def get_train_loader(self, batch_size: int = 32, shuffle: bool = True, num_workers: int = 0) -> DataLoader:
         """获取训练数据加载器"""
-        return DataLoader(self.train_dataset, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(
+            self.train_dataset, 
+            batch_size=batch_size, 
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=True if num_workers > 0 else False
+        )
     
-    def get_val_loader(self, batch_size: int = 32, shuffle: bool = False) -> DataLoader:
+    def get_val_loader(self, batch_size: int = 32, shuffle: bool = False, num_workers: int = 0) -> DataLoader:
         """获取验证数据加载器"""
-        return DataLoader(self.val_dataset, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(
+            self.val_dataset, 
+            batch_size=batch_size, 
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=True if num_workers > 0 else False
+        )
     
-    def get_test_loader(self, batch_size: int = 32, shuffle: bool = False) -> DataLoader:
+    def get_test_loader(self, batch_size: int = 32, shuffle: bool = False, num_workers: int = 0) -> DataLoader:
         """获取测试数据加载器"""
-        return DataLoader(self.test_dataset, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(
+            self.test_dataset, 
+            batch_size=batch_size, 
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=True if num_workers > 0 else False
+        )
     
     def get_data_statistics(self) -> Dict[str, Any]:
         """获取数据统计信息"""
@@ -396,28 +451,54 @@ class EllipticDataLoader:
 
 
 # 向后兼容的函数
-def load_train_data(data_path: str, batch_size: int = 32) -> DataLoader:
+def load_train_data(data_path: str, batch_size: int = 32, num_workers: int = 4) -> DataLoader:
     """加载训练数据（向后兼容）"""
     loader = EllipticDataLoader(data_path)
-    return loader.get_train_loader(batch_size)
+    return loader.get_train_loader(batch_size, num_workers=num_workers)
 
 
-def load_val_data(data_path: str, batch_size: int = 32) -> DataLoader:
+def load_val_data(data_path: str, batch_size: int = 32, num_workers: int = 4) -> DataLoader:
     """加载验证数据（向后兼容）"""
     loader = EllipticDataLoader(data_path)
-    return loader.get_val_loader(batch_size)
+    return loader.get_val_loader(batch_size, num_workers=num_workers)
 
 
-def load_test_data(data_path: str, batch_size: int = 32) -> DataLoader:
+def load_test_data(data_path: str, batch_size: int = 32, num_workers: int = 4) -> DataLoader:
     """加载测试数据（向后兼容）"""
     loader = EllipticDataLoader(data_path)
-    return loader.get_test_loader(batch_size)
+    return loader.get_test_loader(batch_size, num_workers=num_workers)
 
 
-def load_inference_data(data_path: str) -> Data:
-    """加载推理数据（向后兼容）"""
-    dataset = EllipticDataset(root=data_path, include_unknown=True)
-    return dataset[0]
+def load_inference_data(data_path: str, include_unknown: bool = False, 
+                       all_timesteps: bool = True, timestep: Optional[int] = None) -> Data:
+    """加载推理数据
+    
+    Args:
+        data_path: 数据路径
+        include_unknown: 是否包含未知标签的数据，默认为False以避免预测偏差
+        all_timesteps: 是否返回所有时间步的完整数据，默认为True
+        timestep: 指定返回特定时间步的数据（当all_timesteps=False时使用）
+    """
+    dataset = EllipticDataset(root=data_path, include_unknown=include_unknown)
+    
+    if all_timesteps:
+        # 返回包含所有时间步的完整图数据
+        data = Data(
+            x=dataset.x,
+            edge_index=dataset.edge_index,
+            y=dataset.y,
+            time_steps=dataset.time_steps,
+            num_nodes=dataset.x.shape[0]
+        )
+        return data
+    elif timestep is not None:
+        # 返回指定时间步的数据
+        if timestep < 0 or timestep >= len(dataset):
+            raise ValueError(f"时间步 {timestep} 超出范围，有效范围: 0-{len(dataset)-1}")
+        return dataset[timestep]
+    else:
+        # 向后兼容：默认返回第一个时间步
+        return dataset[0]
 
 
 def create_sample_data(data_path: str):

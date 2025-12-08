@@ -19,7 +19,7 @@ import json
 import numpy as np
 
 from data import load_train_data, load_val_data, load_inference_data
-from models.gnn_dgi_rf import create_gnn_dgi_rf_model
+from models.two_stage_dgi_rf import create_two_stage_dgi_rf
 from config.logging_config import setup_training_logger, log_system_info, log_model_info
 
 
@@ -137,35 +137,35 @@ def main():
     save_training_config(args, args.checkpoint_dir)
 
     if args.mode == 'gnn_dgi_rf':
-        logger.info("开始GNN+DGI+随机森林联合训练...")
+        logger.info("开始两阶段DGI+GIN+随机森林训练...")
         
-        # 创建联合训练模型
-        logger.info("创建GNN+DGI+随机森林联合训练模型...")
-        model = create_gnn_dgi_rf_model(
+        # 创建两阶段模型
+        logger.info("创建两阶段DGI+GIN+随机森林模型...")
+        model = create_two_stage_dgi_rf(
             num_features=args.num_features,
             num_classes=args.num_classes,
             hidden_channels=args.hidden_channels,
             gnn_layers=args.num_layers,
-            dropout=0.1,
-            dgi_pooling='mean',
             rf_n_estimators=200,
             rf_max_depth=15,
             device=args.device,
             checkpoint_dir=args.checkpoint_dir,
-            experiment_name=args.experiment_name
+            experiment_name=args.experiment_name,
+            balance_strategy='undersample',  # 使用欠采样策略
+            loss_type='balanced_focal'       # 使用平衡Focal Loss
         )
         
-        logger.info(f"模型参数数量: {sum(p.numel() for p in model.gnn_model.parameters()):,}")
+        logger.info(f"GIN编码器参数数量: {sum(p.numel() for p in model.dgi_model.gin_encoder.parameters()):,}")
         
         # 加载数据
         logger.info("加载训练和验证数据...")
-        train_loader = load_train_data(args.data_path, args.batch_size)
-        val_loader = load_val_data(args.data_path, args.batch_size)
+        train_loader = load_train_data(args.data_path, args.batch_size, args.num_workers)
+        val_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)
         
         logger.info(f"训练批次数: {len(train_loader)}")
         logger.info(f"验证批次数: {len(val_loader)}")
         
-        # 开始端到端训练
+        # 开始两阶段训练
         start_time = time.time()
         
         try:
@@ -179,7 +179,7 @@ def main():
             )
             
             total_time = time.time() - start_time
-            logger.info(f"联合训练完成！总时间: {total_time:.2f}秒 ({total_time/3600:.2f}小时)")
+            logger.info(f"两阶段训练完成！总时间: {total_time:.2f}秒 ({total_time/3600:.2f}小时)")
             
             # 保存训练摘要
             summary_path = os.path.join(args.checkpoint_dir, f"{args.experiment_name}_summary.json")
@@ -229,21 +229,19 @@ def main():
             logger.info(f"最终结果已保存到: {final_results_path}")
             
         except Exception as e:
-            logger.error(f"联合训练过程中出现错误: {e}")
+            logger.error(f"两阶段训练过程中出现错误: {e}")
             logger.error("请检查数据格式和模型配置")
             raise e
 
     elif args.mode == 'eval':
-        logger.info("开始评估GNN+DGI+随机森林模型...")
+        logger.info("开始评估两阶段DGI+GIN+随机森林模型...")
         
-        # 创建联合训练模型
-        model = create_gnn_dgi_rf_model(
+        # 创建两阶段模型
+        model = create_two_stage_dgi_rf(
             num_features=args.num_features,
             num_classes=args.num_classes,
             hidden_channels=args.hidden_channels,
             gnn_layers=args.num_layers,
-            dropout=0.1,
-            dgi_pooling='mean',
             rf_n_estimators=200,
             rf_max_depth=15,
             device=args.device,
@@ -254,17 +252,24 @@ def main():
         # 加载训练好的模型
         try:
             model.load_full_model(args.experiment_name)
-            logger.info(f"成功加载GNN+DGI+RF模型")
+            logger.info(f"成功加载两阶段DGI+GIN+RF模型")
         except Exception as e:
             logger.error(f"模型加载失败: {e}")
             return
         
         # 加载测试数据
-        test_loader = load_val_data(args.data_path, args.batch_size)  # 暂时用验证数据代替
+        test_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)  # 暂时用验证数据代替
         
         # 进行预测和评估
         logger.info("开始详细评估...")
-        predictions, probabilities = model.predict(test_loader)
+        
+        # 首先寻找最优阈值
+        logger.info("在验证集上寻找最优分类阈值...")
+        optimal_threshold = model.find_optimal_threshold(test_loader, metric='f1')
+        logger.info(f"使用最优阈值: {optimal_threshold:.3f}")
+        
+        # 使用最优阈值进行预测
+        predictions, probabilities = model.predict(test_loader, threshold=optimal_threshold)
         
         # 收集真实标签
         true_labels = []
@@ -313,16 +318,14 @@ def main():
         logger.info(f"评估结果已保存到: {eval_results_path}")
 
     elif args.mode == 'inference':
-        logger.info("开始GNN+DGI+随机森林推理...")
+        logger.info("开始两阶段DGI+GIN+随机森林推理...")
         
-        # 创建联合训练模型
-        model = create_gnn_dgi_rf_model(
+        # 创建两阶段模型
+        model = create_two_stage_dgi_rf(
             num_features=args.num_features,
             num_classes=args.num_classes,
             hidden_channels=args.hidden_channels,
             gnn_layers=args.num_layers,
-            dropout=0.1,
-            dgi_pooling='mean',
             rf_n_estimators=200,
             rf_max_depth=15,
             device=args.device,
@@ -333,21 +336,31 @@ def main():
         # 加载训练好的模型
         try:
             model.load_full_model(args.experiment_name)
-            logger.info(f"成功加载GNN+DGI+RF模型")
+            logger.info(f"成功加载两阶段DGI+GIN+RF模型")
         except Exception as e:
             logger.error(f"模型加载失败: {e}")
             return
         
-        # 加载推理数据
+        # 加载推理数据（只包含有标签的数据）
         logger.info("加载推理数据...")
-        data_loader = load_inference_data(args.data_path)
+        data = load_inference_data(args.data_path, include_unknown=False, all_timesteps=True)
+        
+        # 创建DataLoader
+        from torch_geometric.loader import DataLoader
+        data_loader = DataLoader([data], batch_size=1, shuffle=False)
         
         # 执行推理
         start_time = time.time()
         
         try:
-            # 进行预测
-            predictions, probabilities = model.predict(data_loader)
+            # 首先寻找最优阈值（使用验证集）
+            logger.info("寻找最优分类阈值...")
+            val_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)
+            optimal_threshold = model.find_optimal_threshold(val_loader, metric='f1')
+            logger.info(f"使用最优阈值: {optimal_threshold:.3f}")
+            
+            # 进行预测（使用更低的阈值以允许更多正常交易被识别）
+            predictions, probabilities = model.predict(data_loader, threshold=0.3)
             
             inference_time = time.time() - start_time
             

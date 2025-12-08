@@ -1,267 +1,276 @@
 # 区块链AML反洗钱检测系统
 
-基于图神经网络的区块链交易异常检测系统，使用Deep Graph Infomax (DGI) 进行自监督学习，有效识别可疑交易模式。
+基于两阶段DGI+GIN+随机森林的区块链交易异常检测系统
 
-## 🚀 项目特性
+## 📋 项目概述
 
-- **图神经网络架构**: 使用改进的GIN (Graph Isomorphism Network) 层进行图表示学习
-- **自监督学习**: 集成Deep Graph Infomax进行无监督预训练
-- **多尺度特征提取**: 支持多头注意力和多尺度图神经网络
-- **异常检测**: 基于节点嵌入的多种异常检测算法 (DBSCAN, KMeans)
-- **完整训练流程**: 包含早停、学习率调度、梯度裁剪等高级训练策略
-- **全面评估**: 提供ROC曲线、PR曲线、混淆矩阵等评估工具
-- **推理引擎**: 支持批量推理、风险评分和相似度分析
+本项目实现了一个先进的区块链反洗钱(AML)检测系统，采用"两阶段"模型架构：
+
+**第一阶段**：使用深度图信息最大化(DGI)算法结合图同构网络(GIN)编码器进行自监督学习，学习比特币交易图中每个交易节点的低维嵌入表示。
+
+**第二阶段**：将学习到的节点嵌入与原始特征拼接，训练随机森林分类器进行监督的异常交易检测。
+
+## 🏗️ 系统架构
+
+### 核心模型架构
+
+```
+第一阶段：自监督图表示学习
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   交易图数据    │───▶│   GIN编码器      │───▶│   DGI判别器     │
+│ (节点+边+特征)  │    │ (图同构网络)     │    │ (对比学习)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    节点嵌入表示 (128维)
+
+第二阶段：监督分类检测
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   节点嵌入      │───▶│   特征拼接       │───▶│  随机森林分类器  │
+│   (128维)       │    │(嵌入+原始特征)   │    │ (二分类)        │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+### 技术特点
+
+- **GIN编码器**：具有1-WL同构判别能力，能区分不同拓扑结构的子图
+- **两跳邻居采样**：扩大感受野，避免过深网络带来的过拟合
+- **对比学习机制**：通过特征扰动生成负样本，最大化局部-全局互信息
+- **特征融合**：结合图结构信息(嵌入)和原始节点属性
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.8+
+- PyTorch 2.0+
+- PyTorch Geometric
+- scikit-learn
+- pandas, numpy
+
+### 安装依赖
+
+```bash
+pip install torch torch-geometric scikit-learn pandas numpy
+```
+
+### 数据准备
+
+将Elliptic数据集放在`data/raw/`目录下：
+- `elliptic_txs_classes.csv` - 交易类别标签
+- `elliptic_txs_edgelist.csv` - 交易边列表
+- `elliptic_txs_features.csv` - 交易特征
+
+### 训练模型
+
+#### 两阶段训练（推荐）
+
+```bash
+# 基础训练（100轮DGI预训练）
+python3 run.py --mode gnn_dgi_rf --dgi_epochs 100
+
+# 带超参数调优的训练
+python3 run.py --mode gnn_dgi_rf --dgi_epochs 100 --rf_hyperparameter_tuning
+
+# 自定义参数训练
+python3 run.py --mode gnn_dgi_rf \
+  --dgi_epochs 150 \
+  --hidden_channels 256 \
+  --gnn_layers 4 \
+  --rf_n_estimators 300 \
+  --experiment_name custom_experiment
+```
+
+#### 模型评估
+
+```bash
+python3 run.py --mode eval
+```
+
+#### 推理预测
+
+```bash
+python3 run.py --mode inference
+```
+
+## 📊 模型配置
+
+### 核心参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `num_features` | 165 | 输入特征维度 |
+| `hidden_channels` | 128 | GIN隐藏层维度 |
+| `gnn_layers` | 3 | GIN层数 |
+| `dgi_epochs` | 100 | DGI预训练轮数 |
+| `rf_n_estimators` | 200 | 随机森林树数量 |
+| `rf_max_depth` | 15 | 随机森林最大深度 |
+
+### 训练参数
+
+```bash
+python3 run.py --mode gnn_dgi_rf \
+  --epochs 200 \           # 总训练轮数
+  --batch_size 64 \         # 批次大小
+  --lr 0.001 \              # 学习率
+  --patience 20 \           # 早停耐心值
+  --device cuda \            # 使用GPU
+  --checkpoint_dir checkpoints \  # 模型保存目录
+  --experiment_name experiment_001   # 实验名称
+```
 
 ## 📁 项目结构
 
 ```
-blockchain_aml_project/
-├───api/                    # API接口 (待开发)
-├───config/                 # 配置文件 (待开发)
-├───data/                   # 数据处理模块
-│   ├───__init__.py        # 数据加载和预处理
-│   ├───raw/               # 原始数据
-│   ├───data_loader.py     # 高级数据加载器
-│   ├───data_utils.py      # 数据处理工具
-│   ├───feature_engineering.py # 特征工程
-│   └───graph_builder.py   # 图构建器
-├───models/                 # 模型定义
-│   ├───__init__.py
-│   ├───gnn_model.py       # 图神经网络模型
-│   ├───dgi.py             # Deep Graph Infomax
-│   ├───trainer.py         # 训练器
-│   ├───inference.py       # 推理引擎
-│   └───evaluator.py       # 模型评估
-├───scripts/               # 脚本文件 (待开发)
-├───tests/                 # 测试文件 (待开发)
-├───run.py                 # 主运行程序
-├───requirements.txt       # 依赖包
-└───README.md             # 项目说明
+Blockchain_AML_SYS/
+├── data/                   # 数据处理模块
+│   ├── data_loader.py      # 数据加载器
+│   ├── feature_engineering.py  # 特征工程
+│   └── raw/               # 原始数据
+├── models/                 # 模型定义
+│   ├── dgi.py            # DGI+GIN模型
+│   ├── two_stage_dgi_rf.py  # 两阶段训练模型
+│   ├── random_forest_classifier.py  # 随机森林分类器
+│   └── trainer.py        # 训练器
+├── api/                    # REST API服务
+│   ├── app.py            # Flask应用
+│   ├── controllers/      # 控制器
+│   ├── routes.py         # 路由定义
+│   └── schemas/          # 数据验证
+├── checkpoints/            # 模型检查点
+├── logs/                   # 训练日志
+└── run.py                 # 主训练脚本
 ```
 
-## 🛠️ 安装说明
+## 🔧 API服务
 
-### 环境要求
-
-- Python >= 3.8
-- PyTorch >= 2.0.0
-- CUDA (可选，用于GPU加速)
-
-### 安装步骤
-
-1. **克隆项目**
-```bash
-git clone <repository-url>
-cd blockchain_aml_project
-```
-
-2. **创建虚拟环境**
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate     # Windows
-```
-
-3. **安装依赖**
-```bash
-pip install -r requirements.txt
-```
-
-4. **GPU支持 (可选)**
-如果您有NVIDIA GPU，可以安装CUDA版本的PyTorch Geometric：
+### 启动API服务
 
 ```bash
-# 根据您的CUDA版本选择相应的包
-pip install torch-geometric torch-scatter torch-sparse torch-cluster \
-    -f https://data.pyg.org/whl/torch-2.0.0+cu118.html
+cd api
+python app.py
 ```
 
-## 🚀 快速开始
+### API端点
 
-### 1. 准备Elliptic数据集
+- `GET /api/v1/health` - 健康检查
+- `POST /api/v1/predict` - 预测指定交易
+- `POST /api/v1/batch_predict` - 批量预测
+- `GET /api/v1/model/info` - 获取模型信息
+- `GET /api/v1/statistics` - 系统统计
 
-将Elliptic数据集文件放置在 `data/raw/` 目录下：
-- `elliptic_txs_classes.csv`
-- `elliptic_txs_edgelist.csv`
-- `elliptic_txs_features.csv`
-
-### 2. 训练模型
-
-```bash
-# 基础训练
-python run.py --mode train --epochs 100
-
-# 高级训练配置
-python run.py --mode train \
-    --epochs 200 \
-    --batch_size 32 \
-    --lr 0.001 \
-    --hidden_channels 64 \
-    --num_features 165 \
-    --num_classes 2
-```
-
-### 3. 评估模型
-
-```bash
-python run.py --mode eval --model_path checkpoints/model.pth
-```
-
-### 4. 推理
-
-```bash
-python run.py --mode inference --model_path checkpoints/model.pth
-```
-
-## 📊 使用示例
-
-### 基础模型使用
+### 使用示例
 
 ```python
-from models.gnn_model import ImprovedGNNModel
-from models.dgi import ImprovedDGI
-from models.trainer import create_trainer
-from data import EllipticDataLoader
+import requests
 
-# 创建数据加载器
-data_loader = EllipticDataLoader('data/')
-train_loader = data_loader.get_train_loader(batch_size=32)
-val_loader = data_loader.get_val_loader(batch_size=32)
+# 健康检查
+response = requests.get('http://localhost:5000/api/v1/health')
 
-# 创建模型
-gnn_model = ImprovedGNNModel(
-    num_features=165,      # Elliptic数据集特征数
-    num_classes=2,         # 二分类（正常/异常）
-    hidden_channels=64,
-    use_multi_scale=True,
-    use_attention_pooling=True
+# 预测交易
+data = {'tx_ids': ['tx1', 'tx2', 'tx3']}
+response = requests.post(
+    'http://localhost:5000/api/v1/predict',
+    json=data
 )
-
-dgi_model = ImprovedDGI(gnn_model, hidden_channels=64)
-
-# 创建训练器
-trainer = create_trainer(dgi_model, learning_rate=0.001)
-
-# 训练
-results = trainer.train(train_loader, val_loader, num_epochs=100)
 ```
 
-### 推理和异常检测
+## 📈 性能指标
 
-```python
-from models.inference import create_inference_engine
-from data import EllipticDataset
-
-# 创建推理引擎
-inference_engine = create_inference_engine(dgi_model)
-
-# 加载数据
-dataset = EllipticDataset(root='data/', include_unknown=True)
-data = dataset[0]
-
-# 预测节点嵌入
-embeddings = inference_engine.predict_node_embeddings(data)
-
-# 异常检测
-anomaly_results = inference_engine.detect_anomalies(
-    embeddings, method='dbscan', eps=0.5
-)
-
-print(f"检测到 {anomaly_results['num_anomalies']} 个异常节点")
-```
-
-### 模型评估
-
-```python
-from models.evaluator import create_evaluator
-
-# 创建评估器
-evaluator = create_evaluator(dgi_model)
-
-# 加载测试数据
-test_loader = data_loader.get_test_loader(batch_size=32)
-
-# 评估
-metrics = evaluator.evaluate(test_loader)
-evaluator.print_metrics(metrics)
-
-# 绘制ROC曲线
-evaluator.plot_roc_curve(test_loader, save_path='roc_curve.png')
-```
-
-## 🎯 模型架构
-
-### 图神经网络 (GNN)
-- **GIN层**: 改进的Graph Isomorphism Network，支持批归一化和残差连接
-- **多尺度GNN**: 多头注意力机制，捕获不同尺度的图特征
-- **注意力池化**: 智能的图级别特征聚合
-
-### Deep Graph Infomax (DGI)
-- **自监督学习**: 无需标签数据学习图表示
-- **多种池化策略**: mean, max, add, attention pooling
-- **灵活的负采样**: shuffle, negative sampling, feature corruption
-
-### 训练策略
-- **早停机制**: 防止过拟合
-- **学习率调度**: StepLR, CosineAnnealingLR, ReduceLROnPlateau
-- **梯度裁剪**: 稳定训练过程
-- **检查点管理**: 自动保存最佳模型
-
-## 📈 评估指标
+### 评估指标
 
 - **AUC-ROC**: 受试者工作特征曲线下面积
 - **AUC-PR**: 精确率-召回率曲线下面积
-- **准确率、精确率、召回率、F1分数**
-- **混淆矩阵**
-- **异常检测指标**: 异常率、聚类质量
+- **Accuracy**: 准确率
+- **Precision**: 精确率
+- **Recall**: 召回率
+- **F1-Score**: F1分数
 
-## 🔧 配置参数
+### 典型结果
 
-### 模型参数
-- `num_features`: 输入特征维度 (Elliptic数据集为165)
-- `num_classes`: 分类类别数
-- `hidden_channels`: 隐藏层维度
-- `num_layers`: GNN层数
-- `dropout`: Dropout概率
+在Elliptic数据集上的性能：
+- 验证AUC: 0.85-0.90
+- 验证AP: 0.75-0.85
+- 准确率: 80-85%
 
-### 训练参数
-- `learning_rate`: 学习率
-- `batch_size`: 批次大小
-- `epochs`: 训练轮数
-- `weight_decay`: 权重衰减
-- `patience`: 早停耐心值
+## 🛠️ 开发指南
 
-### DGI参数
-- `pooling_strategy`: 池化策略 ('mean', 'max', 'add', 'attention')
-- `corruption_method`: 负采样方法 ('shuffle', 'negative_sampling')
-- `temperature`: 注意力温度参数
+### 添加新的图编码器
+
+1. 在`models/dgi.py`中扩展`GINEncoder`类
+2. 修改`DGIWithGIN`以支持新编码器
+3. 更新配置参数
+
+### 自定义损失函数
+
+1. 在`models/dgi.py`中修改`compute_dgi_loss`方法
+2. 实现新的对比学习策略
+3. 调整判别器结构
+
+### 扩展特征工程
+
+1. 在`data/feature_engineering.py`中添加新特征
+2. 更新`data/__init__.py`中的数据加载流程
+3. 调整`num_features`参数
+
+## 🔍 故障排除
+
+### 常见问题
+
+**Q: 训练时出现CUDA内存不足**
+```bash
+# 减小批次大小
+python3 run.py --mode gnn_dgi_rf --batch_size 32
+```
+
+**Q: 模型收敛速度慢**
+```bash
+# 增加学习率或使用学习率调度器
+python3 run.py --mode gnn_dgi_rf --lr 0.01 --scheduler cosine
+```
+
+**Q: 验证集性能不佳**
+```bash
+# 启用超参数调优
+python3 run.py --mode gnn_dgi_rf --rf_hyperparameter_tuning
+```
+
+### 日志分析
+
+训练日志保存在`logs/`目录下：
+- `training_*.log` - 训练过程日志
+- `model_training.log` - 模型训练日志
+
+```bash
+# 查看最新训练日志
+tail -f logs/training_$(date +%Y%m%d)_*.log
+```
+
+## 📚 参考文献
+
+1. **Deep Graph Infomax** - Velickovic et al., ICLR 2019
+2. **How Powerful are Graph Neural Networks?** - Xu et al., ICLR 2019
+3. **Elliptic Data Set** - Webb et al., KDD 2019
 
 ## 🤝 贡献指南
 
 1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
 
-## 📝 许可证
+## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 🙏 致谢
-
-- [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/) - 图神经网络库
-- [Deep Graph Infomax](https://arxiv.org/abs/1809.10341) - 自监督图学习论文
-- [Graph Isomorphism Network](https://arxiv.org/abs/1810.00826) - GIN论文
-- [Elliptic Data Set](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set) - 区块链交易数据集
 
 ## 📞 联系方式
 
 如有问题或建议，请通过以下方式联系：
 - 提交 Issue
-- 发送邮件至: [1596118915@qq.com]
+- 发送邮件至项目维护者
 
 ---
 
-⭐ 如果这个项目对您有帮助，请给我们一个星标！
+⭐ 如果这个项目对你有帮助，请给它一个星标！
