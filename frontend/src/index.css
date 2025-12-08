@@ -1,0 +1,210 @@
+/* 全局响应式优化样式 */
+
+/* 移动设备优化 */
+@media (max-width: 576px) {
+  .App {
+    padding-top: 60px;
+  }
+  
+  .prediction-form,
+  .results-table,
+  .dashboard,
+  .batch-analysis {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .card-body {
+    padding: 1rem !important;
+  }
+  
+  .btn {
+    padding: 0.6rem 1rem !important;
+    font-size: 0.9rem !important;
+  }
+  
+  .table {
+    font-size: 0.8rem;
+  }
+  
+  .navbar-brand {
+    font-size: 1rem;
+  }
+  
+  .nav-tabs .nav-link {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .badge {
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+  
+  code {
+    font-size: 0.75rem !important;
+    word-break: break-all;
+  }
+  
+  h2 {
+    font-size: 1.5rem !important;
+  }
+  
+  h3 {
+    font-size: 1.25rem !important;
+  }
+  
+  h4 {
+    font-size: 1.1rem !important;
+  }
+  
+  .progress {
+    height: 6px !important;
+  }
+}
+
+/* 平板设备优化 */
+@media (min-width: 577px) and (max-width: 768px) {
+  .prediction-form,
+  .results-table,
+  .dashboard,
+  .batch-analysis {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .card-body {
+    padding: 1.25rem !important;
+  }
+  
+  .btn {
+    padding: 0.7rem 1.2rem !important;
+  }
+  
+  .table {
+    font-size: 0.85rem;
+  }
+  
+  .navbar-brand {
+    font-size: 1.1rem;
+  }
+  
+  h2 {
+    font-size: 1.75rem !important;
+  }
+  
+  h3 {
+    font-size: 1.4rem !important;
+  }
+  
+  h4 {
+    font-size: 1.2rem !important;
+  }
+}
+
+/* 大屏设备优化 */
+@media (min-width: 769px) and (max-width: 992px) {
+  .prediction-form,
+  .results-table,
+  .dashboard,
+  .batch-analysis {
+    padding: 1.75rem;
+  }
+  
+  .table {
+    font-size: 0.9rem;
+  }
+  
+  h2 {
+    font-size: 1.9rem !important;
+  }
+}
+
+/* 超大屏设备优化 */
+@media (min-width: 1200px) {
+  .container-fluid {
+    max-width: 1400px;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
+  
+  .nav-link {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .form-control {
+    min-height: 44px;
+  }
+  
+  .card {
+    margin-bottom: 1rem;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  :root {
+    --card-border: #4a5568;
+    --text-secondary: #e2e8f0;
+    --text-muted: #a0aec0;
+  }
+  
+  .card {
+    border-width: 2px !important;
+  }
+  
+  .btn {
+    border-width: 2px !important;
+  }
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .navbar,
+  .nav-tabs,
+  .btn,
+  .spinner-border {
+    display: none !important;
+  }
+  
+  .App {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .card {
+    border: 1px solid black !important;
+    box-shadow: none !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .table {
+    color: black !important;
+  }
+  
+  .prediction-form,
+  .results-table,
+  .dashboard,
+  .batch-analysis {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: 1px solid black !important;
+  }
+}

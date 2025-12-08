@@ -1,0 +1,424 @@
+/* 区块链AML系统 - 现代化深色主题设计 */
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --success-gradient: linear-gradient(135deg, #13B497 0%, #59D4A4 100%);
+  --warning-gradient: linear-gradient(135deg, #FFA726 0%, #FF7043 100%);
+  --danger-gradient: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
+  
+  --dark-bg: #0a0e27;
+  --card-bg: #151932;
+  --card-border: #2a3f5f;
+  --text-primary: #ffffff;
+  --text-secondary: #a8b2d1;
+  --text-muted: #6b7c93;
+  
+  --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 8px 16px rgba(0, 0, 0, 0.2);
+  --shadow-strong: 0 16px 32px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.App {
+  min-height: 100vh;
+  background: var(--dark-bg);
+  background-image: 
+    radial-gradient(at 40% 20%, rgba(102, 126, 234, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(118, 75, 162, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(240, 147, 251, 0.05) 0px, transparent 50%);
+}
+
+/* 导航栏样式 */
+.navbar {
+  background: rgba(21, 25, 50, 0.95) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--card-border);
+  box-shadow: var(--shadow-medium);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.4rem;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.nav-link {
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.nav-link:hover {
+  color: var(--text-primary) !important;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--primary-gradient);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.nav-link:hover::after {
+  width: 80%;
+}
+
+/* 选项卡样式 */
+.nav-tabs {
+  border-bottom: 2px solid var(--card-border);
+  margin-bottom: 2rem !important;
+}
+
+.nav-tabs .nav-link {
+  color: var(--text-secondary);
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  padding: 1rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--text-primary);
+  background: var(--primary-gradient);
+  border-radius: 8px 8px 0 0;
+}
+
+/* 卡片样式 */
+.prediction-form,
+.results-table,
+.dashboard,
+.batch-analysis {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow-medium);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.prediction-form:hover,
+.results-table:hover,
+.dashboard:hover,
+.batch-analysis:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-strong);
+}
+
+.card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-soft) !important;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-medium) !important;
+}
+
+.card-header {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+  border-bottom: 1px solid var(--card-border) !important;
+  border-radius: 16px 16px 0 0 !important;
+  padding: 1.5rem !important;
+}
+
+.card-body {
+  padding: 1.5rem !important;
+}
+
+/* 表单样式 */
+.form-control {
+  background: rgba(26, 32, 53, 0.8) !important;
+  border: 1px solid var(--card-border) !important;
+  color: var(--text-primary) !important;
+  border-radius: 8px !important;
+  padding: 0.75rem 1rem !important;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  background: rgba(26, 32, 53, 1) !important;
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+  color: var(--text-primary) !important;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.form-label {
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.form-text {
+  color: var(--text-muted) !important;
+}
+
+/* 按钮样式 */
+.btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 0.75rem 1.5rem !important;
+  transition: all 0.3s ease !important;
+  border: none !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: var(--primary-gradient) !important;
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium);
+}
+
+.btn-outline-primary {
+  background: transparent !important;
+  border: 2px solid #667eea !important;
+  color: #667eea !important;
+}
+
+.btn-outline-primary:hover {
+  background: var(--primary-gradient) !important;
+  border-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.btn-success {
+  background: var(--success-gradient) !important;
+}
+
+.btn-warning {
+  background: var(--warning-gradient) !important;
+}
+
+.btn-danger {
+  background: var(--danger-gradient) !important;
+}
+
+/* 表格样式 */
+.table {
+  color: var(--text-primary) !important;
+}
+
+.table thead th {
+  background: rgba(102, 126, 234, 0.1) !important;
+  border-bottom: 2px solid var(--card-border) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  padding: 1rem !important;
+}
+
+.table tbody td {
+  border-bottom: 1px solid rgba(42, 63, 95, 0.5) !important;
+  padding: 1rem !important;
+  vertical-align: middle !important;
+}
+
+.table tbody tr:hover {
+  background: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* 徽章样式 */
+.badge {
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}
+
+.bg-success {
+  background: var(--success-gradient) !important;
+}
+
+.bg-warning {
+  background: var(--warning-gradient) !important;
+}
+
+.bg-danger {
+  background: var(--danger-gradient) !important;
+}
+
+.bg-primary {
+  background: var(--primary-gradient) !important;
+}
+
+/* 警告框样式 */
+.alert {
+  border-radius: 12px !important;
+  border: none !important;
+  padding: 1rem 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.alert-info {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+  color: var(--text-primary) !important;
+  border-left: 4px solid #667eea !important;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, rgba(19, 180, 151, 0.1) 0%, rgba(89, 212, 164, 0.1) 100%) !important;
+  color: var(--text-primary) !important;
+  border-left: 4px solid #13B497 !important;
+}
+
+.alert-danger {
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, rgba(233, 30, 99, 0.1) 100%) !important;
+  color: var(--text-primary) !important;
+  border-left: 4px solid #F44336 !important;
+}
+
+/* 进度条样式 */
+.progress {
+  background: rgba(26, 32, 53, 0.8) !important;
+  border-radius: 8px !important;
+  height: 8px !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.progress-bar {
+  border-radius: 8px !important;
+  transition: all 0.3s ease;
+}
+
+/* 代码样式 */
+code {
+  background: rgba(26, 32, 53, 0.8) !important;
+  color: #e83e8c !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 4px !important;
+  font-size: 0.875rem !important;
+  border: 1px solid var(--card-border);
+}
+
+/* 标题样式 */
+h2, h3, h4, h5 {
+  color: var(--text-primary) !important;
+  font-weight: 700 !important;
+  margin-bottom: 1.5rem !important;
+}
+
+h2 {
+  font-size: 2rem !important;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+h3 {
+  font-size: 1.5rem !important;
+}
+
+h4 {
+  font-size: 1.25rem !important;
+}
+
+/* 加载动画 */
+.spinner-border {
+  border: 3px solid rgba(102, 126, 234, 0.2) !important;
+  border-top: 3px solid #667eea !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .prediction-form,
+  .results-table,
+  .dashboard,
+  .batch-analysis {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .card-body {
+    padding: 1rem !important;
+  }
+  
+  .btn {
+    padding: 0.6rem 1.2rem !important;
+  }
+  
+  .table {
+    font-size: 0.875rem;
+  }
+  
+  .navbar-brand {
+    font-size: 1.2rem;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.prediction-form,
+.results-table,
+.dashboard,
+.batch-analysis,
+.card {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
