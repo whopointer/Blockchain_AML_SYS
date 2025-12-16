@@ -9,6 +9,11 @@ import logging
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 确保当前目录在路径中
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from controllers.prediction_controller import PredictionController
 from routes import register_routes
 from flask import Flask
@@ -44,10 +49,8 @@ def initialize_model():
         logger.error(f"模型初始化错误: {e}")
 
 
-@app.before_first_request
-def initialize():
-    """应用初始化"""
-    initialize_model()
+# 初始化模型
+initialize_model()
 
 
 if __name__ == '__main__':

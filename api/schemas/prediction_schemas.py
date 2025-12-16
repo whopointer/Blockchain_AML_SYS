@@ -89,6 +89,8 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """健康检查响应"""
+    model_config = {"protected_namespaces": ()}
+    
     status: str = Field(..., description="服务状态")
     timestamp: str = Field(..., description="检查时间戳")
     model_loaded: bool = Field(..., description="模型是否已加载")
@@ -96,6 +98,8 @@ class HealthResponse(BaseModel):
 
 class StatisticsResponse(BaseModel):
     """统计信息响应"""
+    model_config = {"protected_namespaces": ()}
+    
     system_status: str = Field(..., description="系统状态")
     model_loaded: bool = Field(..., description="模型是否已加载")
     timestamp: str = Field(..., description="统计时间戳")
