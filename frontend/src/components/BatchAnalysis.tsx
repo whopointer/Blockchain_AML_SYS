@@ -16,7 +16,14 @@ const BatchAnalysis: React.FC = () => {
       const batchResults = await api.batchPredict();
       setResults(batchResults);
     } catch (err: any) {
-      setError(err.response?.data?.error || '批量分析失败，请重试');
+      const errorMessage = err.response?.data?.error || '批量分析失败，请重试';
+      console.error('批量分析错误:', err);
+      setError(errorMessage);
+      
+      // 如果是模型未加载的错误，提示用户先加载模型
+      if (errorMessage.includes('模型') || errorMessage.includes('model')) {
+        setError('模型未加载，请先在系统仪表板中加载模型后再进行批量分析');
+      }
     } finally {
       setLoading(false);
     }

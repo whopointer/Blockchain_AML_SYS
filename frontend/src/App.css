@@ -7,12 +7,12 @@
   --warning-gradient: linear-gradient(135deg, #FFA726 0%, #FF7043 100%);
   --danger-gradient: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
   
-  --dark-bg: #0a0e27;
-  --card-bg: #151932;
-  --card-border: #2a3f5f;
+  --dark-bg: #1a3a52;
+  --card-bg: #244963;
+  --card-border: #3a5f7f;
   --text-primary: #ffffff;
-  --text-secondary: #a8b2d1;
-  --text-muted: #6b7c93;
+  --text-secondary: #d8e3f0;
+  --text-muted: #9bb3c8;
   
   --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-medium: 0 8px 16px rgba(0, 0, 0, 0.2);

@@ -28,7 +28,14 @@ const PredictionForm: React.FC<PredictionFormProps> = ({ onPredictionComplete })
       const results = await api.predictTransactions(request);
       onPredictionComplete(results);
     } catch (err: any) {
-      setError(err.response?.data?.error || '预测失败，请重试');
+      const errorMessage = err.response?.data?.error || '预测失败，请重试';
+      console.error('预测错误:', err);
+      setError(errorMessage);
+      
+      // 如果是模型未加载的错误，提示用户先加载模型
+      if (errorMessage.includes('模型') || errorMessage.includes('model')) {
+        setError('模型未加载，请先在系统仪表板中加载模型后再进行检测');
+      }
     } finally {
       setLoading(false);
     }
