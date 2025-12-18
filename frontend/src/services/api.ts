@@ -17,7 +17,7 @@ export interface PredictionRequest {
 export interface PredictionResult {
   tx_id: string;
   is_suspicious: boolean;
-  confidence_score: number;
+  confidence: number;
   risk_level: 'low' | 'medium' | 'high';
 }
 
@@ -81,6 +81,10 @@ export const api = {
   // 获取预测摘要
   getPredictionSummary: (results: PredictionResult[]): Promise<any> => 
     apiClient.post('/summary', { results }).then(response => response.data),
+
+  // 洗钱路径追踪
+  traceMoneyLaundering: (txId: string, maxDepth: number): Promise<any> => 
+    apiClient.post('/trace', { tx_id: txId, max_depth: maxDepth }).then(response => response.data),
 };
 
 export default api;

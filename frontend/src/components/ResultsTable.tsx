@@ -123,21 +123,27 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
                     <div className="d-flex justify-content-between align-items-center mb-1">
                       <small className="text-muted">置信度</small>
                       <small className="font-weight-bold">
-                        {(result.confidence_score * 100).toFixed(1)}%
+                        {result.confidence != null && !isNaN(result.confidence)
+                          ? `${(result.confidence * 100).toFixed(1)}%`
+                          : 'N/A'}
                       </small>
                     </div>
                     <div className="progress" style={{ height: '8px' }}>
                       <div
                         className={`progress-bar ${
-                          result.confidence_score > 0.8 ? 'bg-success' : 
-                          result.confidence_score > 0.6 ? 'bg-warning' : 'bg-danger'
+                          result.confidence > 0.8 ? 'bg-success' : 
+                          result.confidence > 0.6 ? 'bg-warning' : 'bg-danger'
                         }`}
                         role="progressbar"
                         style={{ 
-                          width: `${result.confidence_score * 100}%`,
+                          width: result.confidence != null && !isNaN(result.confidence)
+                            ? `${result.confidence * 100}%`
+                            : '0%',
                           transition: 'width 0.6s ease'
                         }}
-                        aria-valuenow={result.confidence_score * 100}
+                        aria-valuenow={result.confidence != null && !isNaN(result.confidence) 
+                          ? result.confidence * 100 
+                          : 0}
                         aria-valuemin={0}
                         aria-valuemax={100}
                       />

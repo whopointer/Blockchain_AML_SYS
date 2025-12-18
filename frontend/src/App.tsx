@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import PredictionForm from './components/PredictionForm';
 import ResultsTable from './components/ResultsTable';
 import BatchAnalysis from './components/BatchAnalysis';
+import MoneyLaunderingTrace from './components/MoneyLaunderingTrace';
 import { PredictionResponse } from './services/api';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
               <Nav.Link href="#dashboard">系统仪表板</Nav.Link>
               <Nav.Link href="#prediction">交易检测</Nav.Link>
               <Nav.Link href="#batch">批量分析</Nav.Link>
+              <Nav.Link href="#trace">路径追踪</Nav.Link>
             </Nav>
           </Navbar.Collapse>
         </Container>
@@ -59,6 +61,9 @@ function App() {
               </Tab>
               <Tab eventKey="batch" title="📊 批量分析">
                 <BatchAnalysis />
+              </Tab>
+              <Tab eventKey="trace" title="🔗 洗钱路径追踪">
+                <MoneyLaunderingTrace />
               </Tab>
             </Tabs>
           </Col>
