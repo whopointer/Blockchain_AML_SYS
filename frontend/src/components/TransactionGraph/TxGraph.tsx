@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import * as d3 from "d3";
 import { NodeItem, LinkItem } from "./types";
 import TxDetail from "./TxDetail";
@@ -8,11 +8,68 @@ interface TxGraphProps {
   links?: LinkItem[];
   width: number;
   height: number;
+  filter?: {
+    txType: "all" | "inflow" | "outflow";
+    addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: Date | null;
+    endDate?: Date | null;
+  };
+  onFilterChange?: (v: {
+    txType: "all" | "inflow" | "outflow";
+    addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: Date | null;
+    endDate?: Date | null;
+  }) => void;
 }
 
-const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
+const TxGraph: React.FC<TxGraphProps> = ({
+  nodes,
+  links,
+  width,
+  height,
+  filter,
+  onFilterChange,
+}) => {
   const [selectedLink, setSelectedLink] = useState<LinkItem | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [internalFilter, setInternalFilter] = useState<{
+    txType: "all" | "inflow" | "outflow";
+    addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: Date | null;
+    endDate?: Date | null;
+  }>({ txType: "all", addrType: "all", startDate: null, endDate: null });
+
+  const useFilter = useMemo(
+    () => filter ?? internalFilter,
+    [filter, internalFilter]
+  );
+
+  useEffect(() => {
+    if (filter !== undefined) {
+      setInternalFilter((prev) => {
+        const hasChanged =
+          prev.txType !== filter.txType ||
+          prev.addrType !== filter.addrType ||
+          prev.minAmount !== filter.minAmount ||
+          prev.maxAmount !== filter.maxAmount ||
+          (prev.startDate?.getTime?.() || null) !==
+            (filter.startDate?.getTime?.() || null) ||
+          (prev.endDate?.getTime?.() || null) !==
+            (filter.endDate?.getTime?.() || null);
+
+        if (hasChanged) {
+          return { ...filter };
+        }
+        return prev;
+      });
+    }
+  }, [filter]);
 
   const colorForNode = (v: number, type: string) => {
     if (v > 0) return "#FF6B6B";
@@ -31,18 +88,15 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
     const centerY = height / 2;
     const layerSpacing = 200;
 
-    // 找到根（layer===0）
     const root = nodes.find((n) => n.layer === 0) || nodes[0];
     if (!root) return { nodes, links };
     root.x = centerX;
     root.y = centerY;
 
-    // 确保所有节点都有 layer（默认 0）
     nodes.forEach((n) => {
       if (n.layer === undefined || n.layer === null) n.layer = 0;
     });
 
-    // 按 layer 分组
     const layers: { [key: number]: NodeItem[] } = {};
     nodes.forEach((n) => {
       const l = n.layer as number;
@@ -50,14 +104,12 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       layers[l].push(n);
     });
 
-    // 对每一层设置 x,y：layer 0 在中间，正数层在右边，负数层在左边
     Object.keys(layers)
       .map((k) => Number(k))
       .forEach((layer) => {
         const group = layers[layer];
         const x = centerX + layer * layerSpacing;
 
-        // 为该层计算垂直间距，使节点围绕 centerY 居中分布
         const count = group.length;
         const maxSpacing = 100;
         const minSpacing = 40;
@@ -68,7 +120,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
         const startY = centerY - (spacing * (count - 1)) / 2;
 
         group.forEach((node, i) => {
-          // 中心根节点保持在 center
           if (node === root) {
             node.x = centerX;
             node.y = centerY;
@@ -84,11 +135,112 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
+  const nodesWithPositionRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map()
+  );
+  const transformRef = useRef<{
+    x: number;
+    y: number;
+    k: number;
+  }>({ x: 0, y: 0, k: 1 });
+
+  // 计算筛选后的节点与连线
+  const { filteredNodes, filteredLinks } = useMemo(() => {
+    if (!nodes || !links) return { filteredNodes: [], filteredLinks: [] };
+
+    const root = nodes.find((n) => n.layer === 0) || nodes[0];
+
+    let byTx = links.slice();
+    if (useFilter.txType === "inflow") {
+      byTx = byTx.filter((l) => l.to === root.id);
+    } else if (useFilter.txType === "outflow") {
+      byTx = byTx.filter((l) => l.from === root.id);
+    }
+
+    // 按金额范围过滤
+    const minAmount = useFilter.minAmount ?? 0;
+    const maxAmount = useFilter.maxAmount ?? Number.MAX_VALUE;
+    byTx = byTx.filter((l) => l.val >= minAmount && l.val <= maxAmount);
+
+    // 按时间范围过滤（精确到秒）
+    if (useFilter.startDate || useFilter.endDate) {
+      const startTimestamp = useFilter.startDate
+        ? new Date(useFilter.startDate).getTime()
+        : 0;
+      const endTimestamp = useFilter.endDate
+        ? new Date(useFilter.endDate).getTime()
+        : Number.MAX_VALUE;
+      byTx = byTx.filter((l) => {
+        const txTimestamp = new Date(l.tx_time).getTime();
+        return txTimestamp >= startTimestamp && txTimestamp <= endTimestamp;
+      });
+    }
+
+    const matchAddr = (n: NodeItem) => {
+      const isTagged = !!(n.label && !n.label.startsWith("0x"));
+      const isMalicious = !!(n.malicious && n.malicious > 0);
+      if (useFilter.addrType === "all") return true;
+      if (useFilter.addrType === "tagged") return isTagged;
+      if (useFilter.addrType === "malicious") return isMalicious;
+      if (useFilter.addrType === "normal") return !isTagged && !isMalicious;
+      if (useFilter.addrType === "tagged_malicious")
+        return isTagged || isMalicious;
+      return true;
+    };
+
+    const nodeSet = new Set<string>();
+    byTx.forEach((l) => {
+      nodeSet.add(l.from);
+      nodeSet.add(l.to);
+    });
+
+    const filteredNodes = nodes.filter(
+      (n) => n === root || (nodeSet.has(n.id) && matchAddr(n))
+    );
+
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredLinks = byTx.filter(
+      (l) => filteredNodeIds.has(l.from) && filteredNodeIds.has(l.to)
+    );
+
+    return { filteredNodes, filteredLinks };
+  }, [
+    nodes,
+    links,
+    useFilter.txType,
+    useFilter.addrType,
+    useFilter.minAmount,
+    useFilter.maxAmount,
+    useFilter.startDate,
+    useFilter.endDate,
+  ]);
 
   // 当 props 中的 nodes/links 更新时执行绘图
   useEffect(() => {
-    if (!nodes || !links) return;
-    const layout = computePositions([...nodes], [...links], width, height);
+    if (!filteredNodes || !filteredLinks) return;
+
+    let layout: { nodes: NodeItem[]; links: LinkItem[] };
+    const hasExistingPositions = filteredNodes.every((n) =>
+      nodesWithPositionRef.current.has(n.id)
+    );
+
+    if (hasExistingPositions) {
+      const layoutNodes = filteredNodes.map((n) => {
+        const saved = nodesWithPositionRef.current.get(n.id);
+        return saved ? { ...n, x: saved.x, y: saved.y } : n;
+      });
+      layout = { nodes: layoutNodes, links: filteredLinks };
+    } else {
+      layout = computePositions(
+        [...filteredNodes],
+        [...filteredLinks],
+        width,
+        height
+      );
+      layout.nodes.forEach((n) => {
+        nodesWithPositionRef.current.set(n.id, { x: n.x!, y: n.y! });
+      });
+    }
 
     const svg = d3.select(svgRef.current as unknown as SVGSVGElement);
     const g = d3.select(gRef.current as unknown as SVGGElement);
@@ -103,12 +255,11 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       .attr("markerWidth", 8)
       .attr("markerHeight", 8)
       .attr("markerUnits", "strokeWidth")
-      .attr("orient", "auto") // 随连线方向自动旋转
+      .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-5L10,0L0,5")
       .attr("fill", "#bbb");
 
-    // 清空
     g.selectAll("*").remove();
 
     // 链接（直线）
@@ -138,7 +289,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       .attr("stroke", "#bbb")
       .attr("stroke-width", 2)
       .on("click", function (event, d) {
-        // 点击边时设置选中的边并显示详情弹窗
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
@@ -150,10 +300,8 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       .enter()
       .append("polygon")
       .attr("class", "link-arrow")
-      // 三角形基于局部坐标 (0,0) 为箭头尖，其余两点在左侧
       .attr("points", "5,0 -10,6 -10,-6")
       .attr("fill", "#bbb")
-      // 用 data-scale 保存当前缩放，默认 1（便于在拖拽时保持缩放）
       .attr("data-scale", "1")
       .attr("transform", (d: any) => {
         const s = layout.nodes.find((n) => n.id === d.from) as any;
@@ -164,7 +312,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
         return `translate(${mx},${my}) rotate(${angle}) scale(1)`;
       })
       .on("click", function (event, d) {
-        // 点击箭头时也触发边的点击事件
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
@@ -185,20 +332,17 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       .attr("y", (d: any) => {
         const s = layout.nodes.find((n) => n.id === d.from) as any;
         const t = layout.nodes.find((n) => n.id === d.to) as any;
-        // 将标签位置稍微偏移，使其显示在线段上方
         const dx = t.x - s.x;
         const dy = t.y - s.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        // 垂直偏移量，使文本在线段上方
         const offset = 8;
         return (s.y + t.y) / 2 - (dx / distance) * offset;
       })
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "#fff")
-      .attr("pointer-events", "none") // 确保不会干扰鼠标的交互
+      .attr("pointer-events", "none")
       .on("click", function (event, d) {
-        // 点击标签时也触发边的点击事件
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
@@ -208,13 +352,11 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
     linkLines
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke", "#eee").attr("stroke-width", 4);
-        // 高亮并放大对应箭头
         g.selectAll("polygon.link-arrow")
           .filter((ad: any) => ad === d)
           .each(function (ad: any) {
             const poly = d3.select(this);
             poly.attr("fill", "#eee").attr("data-scale", "1.4");
-            // 重新设置 transform（包含当前 scale）
             const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
             const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
             const mx = (sNode.x + tNode.x) / 2;
@@ -256,7 +398,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
             );
           });
 
-        // 恢复连接线标签样式
         g.selectAll("text.link-label")
           .filter((ad: any) => ad === d)
           .attr("font-weight", "normal")
@@ -289,7 +430,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
       .attr("font-size", 10)
       .attr("fill", "#eee");
 
-    // 格式化 title：若长度 > 14，保留前7位和后7位，中间用 "..." 连接
     nodeGroup
       .append("text")
       .text((d: any) => {
@@ -309,17 +449,14 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
     const dragHandler = d3
       .drag<SVGGElement, NodeItem>()
       .on("start", function (event, d) {
-        // 阻止缩放响应
         if (event.sourceEvent) (event.sourceEvent as any).stopPropagation();
         d3.select(this).raise();
       })
       .on("drag", function (event, d) {
-        // 更新数据坐标
         d.x = event.x;
         d.y = event.y;
-        // 更新节点位置
+        nodesWithPositionRef.current.set(d.id, { x: d.x || 0, y: d.y || 0 });
         d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
-        // 更新连线坐标（重新从 layout.nodes 中读取坐标）
         linksSel
           .attr("x1", function (l: any) {
             return (layout.nodes.find((n) => n.id === l.from) as any).x;
@@ -333,7 +470,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
           .attr("y2", function (l: any) {
             return (layout.nodes.find((n) => n.id === l.to) as any).y;
           });
-        // 同步更新中点箭头位置与方向（保留每个箭头当前 data-scale）
         g.selectAll("polygon.link-arrow").attr("transform", function (l: any) {
           const s = layout.nodes.find((n) => n.id === l.from) as any;
           const t = layout.nodes.find((n) => n.id === l.to) as any;
@@ -344,7 +480,6 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
           return `translate(${mx},${my}) rotate(${angle}) scale(${curScale})`;
         });
 
-        // 同步更新连线标签位置
         g.selectAll("text.link-label")
           .attr("x", function (l: any) {
             const s = layout.nodes.find((n) => n.id === l.from) as any;
@@ -354,11 +489,9 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
           .attr("y", function (l: any) {
             const s = layout.nodes.find((n) => n.id === l.from) as any;
             const t = layout.nodes.find((n) => n.id === l.to) as any;
-            // 将标签位置稍微偏移，使其显示在线段上方
             const dx = t.x - s.x;
             const dy = t.y - s.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            // 垂直偏移量，使文本在线段上方
             const offset = 8;
             return (s.y + t.y) / 2 - (dx / distance) * offset;
           });
@@ -372,26 +505,43 @@ const TxGraph: React.FC<TxGraphProps> = ({ nodes, links, width, height }) => {
         .zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.5, 2])
         .on("zoom", (event) => {
+          transformRef.current = {
+            x: event.transform.x,
+            y: event.transform.y,
+            k: event.transform.k,
+          };
           g.attr("transform", event.transform as any);
         })
     );
 
-    // 初始将根节点居中（把根移到视图中心）
-    const root = nodes.find((n) => n.layer === 0) as any;
-    if (root && root.x <= 0) {
-      const tx = width / 2 - root.x;
-      const ty = height / 2 - root.y;
-      g.attr("transform", `translate(${tx},${ty})`);
+    // 恢复之前保存的缩放和拖动位置
+    const savedTransform = transformRef.current;
+    if (
+      savedTransform.k !== 1 ||
+      savedTransform.x !== 0 ||
+      savedTransform.y !== 0
+    ) {
+      g.attr(
+        "transform",
+        `translate(${savedTransform.x},${savedTransform.y}) scale(${savedTransform.k})`
+      );
+    } else {
+      const root = nodes
+        ? (nodes.find((n) => n.layer === 0) as any)
+        : undefined;
+      if (root && root.x && root.x > 0) {
+        const tx = width / 2 - root.x;
+        const ty = height / 2 - root.y;
+        g.attr("transform", `translate(${tx},${ty})`);
+      }
     }
 
-    // 添加点击SVG背景关闭详情弹窗的功能
     svg.on("click", function (event) {
-      // 只有当点击的是SVG背景而不是元素时才关闭
       if (event.target === this) {
         setShowDetail(false);
       }
     });
-  }, [nodes, links, width, height]);
+  }, [filteredNodes, filteredLinks, nodes, width, height]);
 
   const handleCloseDetail = () => {
     setShowDetail(false);

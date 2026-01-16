@@ -114,7 +114,7 @@
         "tx_hash_list": [
           "0xad342fa679b852009c5887201fb657151589bdb78e727f68c40929f6eaf4e9b6"
         ],
-        "tx_time": "07-05 01:57",
+        "tx_time": "2025-07-05 01:57",
         "color": {
           "color": "#99b4d7",
           "highlight": "#99b4d7"
@@ -125,7 +125,7 @@
         "to": "33745a5d-46ce-4ef9-8d88-38c71138b2af",
         "label": "2711.0479 BNB",
         "val": 2711.0479,
-        "tx_time": "07-03 04:54",
+        "tx_time": "2025-07-03 04:54",
         "tx_hash_list": [
           "0x32c950ddcafe5484a33d0f67088cd35bb534339642af6bee0b95130cf65ff258",
           "0x5d1f2a809e89ba51875480fa647136f96a5699ca826a83e0a812234f9a2a51c7",
@@ -141,7 +141,7 @@
         "to": "c4ea0b04-824f-46ef-9a05-a9a737eaf3d7",
         "label": "100.0 BNB",
         "val": 100.0,
-        "tx_time": "07-03 04:41",
+        "tx_time": "2025-07-03 04:41",
         "tx_hash_list": [
           "0x875cf6ae04e453749b0cef972bb9b9bb83feb6e718645374fbb47f0ddaf841bb"
         ]
@@ -151,7 +151,7 @@
         "to": "25dd6ad2-dd24-4f49-a609-69270dc6d6a2",
         "label": "2800.0 BNB",
         "val": 2800.0,
-        "tx_time": "07-03 04:37",
+        "tx_time": "2025-07-03 04:37",
         "tx_hash_list": [
           "0x50da112db3b0233dd059dd3bc0ca22f227e0cb7387ff116bc9c0b5cd31329d61",
           "0x89f3b2238f7815b25ce129ba44830f56eaaeddf39ae46e28670fb3492c3e40af",
@@ -170,7 +170,7 @@
         "to": "18e38384-2d55-4c9e-88a4-5fb447cb2d7d",
         "label": "1399.0 BNB",
         "val": 1399.0,
-        "tx_time": "07-03 04:30",
+        "tx_time": "2025-07-03 04:30",
         "tx_hash_list": [
           "0xa01365e6dd30193facd065aa097874009077767a24594f7c53bf0831c4e02afa",
           "0xedd104aec7246e50819f48131a937a72d79ad2f02c05bb456fcf805efabfd452",
@@ -189,7 +189,7 @@
           "0xe361d7e2ff10292e312eb91eae60011859e6f51dace598dbfdcf93cb1aa46309",
           "0x57e50e757335171902a8be48875a800e6bee4b16581d40525757e5f60fe05cdd"
         ],
-        "tx_time": "07-03 04:27",
+        "tx_time": "2025-07-03 04:27",
         "color": {
           "color": "#99b4d7",
           "highlight": "#99b4d7"
@@ -205,7 +205,7 @@
           "0xf88ecfcaca73a64463493190c9d98c61e4f1152daebf7750ec92d647dd065d4c",
           "0xfe8e3237d0c58700b635a607a5b98f22920c2d57ded684c0521a628b1cc3cf98"
         ],
-        "tx_time": "07-03 04:19",
+        "tx_time": "2025-07-03 04:19",
         "color": {
           "color": "#99b4d7",
           "highlight": "#99b4d7"

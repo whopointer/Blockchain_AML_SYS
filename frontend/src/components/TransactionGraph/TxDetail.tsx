@@ -1,6 +1,14 @@
 import React from "react";
 import { Modal } from "react-bootstrap";
-import { Table, Tag, TableProps, Space, Tooltip } from "antd";
+import {
+  Table,
+  Tag,
+  TableProps,
+  Space,
+  Tooltip,
+  message,
+  ConfigProvider,
+} from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
 import batchTxHashDetail from "./batch_tx_hash_detail.json";
@@ -36,8 +44,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
     navigator.clipboard
       .writeText(text)
       .then(() => {
-        // 可以在这里添加提示信息，如通知用户已复制
-        console.log("Copied to clipboard:", text);
+        message.success("复制成功");
       })
       .catch((err) => {
         console.error("Failed to copy: ", err);
@@ -87,7 +94,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
           <Tooltip title="复制">
             <CopyOutlined
               onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#1890ff" }}
+              style={{ cursor: "pointer", color: "#667eea" }}
             />
           </Tooltip>
         </Space>
@@ -112,7 +119,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
           <Tooltip title="复制">
             <CopyOutlined
               onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#1890ff" }}
+              style={{ cursor: "pointer", color: "#667eea" }}
             />
           </Tooltip>
         </Space>
@@ -126,7 +133,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
       sorter: (a: any, b: any) => a.value - b.value,
       sortDirections: ["descend", "ascend"],
       showSorterTooltip: false,
-      render: (value: number) => <Tag color="blue">{value} BNB</Tag>,
+      render: (value: number) => <Tag color="#667eea">{value} BNB</Tag>,
     },
     {
       title: "交易Hash",
@@ -147,7 +154,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
           <Tooltip title="复制">
             <CopyOutlined
               onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#1890ff" }}
+              style={{ cursor: "pointer", color: "#667eea" }}
             />
           </Tooltip>
         </Space>
@@ -156,21 +163,46 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
   ];
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" dialogClassName="modal-90w">
-      <Modal.Header closeButton>
-        <Modal.Title>交易明细</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <div>
-          <Table
-            dataSource={transactionData}
-            columns={columns}
-            pagination={{ pageSize: 10 }}
-            scroll={{ y: 400 }}
-          />
-        </div>
-      </Modal.Body>
-    </Modal>
+    <ConfigProvider
+      theme={{
+        components: {
+          Tooltip: {
+            colorTextLightSolid: "#000000",
+          },
+          Table: {
+            headerBg: "#244963",
+            headerColor: "#ffffff",
+            bodySortBg: "#1a3a52",
+            rowHoverBg: "#3a5f7f",
+          },
+        },
+      }}
+    >
+      <Modal
+        show={show}
+        onHide={onHide}
+        size="lg"
+        dialogClassName="modal-90w"
+        contentClassName="dark-modal"
+      >
+        <Modal.Header
+          closeButton
+          style={{ backgroundColor: "#244963", borderColor: "#3a5f7f" }}
+        >
+          <Modal.Title style={{ color: "#ffffff" }}>交易明细</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ backgroundColor: "#1a3a52", color: "#d8e3f0" }}>
+          <div>
+            <Table
+              dataSource={transactionData}
+              columns={columns}
+              pagination={{ pageSize: 10 }}
+              scroll={{ y: 400 }}
+            />
+          </div>
+        </Modal.Body>
+      </Modal>
+    </ConfigProvider>
   );
 };
 
