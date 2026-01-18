@@ -139,8 +139,14 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
       }
     });
 
-    const outgoingStatsArray = Object.values(outgoingMap);
-    const incomingStatsArray = Object.values(incomingMap);
+    const outgoingStatsArray = Object.values(outgoingMap).map((stat) => ({
+      ...stat,
+      key: stat.address,
+    }));
+    const incomingStatsArray = Object.values(incomingMap).map((stat) => ({
+      ...stat,
+      key: stat.address,
+    }));
 
     setOutgoingStats(outgoingStatsArray);
     setIncomingStats(incomingStatsArray);

@@ -10,6 +10,7 @@ import BatchAnalysis from "./components/BatchAnalysis";
 import MoneyLaunderingTrace from "./components/MoneyLaunderingTrace";
 import { PredictionResponse } from "./services/api";
 import TransactionGraph from "./components/TransactionGraph";
+import CaseDetails from "./components/CaseDetails";
 
 function App() {
   const [predictionResults, setPredictionResults] =
@@ -31,6 +32,7 @@ function App() {
               <Nav.Link href="#prediction">交易检测</Nav.Link>
               <Nav.Link href="#batch">批量分析</Nav.Link>
               <Nav.Link href="#trace">路径追踪</Nav.Link>
+              <Nav.Link href="#cases">案件详情</Nav.Link>
             </Nav>
           </Navbar.Collapse>
         </Container>
@@ -69,6 +71,9 @@ function App() {
               </Tab>
               <Tab eventKey="transactionGraph" title="📈 交易图谱">
                 <TransactionGraph />
+              </Tab>
+              <Tab eventKey="caseDetails" title="📋 案件详情">
+                <CaseDetails />
               </Tab>
             </Tabs>
           </Col>

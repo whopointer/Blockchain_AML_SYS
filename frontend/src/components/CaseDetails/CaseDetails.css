@@ -1,0 +1,255 @@
+/* 案件详情页样式 - 暗色主题 */
+
+.case-details-container {
+  padding: 20px;
+  background-color: #1a3a52;
+  min-height: 100vh;
+  color: #ffffff;
+}
+
+.case-details-header {
+  margin-bottom: 24px;
+  border-bottom: 2px solid #1890ff;
+  padding-bottom: 16px;
+}
+
+.case-details-header h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.case-details-header p {
+  margin-top: 8px;
+  color: #d8e3f0;
+  font-size: 14px;
+}
+
+/* 过滤区域 */
+.filter-section {
+  background-color: #244963;
+  padding: 16px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #3a5f7f;
+}
+
+.filter-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.filter-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-row > * {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* 统计卡片 */
+.stat-card {
+  text-align: center;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: #244963;
+  border: 1px solid #3a5f7f;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.stat-card-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-card-label {
+  font-size: 12px;
+  color: #d8e3f0;
+}
+
+.stat-card.high-risk .stat-card-value {
+  color: #ff4d4f;
+}
+
+.stat-card.medium-risk .stat-card-value {
+  color: #faad14;
+}
+
+.stat-card.total .stat-card-value {
+  color: #1890ff;
+}
+
+/* 表格样式 */
+.case-details-table {
+  margin-top: 16px;
+}
+
+.case-details-table :global(.ant-table) {
+  font-size: 13px;
+  background: #244963;
+  color: #ffffff;
+}
+
+.case-details-table :global(.ant-table-thead > tr > th) {
+  background-color: #244963;
+  font-weight: 600;
+  border-color: #3a5f7f;
+  color: #ffffff;
+}
+
+.case-details-table :global(.ant-table-cell) {
+  border-color: #3a5f7f;
+  color: #d8e3f0;
+}
+
+.case-details-table :global(.ant-table-row) {
+  background: #244963;
+  transition: background 0.3s ease;
+}
+
+.case-details-table :global(.ant-table-row:hover > td) {
+  background-color: rgba(102, 126, 234, 0.1);
+}
+
+/* 地址显示 */
+.address-text {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  word-break: break-all;
+  color: #d8e3f0;
+}
+
+/* 标签样式 */
+.snapshot-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+/* 抽屉样式 */
+.snapshot-drawer :global(.ant-drawer-body) {
+  padding: 24px;
+  background: #244963;
+  color: #ffffff;
+}
+
+.snapshot-drawer :global(.ant-drawer-header) {
+  background: #244963;
+  border-bottom: 1px solid #3a5f7f;
+}
+
+.snapshot-drawer :global(.ant-drawer-title) {
+  color: #ffffff;
+}
+
+.snapshot-details-section {
+  margin-bottom: 24px;
+}
+
+.snapshot-details-section h4 {
+  margin: 0 0 12px 0;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #d8e3f0;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-buttons :global(.ant-btn) {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* 描述列表样式 */
+:global(.ant-descriptions-bordered) {
+  border: 1px solid #3a5f7f !important;
+  border-radius: 8px;
+}
+
+:global(.ant-descriptions-bordered) :global(.ant-descriptions-item-label) {
+  background-color: rgba(26, 58, 82, 0.5);
+  color: #ffffff;
+}
+
+:global(.ant-descriptions-bordered) :global(.ant-descriptions-item-content) {
+  background-color: #244963;
+  color: #d8e3f0;
+}
+
+/* 主要卡片样式 */
+.case-details-card {
+  background: #244963 !important;
+  border: 1px solid #3a5f7f !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease;
+}
+
+.case-details-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 头部描述样式 */
+.case-details-header-description {
+  color: #d8e3f0 !important;
+  margin-top: 8px !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+  }
+
+  .filter-row > * {
+    min-width: auto;
+  }
+
+  .case-details-container {
+    padding: 12px;
+  }
+
+  .stat-card {
+    margin-bottom: 12px;
+  }
+
+  .case-details-table :global(.ant-table) {
+    font-size: 12px;
+  }
+
+  /* 添加移动端优化 */
+  .case-details-header h2 {
+    font-size: 20px;
+  }
+
+  .stat-card-value {
+    font-size: 20px;
+  }
+}

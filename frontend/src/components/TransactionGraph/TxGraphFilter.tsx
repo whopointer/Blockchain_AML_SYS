@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef } from "react";
+import React, { useMemo, useCallback, useRef, useEffect } from "react";
 import {
   Select,
   Row,
@@ -10,6 +10,7 @@ import {
   Space,
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
+import graphAnalysisData from "./address_graph_analysis.json";
 
 const { Option } = Select;
 
@@ -33,8 +34,17 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
     endDate?: dayjs.Dayjs | null;
   }>({});
 
-  const firstTxTime = useMemo(() => dayjs("2025-07-03 04:06:00"), []);
-  const latestTxTime = useMemo(() => dayjs("2025-07-05 01:57:00"), []);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const firstTxTime = useMemo(() => {
+    const timeStr = graphAnalysisData.graph_dic.first_tx_datetime;
+    return dayjs(timeStr + ":00");
+  }, []);
+
+  const latestTxTime = useMemo(() => {
+    const timeStr = graphAnalysisData.graph_dic.latest_tx_datetime;
+    return dayjs(timeStr + ":00");
+  }, []);
   const firstTxTimeMs = useMemo(() => firstTxTime.valueOf(), [firstTxTime]);
   const latestTxTimeMs = useMemo(() => latestTxTime.valueOf(), [latestTxTime]);
 
@@ -46,13 +56,26 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
   const debouncedOnChange = useCallback(
     (newFilter: FilterValue) => {
       if (onChange) {
-        requestAnimationFrame(() => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+
+        debounceTimerRef.current = setTimeout(() => {
           onChange(newFilter);
-        });
+          debounceTimerRef.current = null;
+        }, 5);
       }
     },
     [onChange]
   );
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const defaultValue = useMemo(
     () => ({
@@ -122,28 +145,28 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
     (date: Dayjs | null) => {
       if (!date) {
         const currentFilterValue = value || defaultValue;
-        onChange && onChange({ ...currentFilterValue, startDate: null });
+        debouncedOnChange({ ...currentFilterValue, startDate: null });
         return;
       }
       const startOfDay = date.startOf("day");
       const currentFilterValue = value || defaultValue;
-      onChange && onChange({ ...currentFilterValue, startDate: startOfDay });
+      debouncedOnChange({ ...currentFilterValue, startDate: startOfDay });
     },
-    [value, defaultValue, onChange]
+    [value, defaultValue, debouncedOnChange]
   );
 
   const handleEndDateChange = useCallback(
     (date: Dayjs | null) => {
       if (!date) {
         const currentFilterValue = value || defaultValue;
-        onChange && onChange({ ...currentFilterValue, endDate: null });
+        debouncedOnChange({ ...currentFilterValue, endDate: null });
         return;
       }
       const endOfDay = date.endOf("day");
       const currentFilterValue = value || defaultValue;
-      onChange && onChange({ ...currentFilterValue, endDate: endOfDay });
+      debouncedOnChange({ ...currentFilterValue, endDate: endOfDay });
     },
-    [value, defaultValue, onChange]
+    [value, defaultValue, debouncedOnChange]
   );
 
   return (
@@ -184,7 +207,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
               value={value?.txType || "all"}
               onChange={(val) => {
                 const currentFilterValue = value || defaultValue;
-                onChange && onChange({ ...currentFilterValue, txType: val });
+                debouncedOnChange({ ...currentFilterValue, txType: val });
               }}
               style={{ width: "100%" }}
             >
@@ -199,7 +222,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
               value={value?.addrType || "all"}
               onChange={(val) => {
                 const currentFilterValue = value || defaultValue;
-                onChange && onChange({ ...currentFilterValue, addrType: val });
+                debouncedOnChange({ ...currentFilterValue, addrType: val });
               }}
               style={{ width: "100%" }}
             >
@@ -228,11 +251,10 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
               value={value?.minAmount}
               onChange={(val) => {
                 const currentFilterValue = value || defaultValue;
-                onChange &&
-                  onChange({
-                    ...currentFilterValue,
-                    minAmount: val || undefined,
-                  });
+                debouncedOnChange({
+                  ...currentFilterValue,
+                  minAmount: val || undefined,
+                });
               }}
               style={{ width: "100%" }}
               min={0}
@@ -245,11 +267,10 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
               value={value?.maxAmount}
               onChange={(val) => {
                 const currentFilterValue = value || defaultValue;
-                onChange &&
-                  onChange({
-                    ...currentFilterValue,
-                    maxAmount: val || undefined,
-                  });
+                debouncedOnChange({
+                  ...currentFilterValue,
+                  maxAmount: val || undefined,
+                });
               }}
               style={{ width: "100%" }}
               min={0}

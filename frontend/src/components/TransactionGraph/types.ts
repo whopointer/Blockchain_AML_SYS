@@ -12,7 +12,7 @@ export interface NodeItem {
   shape?: string;
   image?: string;
   track?: string;
-  expended?: boolean;
+  expanded?: boolean;
   malicious?: number;
   exg?: number;
   x?: number;

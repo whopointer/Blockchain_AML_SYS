@@ -3,9 +3,10 @@ import TxGraph from "./TxGraph";
 import TxAnalysis from "./TxAnalysis";
 import TxGraphFilter from "./TxGraphFilter";
 import AddressInfo from "./AddressInfo";
+import GraphSnapshotButton from "./GraphSnapshotButton";
 import { NodeItem, LinkItem, sampleData } from "./types";
-import { ConfigProvider, Button, Row, Col } from "antd";
-import { CameraOutlined } from "@ant-design/icons";
+import graphAnalysisData from "./address_graph_analysis.json";
+import { ConfigProvider, Row, Col, message } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import zhCN from "antd/es/locale/zh_CN";
@@ -93,10 +94,23 @@ const TransactionGraph: React.FC = () => {
   // 获取当前地址信息（主节点）
   const mainNode = graphData.nodes?.find((node) => node.layer === 0);
 
-  const handleCreateSnapshot = () => {
+  const handleCreateSnapshot = (snapshotData: any) => {
     // 创建图谱快照的逻辑
-    console.log("创建图谱快照");
-    // TODO: 实现快照功能
+    console.log("创建图谱快照", snapshotData);
+
+    // 打印当前图谱的节点和边信息
+    console.log("=== 图谱快照信息 ===");
+    console.log("快照元数据:", {
+      title: snapshotData.title,
+      description: snapshotData.description,
+      tags: snapshotData.tags,
+    });
+
+    console.log("节点信息 (Nodes):", graphData.nodes);
+    console.log("边信息 (Links):", graphData.links);
+    console.log("筛选条件 (Filter):", filter);
+
+    message.success("图谱快照创建成功！");
   };
 
   return (
@@ -108,6 +122,8 @@ const TransactionGraph: React.FC = () => {
           colorTextBase: "#ffffff",
           colorBorder: "#3a5f7f",
           colorPrimary: "#667eea",
+          colorPrimaryBg: "#1e3a5f", // 选中选项的背景色 - 深蓝色
+          controlItemBgHover: "#305875", // 激活状态的背景色 - 稍亮的蓝色
         },
       }}
     >
@@ -118,9 +134,9 @@ const TransactionGraph: React.FC = () => {
         {/* 地址基本信息 */}
         <AddressInfo
           address={mainNode?.addr}
-          txCount={30} // 从 sampleData 获取的交易总次数
-          firstTxTime="2025-07-03 04:06"
-          latestTxTime="2025-07-05 01:57"
+          txCount={graphAnalysisData.graph_dic.tx_count}
+          firstTxTime={graphAnalysisData.graph_dic.first_tx_datetime}
+          latestTxTime={graphAnalysisData.graph_dic.latest_tx_datetime}
           isMalicious={mainNode?.malicious === 1}
         />
 
@@ -149,44 +165,39 @@ const TransactionGraph: React.FC = () => {
             </div>
           </Col>
           <Col>
-            <Button
-              type="primary"
-              icon={<CameraOutlined />}
-              onClick={handleCreateSnapshot}
-              // style={{ background: "#667eea" }}
-            >
-              创建图谱快照
-            </Button>
+            <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
           </Col>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              margin: "16px 0",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              {dimensions && (
-                <TxGraph
-                  nodes={graphData.nodes}
-                  links={graphData.links}
-                  width={dimensions.width}
-                  height={dimensions.height}
-                  filter={filter}
-                  onFilterChange={setFilter}
-                />
-              )}
-            </div>
-
-            {/* 交易分析（右侧） */}
-            <div style={{ width: "400px", minWidth: "400px", marginLeft: 20 }}>
-              <div style={{ marginBottom: 12 }}>
-                <TxGraphFilter value={filter} onChange={(v) => setFilter(v)} />
-              </div>
-              <TxAnalysis nodes={graphData.nodes} links={graphData.links} />
-            </div>
-          </div>
         </Row>
+
+        {/* 图表内容 */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            margin: "16px 0",
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            {dimensions && (
+              <TxGraph
+                nodes={graphData.nodes}
+                links={graphData.links}
+                width={dimensions.width}
+                height={dimensions.height}
+                filter={filter}
+                onFilterChange={setFilter}
+              />
+            )}
+          </div>
+
+          {/* 交易分析（右侧） */}
+          <div style={{ width: "400px", minWidth: "400px", marginLeft: 20 }}>
+            <div style={{ marginBottom: 12 }}>
+              <TxGraphFilter value={filter} onChange={(v) => setFilter(v)} />
+            </div>
+            <TxAnalysis nodes={graphData.nodes} links={graphData.links} />
+          </div>
+        </div>
       </div>
     </ConfigProvider>
   );
