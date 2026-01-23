@@ -158,12 +158,12 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <span className="text-secondary">模型版本</span>
-                    <span className="text-primary">{modelInfo.model_version}</span>
+                    <span className="text-primary">{modelInfo.model_version || '-'}</span>
                   </div>
                   <div className="d-flex justify-content-between align-items-center">
                     <span className="text-secondary">加载时间</span>
                     <small className="text-muted">
-                      {new Date(modelInfo.loaded_at).toLocaleString()}
+                      {modelInfo.loaded_at ? new Date(modelInfo.loaded_at).toLocaleString() : '-'}
                     </small>
                   </div>
                 </>
@@ -230,25 +230,25 @@ const Dashboard: React.FC = () => {
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <span className="text-secondary">准确率</span>
                     <span className="text-success font-weight-bold">
-                      {(modelInfo.performance_metrics.accuracy * 100).toFixed(2)}%
+                      {((modelInfo.performance_metrics.accuracy ?? 0) * 100).toFixed(2)}%
                     </span>
                   </div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <span className="text-secondary">精确率</span>
+                    <span className="text-secondary">auc</span>
                     <span className="text-info font-weight-bold">
-                      {(modelInfo.performance_metrics.precision * 100).toFixed(2)}%
+                      {((modelInfo.performance_metrics.auc ?? 0) * 100).toFixed(2)}%
                     </span>
                   </div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <span className="text-secondary">召回率</span>
+                    <span className="text-secondary">AP</span>
                     <span className="text-warning font-weight-bold">
-                      {(modelInfo.performance_metrics.recall * 100).toFixed(2)}%
+                      {((modelInfo.performance_metrics.average_precision ?? 0) * 100).toFixed(2)}%
                     </span>
                   </div>
                   <div className="d-flex justify-content-between align-items-center">
                     <span className="text-secondary">F1分数</span>
                     <span className="text-primary font-weight-bold">
-                      {(modelInfo.performance_metrics.f1_score * 100).toFixed(2)}%
+                      {((modelInfo.performance_metrics.f1_score ?? 0) * 100).toFixed(2)}%
                     </span>
                   </div>
                 </>

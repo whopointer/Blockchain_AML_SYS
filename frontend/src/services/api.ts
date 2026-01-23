@@ -30,13 +30,16 @@ export interface PredictionResponse {
 
 export interface ModelInfo {
   model_type: string;
-  model_version: string;
-  loaded_at: string;
-  performance_metrics: {
-    accuracy: number;
-    precision: number;
-    recall: number;
-    f1_score: number;
+  model_version?: string;
+  loaded_at?: string;
+  performance_metrics?: {
+    accuracy?: number;
+    precision?: number;
+    recall?: number;
+    f1_score?: number;
+    auc?: number;
+    average_precision?: number;
+    threshold?: number;
   };
 }
 

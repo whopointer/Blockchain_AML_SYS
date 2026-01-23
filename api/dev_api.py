@@ -6,15 +6,13 @@
 import os
 import sys
 
-# 获取项目根目录
-project_root = os.path.dirname(os.path.abspath(__file__))
+# 获取api目录与项目根目录
+api_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(api_dir)
 
-# 添加项目根目录到路径
+# 添加项目根目录与api目录到路径
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-
-# 添加api目录到路径
-api_dir = os.path.join(project_root, 'api')
 if api_dir not in sys.path:
     sys.path.insert(0, api_dir)
 
@@ -25,8 +23,8 @@ print("访问地址: http://localhost:5001")
 print("API健康检查: http://localhost:5001/api/v1/health")
 print("=" * 50)
 
-# 切换到api目录（确保数据路径正确）
-os.chdir(api_dir)
+# 切换到项目根目录（确保数据/模型路径正确）
+os.chdir(project_root)
 
 # 导入并启动Flask应用
 from api.app import app

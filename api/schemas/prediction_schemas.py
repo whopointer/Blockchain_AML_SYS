@@ -73,6 +73,9 @@ class BatchPredictionResponse(BaseModel):
 class ModelInfo(BaseModel):
     """模型信息"""
     model_type: str = Field(..., description="模型类型")
+    model_version: Optional[str] = Field(None, description="模型版本")
+    loaded_at: Optional[str] = Field(None, description="加载时间")
+    performance_metrics: Optional[Dict[str, Any]] = Field(None, description="性能指标")
     num_features: int = Field(..., gt=0, description="特征数量")
     num_classes: int = Field(..., gt=0, description="类别数量")
     hidden_channels: int = Field(..., gt=0, description="隐藏层维度")
@@ -82,6 +85,8 @@ class ModelInfo(BaseModel):
     experiment_name: str = Field(..., description="实验名称")
     checkpoint_dir: str = Field(..., description="检查点目录")
     status: str = Field(..., description="模型状态")
+    threshold: Optional[float] = Field(None, description="推理阈值")
+    cache_built_at: Optional[str] = Field(None, description="缓存构建时间")
 
 
 class ErrorResponse(BaseModel):
