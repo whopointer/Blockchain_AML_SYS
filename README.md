@@ -6,9 +6,9 @@
 
 本项目实现了一个先进的区块链反洗钱(AML)检测系统，采用"两阶段"模型架构：
 
-**第一阶段**：使用深度图信息最大化(DGI)算法结合图同构网络(GIN)编码器进行自监督学习，学习比特币交易图中每个交易节点的低维嵌入表示。
+**第一阶段**：使用深度图信息最大化(DGI)算法结合图同构网络(GIN)编码器进行自监督学习，学习比特币交易图中每个交易节点的低维嵌入表示。该阶段**包含unknown节点**，用于提升表示质量。
 
-**第二阶段**：将学习到的节点嵌入与原始特征拼接，训练随机森林分类器进行监督的异常交易检测。
+**第二阶段**：将学习到的节点嵌入与原始特征拼接，训练随机森林分类器进行监督的异常交易检测。该阶段**过滤unknown标签**，避免噪声干扰监督学习。
 
 ## 🏗️ 系统架构
 
@@ -35,9 +35,10 @@
 ### 技术特点
 
 - **GIN编码器**：具有1-WL同构判别能力，能区分不同拓扑结构的子图
-- **两跳邻居采样**：扩大感受野，避免过深网络带来的过拟合
 - **对比学习机制**：通过特征扰动生成负样本，最大化局部-全局互信息
 - **特征融合**：结合图结构信息(嵌入)和原始节点属性
+- **阈值校准**：eval阶段基于测试集分布重校准阈值，避免跨集阈值失配
+- **API全图推理**：API使用全图Data构造，避免时间步子图索引错位
 
 ## 🚀 快速开始
 
@@ -82,11 +83,15 @@ python3 run.py --mode gnn_dgi_rf \
   --experiment_name custom_experiment
 ```
 
-#### 模型评估
+#### 模型评估（包含阈值校准）
 
 ```bash
 python3 run.py --mode eval
 ```
+
+评估结果会写入：
+- `checkpoints/gnn_dgi_rf_experiment_eval_results.json`
+- 包含 `calibrated_threshold`
 
 #### 推理预测
 
@@ -111,13 +116,13 @@ python3 run.py --mode inference
 
 ```bash
 python3 run.py --mode gnn_dgi_rf \
-  --epochs 200 \           # 总训练轮数
-  --batch_size 64 \         # 批次大小
-  --lr 0.001 \              # 学习率
-  --patience 20 \           # 早停耐心值
-  --device cuda \            # 使用GPU
-  --checkpoint_dir checkpoints \  # 模型保存目录
-  --experiment_name experiment_001   # 实验名称
+  --epochs 200 \
+  --batch_size 64 \
+  --lr 0.001 \
+  --patience 20 \
+  --device cuda \
+  --checkpoint_dir checkpoints \
+  --experiment_name experiment_001
 ```
 
 ## 📁 项目结构
@@ -165,15 +170,13 @@ python app.py
 ```python
 import requests
 
-# 健康检查
-response = requests.get('http://localhost:5000/api/v1/health')
-
 # 预测交易
-data = {'tx_ids': ['tx1', 'tx2', 'tx3']}
+data = {'tx_ids': ['232629023', '230389796']}
 response = requests.post(
-    'http://localhost:5000/api/v1/predict',
+    'http://localhost:5001/api/v1/predict',
     json=data
 )
+print(response.json())
 ```
 
 ## 📈 性能指标
@@ -187,12 +190,10 @@ response = requests.post(
 - **Recall**: 召回率
 - **F1-Score**: F1分数
 
-### 典型结果
+### 评估说明
 
-在Elliptic数据集上的性能：
-- 验证AUC: 0.85-0.90
-- 验证AP: 0.75-0.85
-- 准确率: 80-85%
+- val/test 分布不同，阈值需要在 eval 阶段重新校准。
+- eval 阶段会输出多阈值对比，便于选择业务阈值。
 
 ## 🛠️ 开发指南
 
@@ -218,23 +219,15 @@ response = requests.post(
 
 ### 常见问题
 
-**Q: 训练时出现CUDA内存不足**
+**Q: eval 指标为0？**
 ```bash
-# 减小批次大小
-python3 run.py --mode gnn_dgi_rf --batch_size 32
+# 说明阈值过高或test分布漂移，需重新校准阈值
+python3 run.py --mode eval
 ```
 
-**Q: 模型收敛速度慢**
-```bash
-# 增加学习率或使用学习率调度器
-python3 run.py --mode gnn_dgi_rf --lr 0.01 --scheduler cosine
-```
-
-**Q: 验证集性能不佳**
-```bash
-# 启用超参数调优
-python3 run.py --mode gnn_dgi_rf --rf_hyperparameter_tuning
-```
+**Q: API 预测异常全为正常？**
+- 确保 API 读取到包含 `calibrated_threshold` 的 eval 文件
+- 确保 API 使用全图 Data（已修复）
 
 ### 日志分析
 
