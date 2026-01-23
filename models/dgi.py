@@ -3,259 +3,231 @@ Deep Graph Infomax (DGI) 实现
 使用GIN编码器的自监督图表示学习
 """
 
+
+
+
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import global_mean_pool, global_max_pool
-from torch_geometric.utils import negative_sampling
-from typing import Optional, Tuple, Dict, Any
-import numpy as np
+
+from torch_geometric.nn import GINConv, global_mean_pool, global_max_pool
 
 
 class GINEncoder(nn.Module):
     """
-    GIN编码器，用于DGI中的节点嵌入学习
-    具有强大的图同构判别能力
+    GIN Encoder（风格A）：
+    - BatchNorm 只放在 GINConv 内部的 MLP 里（nn.BatchNorm1d）
+    - conv 输出后：非最后一层做 ReLU + Dropout
     """
-    
-    def __init__(self, num_features: int, hidden_channels: int, num_layers: int = 3):
-        super(GINEncoder, self).__init__()
+    def __init__(
+        self,
+        num_features: int,
+        hidden_channels: int,
+        num_layers: int = 3,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
         self.num_layers = num_layers
         self.hidden_channels = hidden_channels
-        
-        # GIN层
-        from torch_geometric.nn import GINConv, BatchNorm
-        
+        self.dropout = dropout
+
         self.convs = nn.ModuleList()
-        self.norms = nn.ModuleList()
-        
-        # 第一层
-        self.convs.append(GINConv(
-            nn.Sequential(
-                nn.Linear(num_features, hidden_channels),
-                nn.BatchNorm1d(hidden_channels),
+        self.drop = nn.Dropout(dropout)
+
+        def make_mlp(in_dim: int, out_dim: int) -> nn.Sequential:
+            """
+            经典 GIN MLP（两层）：
+            Linear -> BN -> ReLU -> Linear -> BN
+            注意：不在 MLP 末尾再接 ReLU，把“是否激活”交给外层（更常见、更干净）
+            """
+            return nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+                nn.BatchNorm1d(out_dim),
                 nn.ReLU(),
-                nn.Linear(hidden_channels, hidden_channels),
-                nn.BatchNorm1d(hidden_channels),
-                nn.ReLU()
+                nn.Linear(out_dim, out_dim),
+                nn.BatchNorm1d(out_dim),
             )
-        ))
-        self.norms.append(BatchNorm(hidden_channels))
-        
-        # 中间层
-        for _ in range(num_layers - 2):
-            self.convs.append(GINConv(
-                nn.Sequential(
-                    nn.Linear(hidden_channels, hidden_channels),
-                    nn.BatchNorm1d(hidden_channels),
-                    nn.ReLU(),
-                    nn.Linear(hidden_channels, hidden_channels),
-                    nn.BatchNorm1d(hidden_channels),
-                    nn.ReLU()
-                )
-            ))
-            self.norms.append(BatchNorm(hidden_channels))
-        
-        # 最后一层
-        if num_layers > 1:
-            self.convs.append(GINConv(
-                nn.Sequential(
-                    nn.Linear(hidden_channels, hidden_channels),
-                    nn.BatchNorm1d(hidden_channels),
-                    nn.ReLU(),
-                    nn.Linear(hidden_channels, hidden_channels),
-                    nn.BatchNorm1d(hidden_channels)
-                )
-            ))
-            self.norms.append(BatchNorm(hidden_channels))
-        
-        self.dropout = nn.Dropout(0.1)
-    
+
+        if num_layers <= 0:
+            raise ValueError("num_layers must be >= 1")
+
+        # 第一层：num_features -> hidden
+        self.convs.append(GINConv(make_mlp(num_features, hidden_channels)))
+
+        # 后续层：hidden -> hidden
+        for _ in range(num_layers - 1):
+            self.convs.append(GINConv(make_mlp(hidden_channels, hidden_channels)))
+
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        """
-        前向传播
-        """
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
-            x = self.norms[i](x)
-            if i < len(self.convs) - 1:  # 最后一层不加ReLU
+
+            # 非最后一层：ReLU + Dropout（最后一层保留线性输出，更利于下游任务）
+            if i != len(self.convs) - 1:
                 x = F.relu(x)
-                x = self.dropout(x)
-        
+                x = self.drop(x)
+
         return x
-    
+
     def get_node_embeddings(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        """
-        获取节点嵌入
-        """
         return self.forward(x, edge_index)
 
 
 class DGIWithGIN(nn.Module):
     """
-    使用GIN编码器的Deep Graph Infomax实现
-    实现真正的两阶段训练：自监督学习 + 监督分类
+    DGI + GIN：
+    - 第一阶段：DGI 自监督训练 encoder（gin_encoder）
+    - 第二阶段：freeze encoder，拿 embeddings 给下游分类器/传统模型（比如 RF）
     """
-    
-    def __init__(self, 
-                 num_features: int,
-                 hidden_channels: int = 128,
-                 num_layers: int = 3,
-                 pooling_strategy: str = 'mean',
-                 corruption_method: str = 'feature_shuffle'):
-        super(DGIWithGIN, self).__init__()
-        
+
+    def __init__(
+        self,
+        num_features: int,
+        hidden_channels: int = 128,
+        num_layers: int = 3,
+        pooling_strategy: str = "mean",
+        corruption_method: str = "feature_shuffle",
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+
         self.num_features = num_features
         self.hidden_channels = hidden_channels
         self.pooling_strategy = pooling_strategy
         self.corruption_method = corruption_method
-        
-        # GIN编码器
+
+        # GIN 编码器
         self.gin_encoder = GINEncoder(
             num_features=num_features,
             hidden_channels=hidden_channels,
-            num_layers=num_layers
+            num_layers=num_layers,
+            dropout=dropout,
         )
-        
-        # 判别器 - 简化为双线性变换
+
+        # 判别器：双线性打分，输出 logits（不要手动 sigmoid）
         self.discriminator = nn.Bilinear(hidden_channels, hidden_channels, 1)
-        
-        # 摘要函数（用于生成图级别表示）
+
+        # 摘要函数：对图级 embedding 再做一次 MLP（增强表达）
         self.summary_function = nn.Sequential(
             nn.Linear(hidden_channels, hidden_channels),
             nn.ReLU(),
-            nn.Linear(hidden_channels, hidden_channels)
+            nn.Linear(hidden_channels, hidden_channels),
         )
-        
-        # 训练状态标记
+
         self.is_pretrained = False
-    
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, 
-                batch: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        edge_index: torch.Tensor,
+        batch: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        前向传播，返回正样本分数和负样本分数
+        返回：
+        - positive_scores: [num_nodes]  每个节点与其所属图摘要的匹配分数（logits）
+        - negative_scores: [num_nodes]
         """
-        # 获取节点嵌入（正样本）
+
+        # 正样本节点嵌入
         positive_embeddings = self.gin_encoder.get_node_embeddings(x, edge_index)
-        
-        # 生成负样本（特征扰动）
+
+        # 负样本：特征扰动
         corrupted_x = self._corrupt_features(x)
         negative_embeddings = self.gin_encoder.get_node_embeddings(corrupted_x, edge_index)
-        
-        # 计算图级别摘要
-        if batch is not None:
-            graph_summary = self._pool_embeddings(positive_embeddings, batch)
-        else:
-            # 单图处理
-            batch_tensor = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
-            graph_summary = self._pool_embeddings(positive_embeddings, batch_tensor)
-        
-        # 应用摘要函数
-        graph_summary = self.summary_function(graph_summary)
-        
-        # 计算判别器分数
-        positive_scores = self._compute_discriminator_scores(positive_embeddings, graph_summary)
-        negative_scores = self._compute_discriminator_scores(negative_embeddings, graph_summary)
-        
+
+        # batch 为空则当作单图
+        if batch is None:
+            batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
+
+        # 图级摘要：pooling 得到 [num_graphs, hidden]
+        graph_summary = self._pool_embeddings(positive_embeddings, batch)
+
+        # 摘要增强 + sigmoid（更贴近经典 DGI，训练更稳）
+        graph_summary = torch.sigmoid(self.summary_function(graph_summary))
+
+        # 关键修复：每个节点取它所属图的摘要向量，对齐到 [num_nodes, hidden]
+        summary_per_node = graph_summary[batch]
+
+        # 判别器打分（输出 logits）
+        positive_scores = self.discriminator(positive_embeddings, summary_per_node).squeeze(-1)
+        negative_scores = self.discriminator(negative_embeddings, summary_per_node).squeeze(-1)
+
         return positive_scores, negative_scores
-    
+
     def _corrupt_features(self, x: torch.Tensor) -> torch.Tensor:
         """
-        特征扰动生成负样本
+        负样本生成：特征扰动（默认 feature_shuffle）
         """
-        if self.corruption_method == 'feature_shuffle':
-            # 随机打乱特征
-            return x[torch.randperm(x.size(0))]
-        elif self.corruption_method == 'feature_noise':
-            # 添加高斯噪声
+        if self.corruption_method == "feature_shuffle":
+            # 关键修复：randperm 必须在同一 device 上，否则 CUDA 会报错
+            perm = torch.randperm(x.size(0), device=x.device)
+            return x[perm]
+
+        elif self.corruption_method == "feature_noise":
             noise = torch.randn_like(x) * 0.1
             return x + noise
-        elif self.corruption_method == 'feature_mask':
-            # 随机掩码部分特征
-            mask = torch.rand_like(x) > 0.2  # 80%的特征保留
-            return x * mask.float()
+
+        elif self.corruption_method == "feature_mask":
+            # 随机掩码：80% 保留
+            mask = (torch.rand_like(x) > 0.2).float()
+            return x * mask
+
         else:
             return x
-    
+
     def _pool_embeddings(self, embeddings: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         """
-        图嵌入池化
+        embeddings: [num_nodes, hidden]
+        batch:      [num_nodes] 每个节点所属图 id
+        return:     [num_graphs, hidden]
         """
-        if self.pooling_strategy == 'mean':
+        if self.pooling_strategy == "mean":
             return global_mean_pool(embeddings, batch)
-        elif self.pooling_strategy == 'max':
+        elif self.pooling_strategy == "max":
             return global_max_pool(embeddings, batch)
         else:
             return global_mean_pool(embeddings, batch)
-    
-    def _compute_discriminator_scores(self, node_embeddings: torch.Tensor, 
-                                    graph_summary: torch.Tensor) -> torch.Tensor:
+
+    def compute_dgi_loss(self, positive_scores: torch.Tensor, negative_scores: torch.Tensor) -> torch.Tensor:
         """
-        计算判别器分数
+        DGI loss：BCEWithLogits
+        - 正样本标签 1
+        - 负样本标签 0
         """
-        # 使用双线性判别器计算节点嵌入与图摘要的匹配分数
-        if graph_summary.size(0) == 1:
-            # 单图情况：扩展图摘要到所有节点
-            graph_summary_expanded = graph_summary.expand(node_embeddings.size(0), -1)
-            scores = self.discriminator(node_embeddings, graph_summary_expanded)
-        else:
-            # 批处理情况：对应计算
-            batch_size = graph_summary.size(0)
-            num_nodes_per_graph = node_embeddings.size(0) // batch_size
-            scores_list = []
-            
-            for i in range(batch_size):
-                start_idx = i * num_nodes_per_graph
-                end_idx = start_idx + num_nodes_per_graph
-                batch_embeddings = node_embeddings[start_idx:end_idx]
-                batch_summary = graph_summary[i:i+1].expand(num_nodes_per_graph, -1)
-                
-                batch_scores = self.discriminator(batch_embeddings, batch_summary)
-                scores_list.append(batch_scores)
-            
-            scores = torch.cat(scores_list, dim=0)
-        
-        return scores.squeeze(-1)
-    
-    def compute_dgi_loss(self, positive_scores: torch.Tensor, 
-                        negative_scores: torch.Tensor) -> torch.Tensor:
-        """
-        计算DGI损失
-        """
-        # 正样本标签为1，负样本标签为0
-        positive_labels = torch.ones_like(positive_scores)
-        negative_labels = torch.zeros_like(negative_scores)
-        
-        # 二元交叉熵损失
-        pos_loss = F.binary_cross_entropy_with_logits(positive_scores, positive_labels)
-        neg_loss = F.binary_cross_entropy_with_logits(negative_scores, negative_labels)
-        
+        pos_labels = torch.ones_like(positive_scores)
+        neg_labels = torch.zeros_like(negative_scores)
+
+        pos_loss = F.binary_cross_entropy_with_logits(positive_scores, pos_labels)
+        neg_loss = F.binary_cross_entropy_with_logits(negative_scores, neg_labels)
+
         return pos_loss + neg_loss
-    
+
+    @torch.no_grad()
     def get_node_embeddings(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
         """
-        获取学习到的节点嵌入（用于第二阶段）
+        第二阶段用：输出节点嵌入
         """
         self.eval()
-        with torch.no_grad():
-            embeddings = self.gin_encoder.get_node_embeddings(x, edge_index)
-        return embeddings
-    
-    def freeze_encoder(self):
+        return self.gin_encoder.get_node_embeddings(x, edge_index)
+
+    def freeze_encoder(self) -> None:
         """
-        冻结GIN编码器参数（用于第二阶段训练）
+        第二阶段：冻结 encoder（只训练下游分类器）
         """
-        for param in self.gin_encoder.parameters():
-            param.requires_grad = False
+        for p in self.gin_encoder.parameters():
+            p.requires_grad = False
         self.is_pretrained = True
-    
-    def unfreeze_encoder(self):
+
+    def unfreeze_encoder(self) -> None:
         """
-        解冻GIN编码器参数
+        解冻 encoder
         """
-        for param in self.gin_encoder.parameters():
-            param.requires_grad = True
+        for p in self.gin_encoder.parameters():
+            p.requires_grad = True
         self.is_pretrained = False
+
 
 
 def create_dgi_with_gin(num_features: int, hidden_channels: int = 128, 

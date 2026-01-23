@@ -45,8 +45,8 @@ def parse_args():
     parser.add_argument(
         '--port',
         type=int,
-        default=5000,
-        help='服务器端口 (默认: 5000)'
+        default=5001,
+        help='服务器端口 (默认: 5001)'
     )
     parser.add_argument(
         '--debug',
@@ -115,7 +115,7 @@ def start_production_server(args):
         '--bind', f'{args.host}:{args.port}',
         '--workers', str(args.workers),
         '--timeout', '300',
-        '--keepalive', '5',
+        '--keep-alive', '5',
         '--max-requests', '1000',
         '--max-requests-jitter', '100',
         '--access-logfile', 'logs/api_access.log',
@@ -129,7 +129,17 @@ def start_production_server(args):
     env['EXPERIMENT_NAME'] = args.experiment_name
     
     # 启动服务器
-    subprocess.run(cmd, env=env)
+    try:
+        logger.info(f"执行命令: {' '.join(cmd)}")
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"服务器启动失败，返回码: {result.returncode}")
+            logger.error(f"标准输出: {result.stdout}")
+            logger.error(f"错误输出: {result.stderr}")
+        else:
+            logger.info("服务器已停止")
+    except Exception as e:
+        logger.error(f"启动服务器时出错: {e}")
 
 
 def main():

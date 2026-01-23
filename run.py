@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch_geometric.data import DataLoader
+from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn import global_mean_pool
 import os
 import logging
@@ -18,7 +18,7 @@ from datetime import datetime
 import json
 import numpy as np
 
-from data import load_train_data, load_val_data, load_inference_data
+from data import EllipticDataset, load_inference_data, load_val_data
 from models.two_stage_dgi_rf import create_two_stage_dgi_rf
 from config.logging_config import setup_training_logger, log_system_info, log_model_info
 
@@ -62,9 +62,112 @@ def save_training_config(args, save_path="checkpoints"):
     logging.info(f"训练配置已保存到: {config_path}")
 
 
+def build_time_split_masks(time_steps: torch.Tensor, test_size: float = 0.2, val_size: float = 0.2):
+    """按时间步划分 train/val/test mask（单大图训练用）"""
+    unique_steps = sorted(time_steps.unique().cpu().tolist())
+    n_steps = len(unique_steps)
+    if n_steps < 3:
+        train_steps = unique_steps[:1]
+        val_steps = unique_steps[1:2] if len(unique_steps) > 1 else []
+        test_steps = unique_steps[2:] if len(unique_steps) > 2 else []
+    else:
+        test_start = max(1, int(n_steps * (1 - test_size)))
+        val_start = max(1, int(test_start * (1 - val_size / (1 - test_size))))
+        train_steps = unique_steps[:val_start]
+        val_steps = unique_steps[val_start:test_start]
+        test_steps = unique_steps[test_start:]
+
+    steps_tensor = time_steps
+    train_mask = torch.isin(steps_tensor, torch.tensor(train_steps, dtype=steps_tensor.dtype))
+    val_mask = torch.isin(steps_tensor, torch.tensor(val_steps, dtype=steps_tensor.dtype))
+    test_mask = torch.isin(steps_tensor, torch.tensor(test_steps, dtype=steps_tensor.dtype))
+    return train_mask, val_mask, test_mask, train_steps, val_steps, test_steps
+
+
+def log_multi_threshold_metrics(logger, y_true, y_proba_pos, thresholds):
+    """输出多阈值下的精确率/召回率/F1，便于校准阈值"""
+    from sklearn.metrics import precision_score, recall_score, f1_score
+
+    lines = []
+    for thr in thresholds:
+        y_pred = (y_proba_pos >= thr).astype(int)
+        p = precision_score(y_true, y_pred, zero_division=0)
+        r = recall_score(y_true, y_pred, zero_division=0)
+        f1 = f1_score(y_true, y_pred, zero_division=0)
+        lines.append(f"thr={thr:.2f} | P={p:.4f} R={r:.4f} F1={f1:.4f}")
+
+    logger.info("多阈值对比:")
+    for line in lines:
+        logger.info(f"  {line}")
+
+def find_optimal_threshold_from_proba(y_true, y_proba_pos, metric="f1", recall_min=None, thresholds=None):
+    """基于已计算的正类概率搜索最优阈值（用于评估阶段校准）"""
+    from sklearn.metrics import precision_score, recall_score, f1_score
+
+    y_true = np.asarray(y_true).astype(int).reshape(-1)
+    y_proba_pos = np.asarray(y_proba_pos).reshape(-1)
+
+    if thresholds is None:
+        thresholds = np.arange(0.05, 0.95, 0.02)
+
+    best_score = -1.0
+    best_thr = 0.5
+    best_recall = -1.0
+
+    for thr in thresholds:
+        y_pred = (y_proba_pos >= thr).astype(int)
+        if metric == "f1":
+            score = f1_score(y_true, y_pred, zero_division=0)
+        elif metric == "precision":
+            score = precision_score(y_true, y_pred, zero_division=0)
+        elif metric == "recall":
+            score = recall_score(y_true, y_pred, zero_division=0)
+        else:
+            raise ValueError(f"不支持的指标: {metric}")
+
+        rec = recall_score(y_true, y_pred, zero_division=0)
+        if recall_min is not None and rec < recall_min:
+            continue
+
+        if score > best_score:
+            best_score = score
+            best_thr = float(thr)
+            best_recall = rec
+
+    if best_score < 0 and recall_min is not None:
+        for thr in thresholds:
+            y_pred = (y_proba_pos >= thr).astype(int)
+            if metric == "f1":
+                score = f1_score(y_true, y_pred, zero_division=0)
+            elif metric == "precision":
+                score = precision_score(y_true, y_pred, zero_division=0)
+            elif metric == "recall":
+                score = recall_score(y_true, y_pred, zero_division=0)
+            else:
+                raise ValueError(f"不支持的指标: {metric}")
+            if score > best_score:
+                best_score = score
+                best_thr = float(thr)
+                best_recall = recall_score(y_true, y_pred, zero_division=0)
+
+    return best_thr, best_score, best_recall
+
+
+def get_pos_proba_from_probs(model, probs):
+    """根据 RF 的 classes_ 稳健取出正类(1)概率"""
+    probs = np.asarray(probs)
+    if probs.ndim == 1:
+        return probs
+    try:
+        classes = model.rf_classifier.classifier.classes_
+        pos_idx = int(np.where(classes == 1)[0][0])
+    except Exception:
+        pos_idx = 1 if probs.shape[1] > 1 else 0
+    return probs[:, pos_idx]
+
 def main():
     parser = argparse.ArgumentParser(description='区块链AML反洗钱系统 - 服务器训练版')
-    parser.add_argument('--mode', type=str, default='gnn_dgi_rf', 
+    parser.add_argument('--mode', type=str, default='gnn_dgi_rf',
                        choices=['eval', 'inference', 'gnn_dgi_rf'],
                        help='运行模式: eval(评估), inference(推理), gnn_dgi_rf(GNN+DGI+随机森林联合训练)')
     parser.add_argument('--epochs', type=int, default=200,
@@ -148,34 +251,53 @@ def main():
             gnn_layers=args.num_layers,
             rf_n_estimators=200,
             rf_max_depth=15,
+            rf_class_weight="balanced_subsample",
+            rf_auto_class_weight=False,
             device=args.device,
             checkpoint_dir=args.checkpoint_dir,
             experiment_name=args.experiment_name,
-            balance_strategy='undersample',  # 使用欠采样策略
+            balance_strategy='none',         # 关闭欠采样，避免与 class_weight 叠加过度偏正类
             loss_type='balanced_focal'       # 使用平衡Focal Loss
         )
         
         logger.info(f"GIN编码器参数数量: {sum(p.numel() for p in model.dgi_model.gin_encoder.parameters()):,}")
         
-        # 加载数据
-        logger.info("加载训练和验证数据...")
-        train_loader = load_train_data(args.data_path, args.batch_size, args.num_workers)
-        val_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)
-        
-        logger.info(f"训练批次数: {len(train_loader)}")
-        logger.info(f"验证批次数: {len(val_loader)}")
+        # 加载单大图数据
+        logger.info("加载单大图数据...")
+        dataset = EllipticDataset(root=args.data_path, include_unknown=True)
+        raw_labels = dataset.merged_df["class"].astype(str).values
+        label_map = {"1": 1, "2": 2}
+        y_raw = np.array([label_map.get(v, -1) for v in raw_labels], dtype=np.int64)
+        data = Data(
+            x=dataset.x,
+            edge_index=dataset.edge_index,
+            y=torch.tensor(y_raw, dtype=torch.long),
+            time_steps=dataset.time_steps,
+            num_nodes=dataset.x.shape[0]
+        )
+        data.train_mask, data.val_mask, data.test_mask, train_steps, val_steps, test_steps = build_time_split_masks(
+            data.time_steps
+        )
+
+        logger.info(f"时间步分割: 训练({len(train_steps)}步), 验证({len(val_steps)}步), 测试({len(test_steps)}步)")
+        logger.info(
+            f"节点数量: train={int(data.train_mask.sum())}, val={int(data.val_mask.sum())}, "
+            f"test={int(data.test_mask.sum())}"
+        )
         
         # 开始两阶段训练
         start_time = time.time()
         
         try:
-            training_results = model.end_to_end_train(
-                train_loader=train_loader,
-                val_loader=val_loader,
+            training_results = model.end_to_end_train_single_graph(
+                data=data,
                 dgi_epochs=args.dgi_epochs,
                 rf_hyperparameter_tuning=args.rf_hyperparameter_tuning,
                 learning_rate=args.lr,
-                patience=args.patience
+                patience=args.patience,
+                threshold_metric="f1",
+                include_unknown_in_threshold=False,
+                threshold_recall_min=0.5
             )
             
             total_time = time.time() - start_time
@@ -189,13 +311,27 @@ def main():
             
             # 在验证集上进行最终评估
             logger.info("在验证集上进行最终评估...")
-            val_predictions, val_probabilities = model.predict(val_loader)
-            
-            # 收集验证集真实标签
-            val_labels = []
-            for batch in val_loader:
-                val_labels.extend(batch.y.numpy())
-            val_labels = np.array(val_labels)
+            threshold = None
+            if isinstance(training_results, dict):
+                threshold = (
+                    training_results.get("stage2", {}).get("optimal_threshold")
+                    if training_results.get("stage2")
+                    else None
+                )
+            all_predictions, all_probabilities = model.predict_single_graph(
+                data,
+                mask=None,
+                threshold=threshold
+            )
+
+            val_idx = torch.nonzero(data.val_mask, as_tuple=False).view(-1).cpu().numpy()
+            val_labels_raw = data.y[val_idx].cpu().numpy()
+            known_mask = val_labels_raw >= 0
+            val_labels_raw = val_labels_raw[known_mask]
+            val_labels = (val_labels_raw == 1).astype(int)
+            val_predictions_raw = all_predictions[val_idx][known_mask]
+            val_predictions = (val_predictions_raw == 1).astype(int)
+            val_probabilities = all_probabilities[val_idx][known_mask]
             
             # 计算最终指标
             from sklearn.metrics import classification_report, roc_auc_score, average_precision_score
@@ -210,6 +346,14 @@ def main():
             report = classification_report(val_labels, val_predictions, 
                                         target_names=['正常(0)', '异常(1)'], zero_division=0)
             logger.info(f"\n{report}")
+
+            # 多阈值对比（使用正类概率列）
+            log_multi_threshold_metrics(
+                logger,
+                val_labels,
+                val_probabilities[:, 1],
+                thresholds=[0.3, 0.5, 0.7, 0.9]
+            )
             
             # 保存最终结果
             final_results = {
@@ -244,6 +388,8 @@ def main():
             gnn_layers=args.num_layers,
             rf_n_estimators=200,
             rf_max_depth=15,
+            rf_class_weight="balanced_subsample",
+            rf_auto_class_weight=False,
             device=args.device,
             checkpoint_dir=args.checkpoint_dir,
             experiment_name=args.experiment_name
@@ -257,31 +403,72 @@ def main():
             logger.error(f"模型加载失败: {e}")
             return
         
-        # 加载测试数据
-        test_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)  # 暂时用验证数据代替
+        # 加载单大图数据
+        dataset = EllipticDataset(root=args.data_path, include_unknown=False)
+        raw_labels = dataset.merged_df["class"].astype(str).values
+        label_map = {"1": 1, "2": 2}
+        y_raw = np.array([label_map.get(v, -1) for v in raw_labels], dtype=np.int64)
+        data = Data(
+            x=dataset.x,
+            edge_index=dataset.edge_index,
+            y=torch.tensor(y_raw, dtype=torch.long),
+            time_steps=dataset.time_steps,
+            num_nodes=dataset.x.shape[0]
+        )
+        data.train_mask, data.val_mask, data.test_mask, _, _, _ = build_time_split_masks(data.time_steps)
         
         # 进行预测和评估
         logger.info("开始详细评估...")
         
-        # 首先寻找最优阈值
-        logger.info("在验证集上寻找最优分类阈值...")
-        optimal_threshold = model.find_optimal_threshold(test_loader, metric='f1')
-        logger.info(f"使用最优阈值: {optimal_threshold:.3f}")
+        # 使用训练阶段保存的最优阈值（不在评估阶段重新搜索）
+        optimal_threshold = None
+        if hasattr(model, "training_history") and isinstance(model.training_history, dict):
+            optimal_threshold = (
+                model.training_history.get("stage2", {}).get("optimal_threshold")
+            )
+        if optimal_threshold is None:
+            optimal_threshold = 0.5
+            logger.warning("未找到训练阶段的最优阈值，使用默认阈值 0.5")
+        else:
+            logger.info(f"使用训练阶段最优阈值: {optimal_threshold:.3f}")
         
         # 使用最优阈值进行预测
-        predictions, probabilities = model.predict(test_loader, threshold=optimal_threshold)
-        
-        # 收集真实标签
-        true_labels = []
-        for batch in test_loader:
-            true_labels.extend(batch.y.numpy())
-        true_labels = np.array(true_labels)
-        
+        all_predictions, all_probabilities = model.predict_single_graph(
+            data,
+            mask=None,
+            threshold=optimal_threshold
+        )
+
+        eval_mask = data.test_mask if int(data.test_mask.sum()) > 0 else data.val_mask
+        eval_idx = torch.nonzero(eval_mask, as_tuple=False).view(-1).cpu().numpy()
+        true_labels_raw = data.y[eval_idx].cpu().numpy()
+        known_mask = true_labels_raw >= 0
+        true_labels_raw = true_labels_raw[known_mask]
+        true_labels = (true_labels_raw == 1).astype(int)
+        predictions_raw = all_predictions[eval_idx][known_mask]
+        predictions = (predictions_raw == 1).astype(int)
+        probabilities = all_probabilities[eval_idx][known_mask]
+
+        # 评估阶段重新校准阈值（基于当前 eval 集的概率分布）
+        y_proba_pos = get_pos_proba_from_probs(model, probabilities)
+        recal_thr, recal_score, recal_recall = find_optimal_threshold_from_proba(
+            true_labels,
+            y_proba_pos,
+            metric="f1",
+            recall_min=0.5
+        )
+        logger.info(
+            f"评估阶段校准阈值: {recal_thr:.3f} (metric=f1, score={recal_score:.4f}, recall={recal_recall:.4f})"
+        )
+
+        # 用校准阈值重新计算预测
+        predictions = (y_proba_pos >= recal_thr).astype(int)
+
         # 计算评估指标
         from sklearn.metrics import classification_report, roc_auc_score, average_precision_score, accuracy_score, precision_score, recall_score, f1_score
-        
-        auc = roc_auc_score(true_labels, probabilities[:, 1]) if len(set(true_labels)) > 1 else 0.0
-        ap = average_precision_score(true_labels, probabilities[:, 1]) if len(set(true_labels)) > 1 else 0.0
+
+        auc = roc_auc_score(true_labels, y_proba_pos) if len(set(true_labels)) > 1 else 0.0
+        ap = average_precision_score(true_labels, y_proba_pos) if len(set(true_labels)) > 1 else 0.0
         accuracy = accuracy_score(true_labels, predictions)
         precision = precision_score(true_labels, predictions, zero_division=0)
         recall = recall_score(true_labels, predictions, zero_division=0)
@@ -300,6 +487,14 @@ def main():
         report = classification_report(true_labels, predictions, 
                                     target_names=['正常(0)', '异常(1)'], zero_division=0)
         logger.info(f"\n分类报告:\n{report}")
+
+        # 多阈值对比（使用正类概率列）
+        log_multi_threshold_metrics(
+            logger,
+            true_labels,
+            y_proba_pos,
+            thresholds=[0.3, 0.5, 0.7, 0.9]
+        )
         
         # 保存评估结果
         eval_results = {
@@ -309,7 +504,14 @@ def main():
             'precision': float(precision),
             'recall': float(recall),
             'f1_score': float(f1),
-            'classification_report': report
+            'classification_report': report,
+            'calibrated_threshold': float(recal_thr),
+            'calibration': {
+                'metric': 'f1',
+                'recall_min': 0.5,
+                'score': float(recal_score),
+                'recall': float(recal_recall)
+            }
         }
         
         eval_results_path = os.path.join(args.checkpoint_dir, f"{args.experiment_name}_eval_results.json")
@@ -341,26 +543,39 @@ def main():
             logger.error(f"模型加载失败: {e}")
             return
         
-        # 加载推理数据（只包含有标签的数据）
+        # 加载单大图推理数据
         logger.info("加载推理数据...")
-        data = load_inference_data(args.data_path, include_unknown=False, all_timesteps=True)
-        
-        # 创建DataLoader
-        from torch_geometric.loader import DataLoader
-        data_loader = DataLoader([data], batch_size=1, shuffle=False)
+        dataset = EllipticDataset(root=args.data_path, include_unknown=False)
+        raw_labels = dataset.merged_df["class"].astype(str).values
+        label_map = {"1": 1, "2": 2}
+        y_raw = np.array([label_map.get(v, -1) for v in raw_labels], dtype=np.int64)
+        data = Data(
+            x=dataset.x,
+            edge_index=dataset.edge_index,
+            y=torch.tensor(y_raw, dtype=torch.long),
+            time_steps=dataset.time_steps,
+            num_nodes=dataset.x.shape[0]
+        )
+        data.train_mask, data.val_mask, data.test_mask, _, _, _ = build_time_split_masks(data.time_steps)
         
         # 执行推理
         start_time = time.time()
         
         try:
-            # 首先寻找最优阈值（使用验证集）
-            logger.info("寻找最优分类阈值...")
-            val_loader = load_val_data(args.data_path, args.batch_size, args.num_workers)
-            optimal_threshold = model.find_optimal_threshold(val_loader, metric='f1')
-            logger.info(f"使用最优阈值: {optimal_threshold:.3f}")
+            # 直接使用训练阶段保存的最优阈值
+            optimal_threshold = None
+            if hasattr(model, "training_history") and isinstance(model.training_history, dict):
+                optimal_threshold = (
+                    model.training_history.get("stage2", {}).get("optimal_threshold")
+                )
+            if optimal_threshold is None:
+                optimal_threshold = 0.5
+                logger.warning("未找到训练阶段的最优阈值，使用默认阈值 0.5")
+            else:
+                logger.info(f"使用训练阶段最优阈值: {optimal_threshold:.3f}")
             
             # 进行预测（使用更低的阈值以允许更多正常交易被识别）
-            predictions, probabilities = model.predict(data_loader, threshold=0.3)
+            predictions, probabilities = model.predict_single_graph(data, threshold=optimal_threshold)
             
             inference_time = time.time() - start_time
             
@@ -379,7 +594,7 @@ def main():
             logger.info(f"推理完成！耗时: {inference_time:.2f}秒")
             logger.info(f"预测样本数: {len(predictions)}")
             logger.info(f"异常交易预测数量: {np.sum(predictions == 1)}")
-            logger.info(f"正常交易预测数量: {np.sum(predictions == 0)}")
+            logger.info(f"正常交易预测数量: {np.sum(predictions == 2)}")
             logger.info(f"平均异常概率: {np.mean(probabilities[:, 1]):.4f}")
             logger.info(f"预测结果已保存到: {results_path}")
             

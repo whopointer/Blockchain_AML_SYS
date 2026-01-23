@@ -3,206 +3,155 @@
 实现过采样和欠采样策略以处理类别不平衡问题
 """
 
+
+import logging
+from typing import Optional, Dict, Any
+
 import numpy as np
-import pandas as pd
 import torch
 from torch_geometric.data import Data
-from sklearn.utils import resample
-from typing import Tuple, Dict, Any, Optional
-import logging
 
 
 class DataBalancer:
     """
-    数据平衡器，提供多种策略处理类别不平衡
+    数据平衡器（适配：单大图节点分类 / Elliptic / train_mask）
+
+    重要说明：
+    - 不重建图结构，不删除节点，不改 edge_index
+    - 只对训练节点(train_mask)的“用于计算loss的索引集合”做平衡
+    - 输出结果会挂载到 data 上：
+        data.balanced_train_idx : torch.LongTensor  (用于算loss的节点索引)
+        data.pos_weight         : torch.FloatTensor or None (用于 BCEWithLogitsLoss)
     """
-    
-    def __init__(self, strategy: str = 'undersample', random_state: int = 42):
+
+    def __init__(self, strategy: str = "undersample", random_state: int = 42):
         """
-        初始化数据平衡器
-        
         Args:
-            strategy: 平衡策略，可选 'undersample', 'oversample', 'hybrid'
+            strategy:
+                'undersample'   : 欠采样多数类（推荐用于监督训练阶段）
+                'weighted_loss' : 不采样，返回 pos_weight（最推荐，最稳）
+                'none'          : 不处理
+                兼容旧参数：
+                'oversample'/'hybrid'：在单大图GNN监督阶段不建议，会自动降级为 weighted_loss
             random_state: 随机种子
         """
         self.strategy = strategy
         self.random_state = random_state
         self.logger = logging.getLogger(__name__)
-    
-    def balance_graph_data(self, data: Data) -> Data:
+
+    def balance_graph_data(self, data: Data, ignore_label: Optional[int] = None) -> Data:
         """
-        对图数据进行平衡处理
-        
+        对图数据进行“训练节点层面”的平衡处理（不改变图本体）
+
         Args:
-            data: 原始图数据
-            
+            data: 原始图数据（单大图），需要 data.y 和 data.train_mask
+            ignore_label: 若 y 中存在“未知/不参与监督”的标签值（例如 2 或 -1），在平衡与loss计算时剔除
+
         Returns:
-            平衡后的图数据
+            原 data（图不变），但会额外挂载：
+                data.balanced_train_idx
+                data.pos_weight
         """
-        if not hasattr(data, 'y') or data.y is None:
-            self.logger.warning("数据没有标签，跳过平衡处理")
+        if not hasattr(data, "y") or data.y is None:
+            self.logger.warning("数据没有标签 y，跳过平衡处理")
             return data
-        
-        # 获取节点标签
-        labels = data.y.numpy()
-        balanced_indices = self._get_balanced_indices(labels)
-        
-        # 创建平衡后的数据
-        balanced_data = self._create_balanced_data(data, balanced_indices)
-        
-        # 验证平衡结果
-        balanced_labels = balanced_data.y.numpy()
-        balanced_unique, balanced_counts = np.unique(balanced_labels, return_counts=True)
-        self.logger.info(f"平衡后数据分布: {dict(zip(balanced_unique, balanced_counts))}")
-        
-        return balanced_data
-    
-    def _get_balanced_indices(self, labels: np.ndarray) -> np.ndarray:
-        """
-        获取平衡后的索引
-        
-        Args:
-            labels: 原始标签
-            
-        Returns:
-            平衡后的索引数组
-        """
-        unique_labels, label_counts = np.unique(labels, return_counts=True)
-        
-        self.logger.info(f"原始数据分布: {dict(zip(unique_labels, label_counts))}")
-        
-        if len(unique_labels) != 2:
-            self.logger.warning("只支持二分类数据的平衡处理")
-            return np.arange(len(labels))
-        
-        # 确定多数类和少数类
-        majority_class = unique_labels[np.argmax(label_counts)]
-        minority_class = unique_labels[np.argmin(label_counts)]
-        majority_count = max(label_counts)
-        minority_count = min(label_counts)
-        
-        self.logger.info(f"多数类: {majority_class} (数量: {majority_count})")
-        self.logger.info(f"少数类: {minority_class} (数量: {minority_count})")
-        
-        # 根据策略进行平衡
-        if self.strategy == 'undersample':
-            balanced_indices = self._undersample(
-                labels, majority_class, minority_class, majority_count, minority_count
+
+        if not hasattr(data, "train_mask") or data.train_mask is None:
+            self.logger.warning("数据没有 train_mask，单大图节点分类建议提供 train_mask；跳过平衡处理")
+            return data
+
+        y = data.y
+        train_mask = data.train_mask
+
+        # 只取训练节点索引
+        train_idx = torch.nonzero(train_mask, as_tuple=False).view(-1)
+        if train_idx.numel() == 0:
+            self.logger.warning("train_mask 为空，跳过平衡处理")
+            data.balanced_train_idx = train_idx
+            data.pos_weight = None
+            return data
+
+        # 过滤 ignore_label（例如 unknown）
+        y_flat = y.view(-1)
+        if ignore_label is not None:
+            valid = y_flat[train_idx] != ignore_label
+            train_idx = train_idx[valid]
+
+        if train_idx.numel() == 0:
+            self.logger.warning("过滤 ignore_label 后训练节点为空，跳过平衡处理")
+            data.balanced_train_idx = train_idx
+            data.pos_weight = None
+            return data
+
+        # 统计训练集分布（只统计 0/1）
+        y_train = y_flat[train_idx]
+        # 如果不是严格0/1，仍然统计看看
+        unique, counts = torch.unique(y_train, return_counts=True)
+        dist = {int(k.item()): int(v.item()) for k, v in zip(unique, counts)}
+        self.logger.info(f"训练集原始分布(基于 train_mask): {dist}")
+
+        # 兼容旧策略名，但在单大图GNN监督阶段不做 oversample/hybrid
+        if self.strategy in ("oversample", "hybrid"):
+            self.logger.warning(
+                f"strategy='{self.strategy}' 在单大图GNN监督阶段不建议（节点克隆会破坏边映射），"
+                f"已自动降级为 'weighted_loss'"
             )
-        elif self.strategy == 'oversample':
-            balanced_indices = self._oversample(
-                labels, majority_class, minority_class, majority_count, minority_count
-            )
-        elif self.strategy == 'hybrid':
-            balanced_indices = self._hybrid_sampling(
-                labels, majority_class, minority_class, majority_count, minority_count
-            )
+            effective_strategy = "weighted_loss"
+        else:
+            effective_strategy = self.strategy
+
+        # 默认输出
+        balanced_train_idx = train_idx
+        pos_weight = None
+
+        if effective_strategy == "none":
+            pass
+
+        elif effective_strategy == "weighted_loss":
+            # pos_weight = N_neg / N_pos (用于 BCEWithLogitsLoss)
+            count0 = int((y_train == 0).sum().item())
+            count1 = int((y_train == 1).sum().item())
+
+            if count0 == 0 or count1 == 0:
+                self.logger.warning("训练集中某一类数量为0，pos_weight 无意义；将不设置 pos_weight")
+                pos_weight = None
+            else:
+                pos_weight = torch.tensor([count0 / count1], dtype=torch.float, device=y.device)
+
+        elif effective_strategy == "undersample":
+            balanced_train_idx = self._undersample_train_indices(train_idx, y_flat, device=y.device)
+
         else:
             raise ValueError(f"未知的平衡策略: {self.strategy}")
-        
-        return balanced_indices
-    
-    def _undersample(self, labels: np.ndarray, majority_class: int, minority_class: int,
-                    majority_count: int, minority_count: int) -> np.ndarray:
-        """欠采样策略：减少多数类样本"""
-        majority_indices = np.where(labels == majority_class)[0]
-        minority_indices = np.where(labels == minority_class)[0]
-        
-        # 随机选择与少数类相同数量的多数类样本
-        sampled_majority_indices = resample(
-            majority_indices,
-            n_samples=minority_count,
-            replace=False,
-            random_state=self.random_state
-        )
-        
-        balanced_indices = np.concatenate([sampled_majority_indices, minority_indices])
-        return balanced_indices
-    
-    def _oversample(self, labels: np.ndarray, majority_class: int, minority_class: int,
-                   majority_count: int, minority_count: int) -> np.ndarray:
-        """过采样策略：增加少数类样本"""
-        majority_indices = np.where(labels == majority_class)[0]
-        minority_indices = np.where(labels == minority_class)[0]
-        
-        # 过采样少数类到与多数类相同数量
-        sampled_minority_indices = resample(
-            minority_indices,
-            n_samples=majority_count,
-            replace=True,
-            random_state=self.random_state
-        )
-        
-        balanced_indices = np.concatenate([majority_indices, sampled_minority_indices])
-        return balanced_indices
-    
-    def _hybrid_sampling(self, labels: np.ndarray, majority_class: int, minority_class: int,
-                        majority_count: int, minority_count: int) -> np.ndarray:
-        """混合采样策略：同时对多数类欠采样和对少数类过采样"""
-        majority_indices = np.where(labels == majority_class)[0]
-        minority_indices = np.where(labels == minority_class)[0]
-        
-        # 目标数量：取两者之间的中间值
-        target_count = (majority_count + minority_count) // 2
-        
-        # 对多数类欠采样到目标数量
-        sampled_majority_indices = resample(
-            majority_indices,
-            n_samples=min(target_count, len(majority_indices)),
-            replace=False,
-            random_state=self.random_state
-        )
-        
-        # 对少数类过采样到目标数量
-        sampled_minority_indices = resample(
-            minority_indices,
-            n_samples=target_count,
-            replace=True,
-            random_state=self.random_state
-        )
-        
-        balanced_indices = np.concatenate([sampled_majority_indices, sampled_minority_indices])
-        return balanced_indices
-    
-    def _create_balanced_data(self, original_data: Data, indices: np.ndarray) -> Data:
-        """根据索引创建平衡后的图数据"""
-        # 重新索引节点
-        old_to_new = {old_idx: new_idx for new_idx, old_idx in enumerate(indices)}
-        
-        # 创建新的节点特征
-        new_x = original_data.x[indices]
-        new_y = original_data.y[indices]
-        if hasattr(original_data, 'time_steps'):
-            new_time_steps = original_data.time_steps[indices]
-        
-        # 重新构建边索引
-        if original_data.edge_index is not None:
-            # 筛选只保留平衡后节点之间的边
-            mask = torch.isin(original_data.edge_index[0], torch.tensor(indices)) & \
-                   torch.isin(original_data.edge_index[1], torch.tensor(indices))
-            
-            new_edge_index = original_data.edge_index[:, mask]
-            
-            # 重新映射边索引
-            new_edge_index[0] = torch.tensor([old_to_new[idx.item()] for idx in new_edge_index[0]])
-            new_edge_index[1] = torch.tensor([old_to_new[idx.item()] for idx in new_edge_index[1]])
-        else:
-            new_edge_index = torch.empty((2, 0), dtype=torch.long)
-        
-        # 创建新的数据对象
-        balanced_data = Data(
-            x=new_x,
-            edge_index=new_edge_index,
-            y=new_y
-        )
-        
-        if hasattr(original_data, 'time_steps'):
-            balanced_data.time_steps = new_time_steps
-        
-        return balanced_data
+
+        # 挂载到 data 上，供训练阶段直接使用
+        data.balanced_train_idx = balanced_train_idx
+        data.pos_weight = pos_weight
+
+        # 打印平衡后分布
+        if balanced_train_idx.numel() > 0:
+            y_bal = y_flat[balanced_train_idx]
+            u2, c2 = torch.unique(y_bal, return_counts=True)
+            dist2 = {int(k.item()): int(v.item()) for k, v in zip(u2, c2)}
+            self.logger.info(f"训练集平衡后分布(用于loss的索引集合): {dist2}")
+
+        if pos_weight is not None:
+            self.logger.info(f"pos_weight (for BCEWithLogitsLoss): {pos_weight.detach().cpu().numpy().tolist()}")
+
+        return data
+
+    def _undersample_train_indices(self, train_idx: torch.Tensor, y_flat: torch.Tensor,
+                                   device: torch.device) -> torch.Tensor:
+        """
+        欠采样：只在 train_idx 里做多数类下采样，返回平衡后的 train_idx 子集
+        """
+        y_train = y_flat[train_idx]
+
+        idx0 = train_idx[y_train == 0]
+        idx1 = train_idx[y_train == 1]
 
 
-def create_balanced_loader(data: Data, batch_size: int = 64, 
+def create_balanced_loader(data: Data, batch_size: int = 64,
                           balance_strategy: str = 'undersample',
                           shuffle: bool = True) -> torch.utils.data.DataLoader:
     """

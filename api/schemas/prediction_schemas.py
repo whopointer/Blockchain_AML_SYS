@@ -14,8 +14,10 @@ class TransactionPrediction(BaseModel):
     probability: float = Field(..., ge=0.0, le=1.0, description="异常概率")
     is_suspicious: bool = Field(..., description="是否可疑")
     confidence: float = Field(..., ge=0.0, le=1.0, description="预测置信度")
+    error : str = Field(...,description="是否出错")
     timestamp: str = Field(..., description="预测时间戳")
-    
+    risk_level: str = Field(...,description="危险等级")
+
     @validator('timestamp')
     def validate_timestamp(cls, v):
         """验证时间戳格式"""
@@ -51,6 +53,7 @@ class PredictionResponse(BaseModel):
     total_transactions: int = Field(..., ge=0, description="总交易数")
     suspicious_count: int = Field(..., ge=0, description="可疑交易数")
     timestamp: str = Field(..., description="响应时间戳")
+
     
     @validator('suspicious_count')
     def validate_suspicious_count(cls, v, values):
