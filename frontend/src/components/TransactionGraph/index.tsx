@@ -114,23 +114,8 @@ const TransactionGraph: React.FC = () => {
   };
 
   return (
-    <ConfigProvider
-      locale={zhCN}
-      theme={{
-        token: {
-          colorBgBase: "#244963",
-          colorTextBase: "#ffffff",
-          colorBorder: "#3a5f7f",
-          colorPrimary: "#667eea",
-          colorPrimaryBg: "#1e3a5f", // 选中选项的背景色 - 深蓝色
-          controlItemBgHover: "#305875", // 激活状态的背景色 - 稍亮的蓝色
-        },
-      }}
-    >
-      <div
-        ref={containerRef}
-        style={{ backgroundColor: "#1a3a52", borderRadius: 16 }}
-      >
+    <>
+      <div ref={containerRef} style={{ borderRadius: 16 }}>
         {/* 地址基本信息 */}
         <AddressInfo
           address={mainNode?.addr}
@@ -140,66 +125,73 @@ const TransactionGraph: React.FC = () => {
           isMalicious={mainNode?.malicious === 1}
         />
 
-        {/* 标题栏 */}
-        <Row
-          style={{
-            marginBottom: 16,
-            padding: "12px 16px",
-            backgroundColor: "#244963",
-            borderRadius: 8,
-            border: "1px solid #3a5f7f",
-            alignItems: "center",
-          }}
-        >
-          <Col flex={1}>
-            <div
-              style={{
-                margin: 0,
-                color: "#ffffff",
-                fontSize: 18,
-                lineHeight: "18px",
-                fontWeight: 600,
-              }}
-            >
-              交易图谱
-            </div>
-          </Col>
-          <Col>
-            <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
-          </Col>
-        </Row>
-
-        {/* 图表内容 */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "center",
-            margin: "16px 0",
+            backgroundColor: "#244963",
+            borderColor: "#3a5f7f",
+            color: "#ffffff",
+            borderRadius: 10,
+            padding: 16,
           }}
         >
-          <div style={{ flex: 1 }}>
-            {dimensions && (
-              <TxGraph
-                nodes={graphData.nodes}
-                links={graphData.links}
-                width={dimensions.width}
-                height={dimensions.height}
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-            )}
-          </div>
+          {/* 标题栏 */}
+          <Row
+            style={{
+              marginBottom: 16,
+              padding: "12px 16px",
+              borderRadius: 8,
+              alignItems: "center",
+            }}
+          >
+            <Col flex={1}>
+              <div
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  lineHeight: "18px",
+                  fontWeight: 600,
+                }}
+              >
+                交易图谱
+              </div>
+            </Col>
+            <Col>
+              <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
+            </Col>
+          </Row>
 
-          {/* 交易分析（右侧） */}
-          <div style={{ width: "400px", minWidth: "400px", marginLeft: 20 }}>
-            <div style={{ marginBottom: 12 }}>
-              <TxGraphFilter value={filter} onChange={(v) => setFilter(v)} />
+          {/* 图表内容 */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              margin: "16px 0",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              {dimensions && (
+                <TxGraph
+                  nodes={graphData.nodes}
+                  links={graphData.links}
+                  width={dimensions.width}
+                  height={dimensions.height}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                />
+              )}
             </div>
-            <TxAnalysis nodes={graphData.nodes} links={graphData.links} />
+
+            {/* 交易分析（右侧） */}
+            <div style={{ width: "400px", minWidth: "400px", marginLeft: 20 }}>
+              <div style={{ marginBottom: 12 }}>
+                <TxGraphFilter value={filter} onChange={(v) => setFilter(v)} />
+              </div>
+              <TxAnalysis nodes={graphData.nodes} links={graphData.links} />
+            </div>
           </div>
         </div>
       </div>
-    </ConfigProvider>
+    </>
   );
 };
 

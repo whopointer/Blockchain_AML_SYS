@@ -1,10 +1,8 @@
-/* 案件详情页样式 - 暗色主题 */
+/* 案件详情页样式 */
 
 .case-details-container {
   padding: 20px;
-  background-color: #1a3a52;
   min-height: 100vh;
-  color: #ffffff;
 }
 
 .case-details-header {
@@ -15,31 +13,26 @@
 
 .case-details-header h2 {
   margin: 0;
-  color: #ffffff;
   font-size: 24px;
   font-weight: 600;
 }
 
 .case-details-header p {
   margin-top: 8px;
-  color: #d8e3f0;
   font-size: 14px;
 }
 
 /* 过滤区域 */
 .filter-section {
-  background-color: #244963;
   padding: 16px;
   border-radius: 16px;
   margin-bottom: 20px;
-  border: 1px solid #3a5f7f;
 }
 
 .filter-section-title {
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 12px;
-  color: var(--text-primary);
 }
 
 .filter-row {
@@ -58,28 +51,19 @@
   text-align: center;
   padding: 16px;
   border-radius: 16px;
-  background-color: #244963;
-  border: 1px solid #3a5f7f;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid #d9d9d9;
 }
 
 .stat-card-value {
   font-size: 24px;
   font-weight: 600;
-  color: #1890ff;
   line-height: 1;
   margin-bottom: 8px;
 }
 
 .stat-card-label {
   font-size: 12px;
-  color: #d8e3f0;
+  color: #666;
 }
 
 .stat-card.high-risk .stat-card-value {
@@ -101,29 +85,21 @@
 
 .case-details-table :global(.ant-table) {
   font-size: 13px;
-  background: #244963;
-  color: #ffffff;
 }
 
 .case-details-table :global(.ant-table-thead > tr > th) {
-  background-color: #244963;
   font-weight: 600;
-  border-color: #3a5f7f;
-  color: #ffffff;
 }
 
 .case-details-table :global(.ant-table-cell) {
-  border-color: #3a5f7f;
-  color: #d8e3f0;
 }
 
 .case-details-table :global(.ant-table-row) {
-  background: #244963;
   transition: background 0.3s ease;
 }
 
 .case-details-table :global(.ant-table-row:hover > td) {
-  background-color: rgba(102, 126, 234, 0.1);
+  background-color: #f5f5f5;
 }
 
 /* 地址显示 */
@@ -131,7 +107,6 @@
   font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 12px;
   word-break: break-all;
-  color: #d8e3f0;
 }
 
 /* 标签样式 */
@@ -144,17 +119,6 @@
 /* 抽屉样式 */
 .snapshot-drawer :global(.ant-drawer-body) {
   padding: 24px;
-  background: #244963;
-  color: #ffffff;
-}
-
-.snapshot-drawer :global(.ant-drawer-header) {
-  background: #244963;
-  border-bottom: 1px solid #3a5f7f;
-}
-
-.snapshot-drawer :global(.ant-drawer-title) {
-  color: #ffffff;
 }
 
 .snapshot-details-section {
@@ -163,7 +127,6 @@
 
 .snapshot-details-section h4 {
   margin: 0 0 12px 0;
-  color: #ffffff;
   font-weight: 600;
   font-size: 14px;
 }
@@ -172,7 +135,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #d8e3f0;
+  color: #666;
 }
 
 /* 操作按钮 */
@@ -188,24 +151,11 @@
 
 /* 描述列表样式 */
 :global(.ant-descriptions-bordered) {
-  border: 1px solid #3a5f7f !important;
   border-radius: 8px;
-}
-
-:global(.ant-descriptions-bordered) :global(.ant-descriptions-item-label) {
-  background-color: rgba(26, 58, 82, 0.5);
-  color: #ffffff;
-}
-
-:global(.ant-descriptions-bordered) :global(.ant-descriptions-item-content) {
-  background-color: #244963;
-  color: #d8e3f0;
 }
 
 /* 主要卡片样式 */
 .case-details-card {
-  background: #244963 !important;
-  border: 1px solid #3a5f7f !important;
   border-radius: 16px !important;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.3s ease;
@@ -218,7 +168,6 @@
 
 /* 头部描述样式 */
 .case-details-header-description {
-  color: #d8e3f0 !important;
   margin-top: 8px !important;
 }
 

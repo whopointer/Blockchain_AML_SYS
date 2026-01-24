@@ -166,14 +166,11 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
     <ConfigProvider
       theme={{
         components: {
-          Tooltip: {
-            colorTextLightSolid: "#000000",
-          },
           Table: {
-            headerBg: "#244963",
-            headerColor: "#ffffff",
-            bodySortBg: "#1a3a52",
-            rowHoverBg: "#3a5f7f",
+            headerBg: "#f8f9fa",
+            headerColor: "#000000",
+            bodySortBg: "#ffffff",
+            rowHoverBg: "#f5f5f5",
           },
         },
       }}
@@ -183,15 +180,13 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
         onHide={onHide}
         size="lg"
         dialogClassName="modal-90w"
-        contentClassName="dark-modal"
       >
         <Modal.Header
           closeButton
-          style={{ backgroundColor: "#244963", borderColor: "#3a5f7f" }}
         >
-          <Modal.Title style={{ color: "#ffffff" }}>交易明细</Modal.Title>
+          <Modal.Title>交易明细</Modal.Title>
         </Modal.Header>
-        <Modal.Body style={{ backgroundColor: "#1a3a52", color: "#d8e3f0" }}>
+        <Modal.Body>
           <div>
             <Table
               dataSource={transactionData}

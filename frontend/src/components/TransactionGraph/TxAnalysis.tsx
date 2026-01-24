@@ -214,8 +214,11 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
       showSorterTooltip: false,
       render: (text: number, record: AddressStat) => (
         <a
-          onClick={() => handleCountClick(record.address, false)}
-          style={{ color: "#667eea", textDecoration: "underline" }}
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleCountClick(record.address, false);
+          }}
         >
           {text}
         </a>
@@ -235,8 +238,8 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
   return (
     <div
       style={{
-        backgroundColor: "#244963",
-        border: "1px solid #3a5f7f",
+        backgroundColor: "#ffffff",
+        // border: "1px solid #3a5f7f",
         borderRadius: 8,
         padding: 16,
         height: "auto",
@@ -248,7 +251,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
         style={{
           marginTop: 0,
           marginBottom: 0,
-          color: "#ffffff",
+          color: "#222",
           fontSize: 18,
           fontWeight: 500,
         }}
@@ -261,7 +264,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
           marginTop: 0,
           marginBottom: 16,
           fontSize: 12,
-          color: "#9bb3c8",
+          color: "#666",
         }}
       >
         {nodes.length > 0

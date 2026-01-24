@@ -102,9 +102,6 @@ const GraphSnapshotButton: React.FC<GraphSnapshotButtonProps> = ({
         cancelText="取消"
         okButtonProps={{
           disabled: !formValid,
-          style: {
-            borderColor: !formValid ? "#3a5f7f" : undefined,
-          },
         }}
       >
         <Form

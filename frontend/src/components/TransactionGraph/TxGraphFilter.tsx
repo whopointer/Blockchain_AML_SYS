@@ -1,14 +1,5 @@
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
-import {
-  Select,
-  Row,
-  Col,
-  InputNumber,
-  DatePicker,
-  ConfigProvider,
-  Slider,
-  Space,
-} from "antd";
+import { Select, Row, Col, InputNumber, DatePicker, Slider, Space } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import graphAnalysisData from "./address_graph_analysis.json";
 
@@ -170,38 +161,20 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
   );
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorBgElevated: "#1a3a52",
-          colorPrimary: "#667eea",
-          colorText: "#ffffff",
-        },
-        components: {
-          Select: {
-            controlItemBgHover: "#3a5f7f",
-            controlItemBgActive: "#667eea",
-          },
-          Tooltip: {
-            colorTextLightSolid: "#222",
-          },
-        },
-      }}
-    >
+    <>
       <div
         style={{
-          backgroundColor: "#244963",
-          border: "1px solid #3a5f7f",
+          backgroundColor: "white",
+          color: "#222",
           borderRadius: 8,
           padding: 16,
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          color: "#d8e3f0",
         }}
       >
         <Row gutter={12} style={{ marginBottom: 8, alignItems: "center" }}>
-          <Col style={{ fontWeight: "bold", color: "#ffffff" }}>数据筛选</Col>
+          <Col style={{ fontWeight: "bold" }}>数据筛选</Col>
           <Col flex={1}>
             <Select
               value={value?.txType || "all"}
@@ -240,7 +213,6 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
             style={{
               fontWeight: "bold",
               whiteSpace: "nowrap",
-              color: "#ffffff",
             }}
           >
             金额筛选
@@ -293,7 +265,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
           </Col>
           <Col flex={1}>
             <Space direction="vertical" style={{ width: "100%" }}>
-              <Row gutter={8} style={{ fontSize: 12, color: "#9bb3c8" }}>
+              <Row gutter={8} style={{ fontSize: 12 }}>
                 <Col style={{ flex: 1 }}>
                   <DatePicker
                     placeholder="起始日期"
@@ -320,12 +292,8 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                 value={sliderValue}
                 onChange={handleSliderChange}
                 marks={{
-                  0: (
-                    <span style={{ fontSize: 10, color: "#9bb3c8" }}>最早</span>
-                  ),
-                  [totalSeconds]: (
-                    <span style={{ fontSize: 10, color: "#9bb3c8" }}>最近</span>
-                  ),
+                  0: <span style={{ fontSize: 10 }}>最早</span>,
+                  [totalSeconds]: <span style={{ fontSize: 10 }}>最近</span>,
                 }}
                 tooltip={{
                   formatter: (value) => {
@@ -335,26 +303,12 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                     );
                   },
                 }}
-                trackStyle={[{ backgroundColor: "#667eea" }]}
-                railStyle={{ backgroundColor: "#3a5f7f" }}
-                handleStyle={[
-                  {
-                    backgroundColor: "#667eea",
-                    borderColor: "#667eea",
-                    boxShadow: "0 0 0 3px rgba(102, 126, 234, 0.2)",
-                  },
-                  {
-                    backgroundColor: "#667eea",
-                    borderColor: "#667eea",
-                    boxShadow: "0 0 0 3px rgba(102, 126, 234, 0.2)",
-                  },
-                ]}
               />
             </Space>
           </Col>
         </Row>
       </div>
-    </ConfigProvider>
+    </>
   );
 };
 

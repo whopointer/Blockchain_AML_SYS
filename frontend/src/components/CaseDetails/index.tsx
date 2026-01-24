@@ -4,7 +4,6 @@ import dayjs, { Dayjs } from "dayjs";
 import zhCN from "antd/locale/zh_CN";
 import "./CaseDetails.css";
 
-import FilterSection from "./FilterSection";
 import SnapshotTable from "./SnapshotTable";
 import GraphDisplay from "./GraphDisplay";
 
@@ -658,15 +657,6 @@ const CaseDetails: React.FC = () => {
       locale={zhCN}
       theme={{
         token: {
-          colorBgBase: "#1a3a52", // 深色背景
-          colorBgContainer: "#244963", // 容器背景
-          colorBgElevated: "#244963", // 浮层背景
-          colorBorder: "#3a5f7f", // 边框颜色
-          colorText: "#ffffff", // 主要文字
-          colorTextSecondary: "#d8e3f0", // 次要文字
-          colorTextTertiary: "#9bb3c8", // 三级文字
-          colorFill: "#3a5f7f", // 填充色
-          colorFillSecondary: "rgba(58, 95, 127, 0.6)", // 次要填充
           colorPrimary: "#667eea", // 主要强调色
           colorSuccess: "#13b497", // 成功色
           colorWarning: "#faad14", // 警告色
@@ -675,48 +665,15 @@ const CaseDetails: React.FC = () => {
         },
         components: {
           Table: {
-            headerBg: "#244963",
-            headerColor: "#ffffff",
-            bodySortBg: "#1a3a52",
-            rowHoverBg: "#3a5f7f",
             cellPaddingBlock: 12,
             cellPaddingInline: 16,
-          },
-          Select: {
-            controlItemBgHover: "#3a5f7f",
-            controlItemBgActive: "#667eea",
-            colorBgContainer: "#244963",
-            colorText: "#ffffff",
-            colorTextPlaceholder: "#9bb3c8",
-            colorBorder: "#3a5f7f",
-            colorPrimary: "#667eea",
-          },
-          Drawer: {
-            colorBgElevated: "#244963",
-            colorText: "#ffffff",
-            colorTextDescription: "#d8e3f0",
-          },
-          Card: {
-            colorBgContainer: "#244963",
-            colorBorderSecondary: "#3a5f7f",
-          },
-          Input: {
-            colorBgContainer: "#244963",
-            colorText: "#ffffff",
-            colorTextPlaceholder: "#9bb3c8",
-            colorBorder: "#3a5f7f",
           },
         },
       }}
     >
       <div className="case-details-container">
         <Card className="case-details-card">
-          <FilterSection
-            filterConfig={filterConfig}
-            setFilterConfig={setFilterConfig}
-            handleClearFilters={handleClearFilters}
-            allTags={allTags}
-          />
+
 
           <SnapshotTable
             filteredSnapshots={filteredSnapshots}
