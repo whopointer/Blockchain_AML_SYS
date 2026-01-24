@@ -22,19 +22,18 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
   isMalicious = false,
 }) => {
   return (
-    <Card
-      style={{
-        marginBottom: 16,
-        backgroundColor: "#244963",
-        borderColor: "#3a5f7f",
-        color: "#ffffff",
-      }}
-    >
+    <Card>
       <Row gutter={[16, 16]} align="middle">
         {/* 地址信息 */}
         <Col xs={24} sm={12} md={6}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "#9bb3c8", marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 8,
+              }}
+            >
               <EnvironmentOutlined /> 当前地址
             </div>
             <div
@@ -44,7 +43,7 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
                 fontFamily: "monospace",
                 wordBreak: "break-all",
                 marginBottom: 8,
-                color: "#ffffff",
+                color: "var(--text-color)",
               }}
               title={address}
             >
@@ -58,22 +57,38 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
         <Col xs={24} sm={12} md={6}>
           <Statistic
             title={
-              <span style={{ color: "#d8e3f0" }}>
+              <span style={{ color: "var(--text-secondary)" }}>
                 <SwapOutlined /> 交易总次数
               </span>
             }
             value={txCount}
-            valueStyle={{ color: "#667eea", fontSize: 18, fontWeight: "bold" }}
+            valueStyle={{
+              color: "var(--text-color)",
+              fontSize: 18,
+              fontWeight: "bold",
+            }}
           />
         </Col>
 
         {/* 首次交易时间 */}
         <Col xs={24} sm={12} md={6}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "#9bb3c8", marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 8,
+              }}
+            >
               <ClockCircleOutlined /> 首次交易时间
             </div>
-            <div style={{ fontSize: 14, fontWeight: "bold", color: "#ffffff" }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: "bold",
+                color: "var(--text-color)",
+              }}
+            >
               {firstTxTime || "-"}
             </div>
           </div>
@@ -82,10 +97,22 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
         {/* 最近交易时间 */}
         <Col xs={24} sm={12} md={6}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "#9bb3c8", marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                marginBottom: 8,
+              }}
+            >
               <ClockCircleOutlined /> 最近交易时间
             </div>
-            <div style={{ fontSize: 14, fontWeight: "bold", color: "#ffffff" }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: "bold",
+                color: "var(--text-color)",
+              }}
+            >
               {latestTxTime || "-"}
             </div>
           </div>

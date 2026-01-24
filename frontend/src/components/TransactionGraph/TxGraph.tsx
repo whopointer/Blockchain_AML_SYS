@@ -47,7 +47,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
 
   const useFilter = useMemo(
     () => filter ?? internalFilter,
-    [filter, internalFilter]
+    [filter, internalFilter],
   );
 
   useEffect(() => {
@@ -82,7 +82,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
     nodes: NodeItem[],
     links: LinkItem[],
     width: number,
-    height: number
+    height: number,
   ) {
     const centerX = width / 2;
     const centerY = height / 2;
@@ -115,7 +115,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
         const minSpacing = 40;
         const spacing = Math.min(
           maxSpacing,
-          Math.max(minSpacing, height / (count + 1))
+          Math.max(minSpacing, height / (count + 1)),
         );
         const startY = centerY - (spacing * (count - 1)) / 2;
 
@@ -136,7 +136,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
   const nodesWithPositionRef = useRef<Map<string, { x: number; y: number }>>(
-    new Map()
+    new Map(),
   );
   const transformRef = useRef<{
     x: number;
@@ -195,12 +195,12 @@ const TxGraph: React.FC<TxGraphProps> = ({
     });
 
     const filteredNodes = nodes.filter(
-      (n) => n === root || (nodeSet.has(n.id) && matchAddr(n))
+      (n) => n === root || (nodeSet.has(n.id) && matchAddr(n)),
     );
 
     const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
     const filteredLinks = byTx.filter(
-      (l) => filteredNodeIds.has(l.from) && filteredNodeIds.has(l.to)
+      (l) => filteredNodeIds.has(l.from) && filteredNodeIds.has(l.to),
     );
 
     return { filteredNodes, filteredLinks };
@@ -221,7 +221,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
 
     let layout: { nodes: NodeItem[]; links: LinkItem[] };
     const hasExistingPositions = filteredNodes.every((n) =>
-      nodesWithPositionRef.current.has(n.id)
+      nodesWithPositionRef.current.has(n.id),
     );
 
     if (hasExistingPositions) {
@@ -235,7 +235,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
         [...filteredNodes],
         [...filteredLinks],
         width,
-        height
+        height,
       );
       layout.nodes.forEach((n) => {
         nodesWithPositionRef.current.set(n.id, { x: n.x!, y: n.y! });
@@ -258,7 +258,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", "#bbb");
+      .attr("fill", "var(--text-muted)");
 
     g.selectAll("*").remove();
 
@@ -272,21 +272,21 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("stroke-width", 2)
       .attr(
         "x1",
-        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.from) as any).x
+        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.from) as any).x,
       )
       .attr(
         "y1",
-        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.from) as any).y
+        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.from) as any).y,
       )
       .attr(
         "x2",
-        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.to) as any).x
+        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.to) as any).x,
       )
       .attr(
         "y2",
-        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.to) as any).y
+        (d: LinkItem) => (layout.nodes.find((n) => n.id === d.to) as any).y,
       )
-      .attr("stroke", "#bbb")
+      .attr("stroke", "var(--text-muted)")
       .attr("stroke-width", 2)
       .on("click", function (event, d) {
         setSelectedLink(d);
@@ -301,7 +301,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .append("polygon")
       .attr("class", "link-arrow")
       .attr("points", "5,0 -10,6 -10,-6")
-      .attr("fill", "#bbb")
+      .attr("fill", "var(--text-muted)")
       .attr("data-scale", "1")
       .attr("transform", (d: any) => {
         const s = layout.nodes.find((n) => n.id === d.from) as any;
@@ -340,7 +340,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       })
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
-      .attr("fill", "#fff")
+      .attr("fill", "var(--text-secondary)")
       .attr("pointer-events", "none")
       .on("click", function (event, d) {
         setSelectedLink(d);
@@ -351,12 +351,12 @@ const TxGraph: React.FC<TxGraphProps> = ({
     // 让鼠标悬停同时高亮线与对应的中点箭头
     linkLines
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("stroke", "#eee").attr("stroke-width", 4);
+        d3.select(this).attr("stroke-width", 4);
         g.selectAll("polygon.link-arrow")
           .filter((ad: any) => ad === d)
           .each(function (ad: any) {
             const poly = d3.select(this);
-            poly.attr("fill", "#eee").attr("data-scale", "1.4");
+            poly.attr("data-scale", "1.4");
             const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
             const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
             const mx = (sNode.x + tNode.x) / 2;
@@ -366,7 +366,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
               Math.PI;
             poly.attr(
               "transform",
-              `translate(${mx},${my}) rotate(${angle}) scale(1.4)`
+              `translate(${mx},${my}) rotate(${angle}) scale(1.4)`,
             );
           });
 
@@ -374,17 +374,18 @@ const TxGraph: React.FC<TxGraphProps> = ({
         g.selectAll("text.link-label")
           .filter((ad: any) => ad === d)
           .attr("font-weight", "bold")
-          .attr("font-size", 12)
-          .attr("fill", "#fff");
+          .attr("font-size", 12);
       })
       .on("mouseout", function (event, d) {
-        d3.select(this).attr("stroke", "#bbb").attr("stroke-width", 2);
+        d3.select(this)
+          .attr("stroke", "var(--text-muted)")
+          .attr("stroke-width", 2);
         // 恢复箭头大小与颜色
         g.selectAll("polygon.link-arrow")
           .filter((ad: any) => ad === d)
           .each(function (ad: any) {
             const poly = d3.select(this);
-            poly.attr("fill", "#bbb").attr("data-scale", "1");
+            poly.attr("fill", "var(--text-muted)").attr("data-scale", "1");
             const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
             const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
             const mx = (sNode.x + tNode.x) / 2;
@@ -394,7 +395,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
               Math.PI;
             poly.attr(
               "transform",
-              `translate(${mx},${my}) rotate(${angle}) scale(1)`
+              `translate(${mx},${my}) rotate(${angle}) scale(1)`,
             );
           });
 
@@ -402,7 +403,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
           .filter((ad: any) => ad === d)
           .attr("font-weight", "normal")
           .attr("font-size", 10)
-          .attr("fill", "#fff");
+          .attr("fill", "var(--text-secondary)");
       });
 
     // 节点
@@ -428,7 +429,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("y", (d: any) => (d.layer === 0 ? -20 : -12))
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
-      .attr("fill", "#eee");
+      .attr("fill", "var(--text-secondary)");
 
     nodeGroup
       .append("text")
@@ -441,7 +442,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("y", (d: any) => (d.layer === 0 ? 25 : 16))
       .attr("text-anchor", "middle")
       .attr("font-size", 12)
-      .attr("fill", "#eee");
+      .attr("fill", "var(--text-color)");
 
     // 允许拖动：只改变被拖动节点的位置，并及时更新连线
     const linksSel = g.selectAll("line.link");
@@ -511,7 +512,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
             k: event.transform.k,
           };
           g.attr("transform", event.transform as any);
-        })
+        }),
     );
 
     // 恢复之前保存的缩放和拖动位置
@@ -523,7 +524,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
     ) {
       g.attr(
         "transform",
-        `translate(${savedTransform.x},${savedTransform.y}) scale(${savedTransform.k})`
+        `translate(${savedTransform.x},${savedTransform.y}) scale(${savedTransform.k})`,
       );
     } else {
       const root = nodes
@@ -554,7 +555,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
         ref={svgRef}
         width={width}
         height={height}
-        style={{ border: "1px solid #e6e6e6" }}
+        style={{ border: "1px solid #e6e6e6", backgroundColor: "white" }}
       >
         <g ref={gRef} />
       </svg>

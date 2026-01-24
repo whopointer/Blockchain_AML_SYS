@@ -7,7 +7,7 @@
 
 .case-details-header {
   margin-bottom: 24px;
-  border-bottom: 2px solid #1890ff;
+  border-bottom: 2px solid var(--primary-color);
   padding-bottom: 16px;
 }
 
@@ -15,17 +15,21 @@
   margin: 0;
   font-size: 24px;
   font-weight: 600;
+  color: var(--text-color);
 }
 
 .case-details-header p {
   margin-top: 8px;
   font-size: 14px;
+  color: var(--text-secondary);
 }
 
 /* 过滤区域 */
 .filter-section {
   padding: 16px;
-  border-radius: 16px;
+  border-radius: var(--border-radius);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   margin-bottom: 20px;
 }
 
@@ -50,8 +54,14 @@
 .stat-card {
   text-align: center;
   padding: 16px;
-  border-radius: 16px;
-  border: 1px solid #d9d9d9;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-medium);
 }
 
 .stat-card-value {
@@ -63,35 +73,45 @@
 
 .stat-card-label {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .stat-card.high-risk .stat-card-value {
-  color: #ff4d4f;
+  color: var(--danger-color);
 }
 
 .stat-card.medium-risk .stat-card-value {
-  color: #faad14;
+  color: var(--warning-color);
 }
 
 .stat-card.total .stat-card-value {
-  color: #1890ff;
+  color: var(--primary-color);
 }
 
 /* 表格样式 */
 .case-details-table {
   margin-top: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
 }
 
 .case-details-table :global(.ant-table) {
   font-size: 13px;
+  background: transparent;
 }
 
 .case-details-table :global(.ant-table-thead > tr > th) {
   font-weight: 600;
+  background: #fafafa;
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-color);
 }
 
 .case-details-table :global(.ant-table-cell) {
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
 .case-details-table :global(.ant-table-row) {
@@ -113,7 +133,7 @@
 .snapshot-tag {
   font-size: 12px;
   padding: 2px 8px;
-  border-radius: 2px;
+  border-radius: var(--border-radius);
 }
 
 /* 抽屉样式 */
@@ -135,7 +155,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 /* 操作按钮 */
@@ -156,14 +176,16 @@
 
 /* 主要卡片样式 */
 .case-details-card {
-  border-radius: 16px !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-soft) !important;
   transition: all 0.3s ease;
+  border: 1px solid var(--border-color) !important;
+  background: var(--card-bg) !important;
 }
 
 .case-details-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium) !important;
 }
 
 /* 头部描述样式 */

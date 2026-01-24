@@ -127,8 +127,6 @@ const TransactionGraph: React.FC = () => {
 
         <div
           style={{
-            backgroundColor: "#244963",
-            borderColor: "#3a5f7f",
             color: "#ffffff",
             borderRadius: 10,
             padding: 16,
@@ -137,8 +135,7 @@ const TransactionGraph: React.FC = () => {
           {/* 标题栏 */}
           <Row
             style={{
-              marginBottom: 16,
-              padding: "12px 16px",
+              padding: "12px 0",
               borderRadius: 8,
               alignItems: "center",
             }}
@@ -165,7 +162,6 @@ const TransactionGraph: React.FC = () => {
             style={{
               display: "flex",
               justifyContent: "center",
-              margin: "16px 0",
             }}
           >
             <div style={{ flex: 1 }}>
