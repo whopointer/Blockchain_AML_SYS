@@ -3,17 +3,17 @@
 :root {
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --success-gradient: linear-gradient(135deg, #13B497 0%, #59D4A4 100%);
-  --warning-gradient: linear-gradient(135deg, #FFA726 0%, #FF7043 100%);
-  --danger-gradient: linear-gradient(135deg, #F44336 0%, #E91E63 100%);
-  
+  --success-gradient: linear-gradient(135deg, #13b497 0%, #59d4a4 100%);
+  --warning-gradient: linear-gradient(135deg, #ffa726 0%, #ff7043 100%);
+  --danger-gradient: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
+
   --dark-bg: #1a3a52;
   --card-bg: #244963;
   --card-border: #3a5f7f;
   --text-primary: #ffffff;
   --text-secondary: #d8e3f0;
   --text-muted: #9bb3c8;
-  
+
   --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-medium: 0 8px 16px rgba(0, 0, 0, 0.2);
   --shadow-strong: 0 16px 32px rgba(0, 0, 0, 0.3);
@@ -28,15 +28,19 @@
 body {
   background: var(--dark-bg);
   color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   line-height: 1.6;
 }
 
 .App {
   min-height: 100vh;
   background: var(--dark-bg);
-  background-image: 
-    radial-gradient(at 40% 20%, rgba(102, 126, 234, 0.1) 0px, transparent 50%),
+  background-image: radial-gradient(
+      at 40% 20%,
+      rgba(102, 126, 234, 0.1) 0px,
+      transparent 50%
+    ),
     radial-gradient(at 80% 0%, rgba(118, 75, 162, 0.1) 0px, transparent 50%),
     radial-gradient(at 0% 50%, rgba(240, 147, 251, 0.05) 0px, transparent 50%);
 }
@@ -70,7 +74,7 @@ body {
 }
 
 .nav-link::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -2px;
   left: 50%;
@@ -147,7 +151,11 @@ body {
 }
 
 .card-header {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.1) 0%,
+    rgba(118, 75, 162, 0.1) 100%
+  ) !important;
   border-bottom: 1px solid var(--card-border) !important;
   border-radius: 16px 16px 0 0 !important;
   padding: 1.5rem !important;
@@ -289,21 +297,33 @@ body {
 }
 
 .alert-info {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.1) 0%,
+    rgba(118, 75, 162, 0.1) 100%
+  ) !important;
   color: var(--text-primary) !important;
   border-left: 4px solid #667eea !important;
 }
 
 .alert-success {
-  background: linear-gradient(135deg, rgba(19, 180, 151, 0.1) 0%, rgba(89, 212, 164, 0.1) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(19, 180, 151, 0.1) 0%,
+    rgba(89, 212, 164, 0.1) 100%
+  ) !important;
   color: var(--text-primary) !important;
-  border-left: 4px solid #13B497 !important;
+  border-left: 4px solid #13b497 !important;
 }
 
 .alert-danger {
-  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, rgba(233, 30, 99, 0.1) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(244, 67, 54, 0.1) 0%,
+    rgba(233, 30, 99, 0.1) 100%
+  ) !important;
   color: var(--text-primary) !important;
-  border-left: 4px solid #F44336 !important;
+  border-left: 4px solid #f44336 !important;
 }
 
 /* 进度条样式 */
@@ -330,7 +350,10 @@ code {
 }
 
 /* 标题样式 */
-h2, h3, h4, h5 {
+h2,
+h3,
+h4,
+h5 {
   color: var(--text-primary) !important;
   font-weight: 700 !important;
   margin-bottom: 1.5rem !important;
@@ -367,19 +390,19 @@ h4 {
     padding: 1.5rem;
     margin-bottom: 1rem;
   }
-  
+
   .card-body {
     padding: 1rem !important;
   }
-  
+
   .btn {
     padding: 0.6rem 1.2rem !important;
   }
-  
+
   .table {
     font-size: 0.875rem;
   }
-  
+
   .navbar-brand {
     font-size: 1.2rem;
   }
@@ -421,4 +444,27 @@ h4 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #667eea;
+}
+
+/* 暗色主题 Modal 样式 */
+.dark-modal {
+  background-color: #1a3a52 !important;
+}
+
+.dark-modal .modal-content {
+  background-color: #1a3a52 !important;
+  border: 1px solid #3a5f7f !important;
+}
+
+.dark-modal .modal-header {
+  background-color: #244963 !important;
+  border-bottom: 1px solid #3a5f7f !important;
+}
+
+.dark-modal .modal-header .btn-close {
+  filter: brightness(0) invert(1);
+}
+
+.dark-modal .modal-title {
+  color: #ffffff !important;
 }
