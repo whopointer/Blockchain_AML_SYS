@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Modal } from "react-bootstrap";
 import {
   Table,
@@ -8,10 +8,14 @@ import {
   Tooltip,
   message,
   ConfigProvider,
+  Spin,
 } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
-import batchTxHashDetail from "./batch_tx_hash_detail.json";
+import {
+  TransactionDetail,
+  transactionApi,
+} from "../../services/transaction/index";
 
 // 自定义函数用于在文本中间添加省略号
 const truncateMiddle = (str: string, maxLength: number = 15) => {
@@ -23,7 +27,7 @@ const truncateMiddle = (str: string, maxLength: number = 15) => {
   const endLength = Math.floor(maxLength / 2) - 1;
 
   return `${str.substring(0, startLength)}...${str.substring(
-    str.length - endLength
+    str.length - endLength,
   )}`;
 };
 
@@ -34,10 +38,17 @@ interface TxDetailProps {
 }
 
 const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
-  // 如果没有选中的边，返回空内容
-  if (!link) {
-    return null;
-  }
+  // 测试用的交易哈希列表
+  const testTxHashes = useMemo(
+    () => [
+      "0x000109f8e4760f085ddc9df66f891e24b0b219a3d258aba479c7cdb0a9a1cd9f",
+      "0x00019497573dedae9387f8b3eb3a4e1a0622eb473f527c3e673811599ba25d86",
+    ],
+    [],
+  );
+
+  const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // 复制文本到剪贴板的函数
   const copyToClipboard = (text: string) => {
@@ -51,10 +62,39 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
       });
   };
 
-  const filteredTransactions = batchTxHashDetail.tx_detail_list;
+  // 获取交易详情
+  useEffect(() => {
+    if (show && link) {
+      const fetchTransactionDetails = async () => {
+        setLoading(true);
+        try {
+          const response = await transactionApi.getTransactionDetails({
+            tx_hash_list: testTxHashes,
+          });
+          if (response.success) {
+            setTransactions(response.tx_detail_list);
+          } else {
+            message.error(`获取交易详情失败: ${response.msg}`);
+          }
+        } catch (error) {
+          console.error("获取交易详情出错:", error);
+          message.error("获取交易详情失败，请稍后重试");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchTransactionDetails();
+    }
+  }, [show, link, testTxHashes]);
+
+  // 如果没有选中的边，返回空内容
+  if (!link) {
+    return null;
+  }
 
   // 生成交易数据列表
-  const transactionData = filteredTransactions.map((tx, index) => ({
+  const transactionData = transactions.map((tx, index) => ({
     key: index,
     time: tx.time,
     from: tx.from,
@@ -175,25 +215,20 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
         },
       }}
     >
-      <Modal
-        show={show}
-        onHide={onHide}
-        size="lg"
-        dialogClassName="modal-90w"
-      >
-        <Modal.Header
-          closeButton
-        >
+      <Modal show={show} onHide={onHide} size="lg" dialogClassName="modal-90w">
+        <Modal.Header closeButton>
           <Modal.Title>交易明细</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div>
-            <Table
-              dataSource={transactionData}
-              columns={columns}
-              pagination={{ pageSize: 10 }}
-              scroll={{ y: 400 }}
-            />
+            <Spin spinning={loading} tip="加载交易详情中...">
+              <Table
+                dataSource={transactionData}
+                columns={columns}
+                pagination={{ pageSize: 10 }}
+                scroll={{ y: 400 }}
+              />
+            </Spin>
           </div>
         </Modal.Body>
       </Modal>

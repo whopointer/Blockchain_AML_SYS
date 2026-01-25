@@ -6,10 +6,9 @@ import AddressInfo from "./AddressInfo";
 import GraphSnapshotButton from "./GraphSnapshotButton";
 import { NodeItem, LinkItem, sampleData } from "./types";
 import graphAnalysisData from "./address_graph_analysis.json";
-import { ConfigProvider, Row, Col, message } from "antd";
+import { Row, Col, message, Card } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import zhCN from "antd/es/locale/zh_CN";
 
 dayjs.locale("zh-cn");
 
@@ -46,7 +45,7 @@ const TransactionGraph: React.FC = () => {
       if (currentContainer) {
         const containerWidth = currentContainer.clientWidth;
         if (containerWidth > 0) {
-          const width = containerWidth - 450;
+          const width = containerWidth - 480;
           const height = window.innerHeight - 120;
           setDimensions({ width, height: Math.max(height, 600) });
         }
@@ -115,7 +114,7 @@ const TransactionGraph: React.FC = () => {
 
   return (
     <>
-      <div ref={containerRef} style={{ borderRadius: 16 }}>
+      <div ref={containerRef} style={{ padding: 16 }}>
         {/* 地址基本信息 */}
         <AddressInfo
           address={mainNode?.addr}
@@ -125,45 +124,22 @@ const TransactionGraph: React.FC = () => {
           isMalicious={mainNode?.malicious === 1}
         />
 
-        <div
-          style={{
-            color: "#ffffff",
-            borderRadius: 10,
-            padding: 16,
-          }}
+        {/* 交易图谱主内容 */}
+        <Card
+          title={
+            <Row style={{ width: "100%", alignItems: "center" }}>
+              <Col flex={1} style={{fontSize: 18}}>交易图谱</Col>
+              <Col>
+                <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
+              </Col>
+            </Row>
+          }
+          style={{ margin: "16px 0", borderRadius: 8, }}
+          bordered={false}
+          bodyStyle={{ padding: 16 }}
         >
-          {/* 标题栏 */}
-          <Row
-            style={{
-              padding: "12px 0",
-              borderRadius: 8,
-              alignItems: "center",
-            }}
-          >
-            <Col flex={1}>
-              <div
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  lineHeight: "18px",
-                  fontWeight: 600,
-                }}
-              >
-                交易图谱
-              </div>
-            </Col>
-            <Col>
-              <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
-            </Col>
-          </Row>
-
           {/* 图表内容 */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center" }}>
             <div style={{ flex: 1 }}>
               {dimensions && (
                 <TxGraph
@@ -185,7 +161,7 @@ const TransactionGraph: React.FC = () => {
               <TxAnalysis nodes={graphData.nodes} links={graphData.links} />
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </>
   );

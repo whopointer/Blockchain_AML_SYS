@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { LinkItem, NodeItem } from "./types";
-import { Input, Table, Typography, Space } from "antd";
+import { Input, Table, Typography, Space, Card } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "./TxDetail";
 
@@ -236,12 +236,10 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
   ];
 
   return (
-    <div
+    <Card
       style={{
         backgroundColor: "#ffffff",
-        // border: "1px solid #3a5f7f",
         borderRadius: 8,
-        padding: 16,
         height: "auto",
         display: "flex",
         flexDirection: "column",
@@ -316,7 +314,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
         onHide={() => setShowTxDetail(false)}
         link={selectedLink}
       />
-    </div>
+    </Card>
   );
 };
 

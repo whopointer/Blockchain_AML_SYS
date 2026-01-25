@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useRef, useEffect } from "react";
 import { Select, Row, Col, InputNumber, DatePicker, Slider, Space } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import graphAnalysisData from "./address_graph_analysis.json";
+import { Card } from "antd";
 
 const { Option } = Select;
 
@@ -162,12 +163,11 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
 
   return (
     <>
-      <div
+      <Card
         style={{
           backgroundColor: "white",
           color: "#222",
           borderRadius: 8,
-          padding: 16,
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -307,7 +307,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
             </Space>
           </Col>
         </Row>
-      </div>
+      </Card>
     </>
   );
 };
