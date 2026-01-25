@@ -420,31 +420,16 @@ def main():
         # 进行预测和评估
         logger.info("开始详细评估...")
         
-        # 使用训练阶段保存的最优阈值（不在评估阶段重新搜索）
-        optimal_threshold = None
-        if hasattr(model, "training_history") and isinstance(model.training_history, dict):
-            optimal_threshold = (
-                model.training_history.get("stage2", {}).get("optimal_threshold")
-            )
-        if optimal_threshold is None:
-            optimal_threshold = 0.5
-            logger.warning("未找到训练阶段的最优阈值，使用默认阈值 0.5")
-        else:
-            logger.info(f"使用训练阶段最优阈值: {optimal_threshold:.3f}")
-        
-        # 使用最优阈值进行预测
-        all_predictions, all_probabilities = model.predict_single_graph(
-            data,
-            mask=None,
-            threshold=optimal_threshold
-        )
-
+        # 获取评估集数据
         eval_mask = data.test_mask if int(data.test_mask.sum()) > 0 else data.val_mask
         eval_idx = torch.nonzero(eval_mask, as_tuple=False).view(-1).cpu().numpy()
         true_labels_raw = data.y[eval_idx].cpu().numpy()
         known_mask = true_labels_raw >= 0
         true_labels_raw = true_labels_raw[known_mask]
         true_labels = (true_labels_raw == 1).astype(int)
+        
+        # 直接进行预测（不指定阈值，使用模型默认的predict_proba）
+        all_predictions, all_probabilities = model.predict_single_graph(data, mask=None)
         predictions_raw = all_predictions[eval_idx][known_mask]
         predictions = (predictions_raw == 1).astype(int)
         probabilities = all_probabilities[eval_idx][known_mask]
@@ -562,17 +547,45 @@ def main():
         start_time = time.time()
         
         try:
-            # 直接使用训练阶段保存的最优阈值
+            # 优先使用评估阶段保存的校准阈值
             optimal_threshold = None
-            if hasattr(model, "training_history") and isinstance(model.training_history, dict):
-                optimal_threshold = (
-                    model.training_history.get("stage2", {}).get("optimal_threshold")
-                )
+            threshold_source = "unknown"
+            
+            # 首先尝试从评估结果文件中读取校准阈值
+            try:
+                eval_path = os.path.join(args.checkpoint_dir, f"{args.experiment_name}_eval_results.json")
+                if os.path.exists(eval_path):
+                    with open(eval_path, "r", encoding="utf-8") as f:
+                        eval_results = json.load(f)
+                    calibrated_threshold = eval_results.get("calibrated_threshold")
+                    if calibrated_threshold is not None:
+                        optimal_threshold = float(calibrated_threshold)
+                        if 0.0 < optimal_threshold < 1.0:
+                            threshold_source = "eval_calibrated"
+                            logger.info(f"使用评估阶段校准阈值: {optimal_threshold:.3f}")
+                        else:
+                            logger.warning(f"评估阈值 {optimal_threshold:.3f} 无效，回退到训练阈值")
+                            optimal_threshold = None
+            except Exception as e:
+                logger.warning(f"读取评估结果文件失败: {e}，回退到训练阈值")
+            
+            # 如果没有评估阈值，使用训练阶段的最优阈值
+            if optimal_threshold is None:
+                if hasattr(model, "training_history") and isinstance(model.training_history, dict):
+                    optimal_threshold = (
+                        model.training_history.get("stage2", {}).get("optimal_threshold")
+                    )
+                if optimal_threshold is not None:
+                    threshold_source = "training_optimal"
+                    logger.info(f"使用训练阶段最优阈值: {optimal_threshold:.3f}")
+            
+            # 最后使用默认阈值作为兜底
             if optimal_threshold is None:
                 optimal_threshold = 0.5
-                logger.warning("未找到训练阶段的最优阈值，使用默认阈值 0.5")
-            else:
-                logger.info(f"使用训练阶段最优阈值: {optimal_threshold:.3f}")
+                threshold_source = "default"
+                logger.warning("未找到任何有效阈值，使用默认阈值 0.5")
+            
+            logger.info(f"推理阈值来源={threshold_source}, value={optimal_threshold:.3f}")
             
             # 进行预测（使用更低的阈值以允许更多正常交易被识别）
             predictions, probabilities = model.predict_single_graph(data, threshold=optimal_threshold)
