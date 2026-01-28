@@ -1,0 +1,226 @@
+/* 案件详情页样式 */
+
+.case-details-container {
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.case-details-header {
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 16px;
+}
+
+.case-details-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.case-details-header p {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* 过滤区域 */
+.filter-section {
+  padding: 16px;
+  border-radius: var(--border-radius);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.filter-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-row > * {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* 统计卡片 */
+.stat-card {
+  text-align: center;
+  padding: 16px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-medium);
+}
+
+.stat-card-value {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.stat-card-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.stat-card.high-risk .stat-card-value {
+  color: var(--danger-color);
+}
+
+.stat-card.medium-risk .stat-card-value {
+  color: var(--warning-color);
+}
+
+.stat-card.total .stat-card-value {
+  color: var(--primary-color);
+}
+
+/* 表格样式 */
+.case-details-table {
+  margin-top: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.case-details-table :global(.ant-table) {
+  font-size: 13px;
+  background: transparent;
+}
+
+.case-details-table :global(.ant-table-thead > tr > th) {
+  font-weight: 600;
+  background: #fafafa;
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.case-details-table :global(.ant-table-cell) {
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.case-details-table :global(.ant-table-row) {
+  transition: background 0.3s ease;
+}
+
+.case-details-table :global(.ant-table-row:hover > td) {
+  background-color: #f5f5f5;
+}
+
+/* 地址显示 */
+.address-text {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* 标签样式 */
+.snapshot-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--border-radius);
+}
+
+/* 抽屉样式 */
+.snapshot-drawer :global(.ant-drawer-body) {
+  padding: 24px;
+}
+
+.snapshot-details-section {
+  margin-bottom: 24px;
+}
+
+.snapshot-details-section h4 {
+  margin: 0 0 12px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-buttons :global(.ant-btn) {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* 描述列表样式 */
+:global(.ant-descriptions-bordered) {
+  border-radius: 8px;
+}
+
+/* 主要卡片样式 */
+.case-details-card {
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-soft) !important;
+  transition: all 0.3s ease;
+  border: 1px solid var(--border-color) !important;
+  background: var(--card-bg) !important;
+}
+
+.case-details-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium) !important;
+}
+
+/* 头部描述样式 */
+.case-details-header-description {
+  margin-top: 8px !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+  }
+
+  .filter-row > * {
+    min-width: auto;
+  }
+
+  .case-details-container {
+    padding: 12px;
+  }
+
+  .stat-card {
+    margin-bottom: 12px;
+  }
+
+  .case-details-table :global(.ant-table) {
+    font-size: 12px;
+  }
+
+  /* 添加移动端优化 */
+  .case-details-header h2 {
+    font-size: 20px;
+  }
+
+  .stat-card-value {
+    font-size: 20px;
+  }
+}

@@ -1,0 +1,221 @@
+{
+  "success": true,
+  "msg": "ok",
+  "graph_dic": {
+    "node_list": [
+      {
+        "id": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "label": "",
+        "title": "0x5ea46e4e1a8c466b99a57e00c0d342cb1f4f2bf7",
+        "layer": 0,
+        "addr": "0x5ea46e4e1a8c466b99a57e00c0d342cb1f4f2bf7",
+        "track": "one",
+        "pid": 0,
+        "color": "#4fae7b",
+        "shape": "star",
+        "expanded": true,
+        "malicious": 1
+      },
+      {
+        "id": "f0932d3f-52a0-4b95-a885-1d4045778088",
+        "label": "0x91d...e131b",
+        "title": "0x91d6673ca8db6ac157f02c6290d0e02aaa3e131b",
+        "layer": -1,
+        "addr": "0x91d6673ca8db6ac157f02c6290d0e02aaa3e131b",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false
+      },
+      {
+        "id": "33745a5d-46ce-4ef9-8d88-38c71138b2af",
+        "label": "PancakeSwap Crosschain",
+        "title": "0xe82e2d3b9db59f7c7b438239d92e2190a64e26ce",
+        "layer": 1,
+        "addr": "0xe82e2d3b9db59f7c7b438239d92e2190a64e26ce",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "exg": 1,
+        "shape": "circularImage",
+        "image": "/entity.png"
+      },
+      {
+        "id": "c4ea0b04-824f-46ef-9a05-a9a737eaf3d7",
+        "label": "Bridgers.xyz Swap",
+        "title": "0xb685760ebd368a891f27ae547391f4e2a289895b",
+        "layer": 1,
+        "addr": "0xb685760ebd368a891f27ae547391f4e2a289895b",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "exg": 1,
+        "shape": "circularImage",
+        "image": "/entity.png"
+      },
+      {
+        "id": "25dd6ad2-dd24-4f49-a609-69270dc6d6a2",
+        "label": "SymbiosisFinance",
+        "title": "0x44487a445a7595446309464a82244b4bd4e325d5",
+        "layer": 1,
+        "addr": "0x44487a445a7595446309464a82244b4bd4e325d5",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "exg": 1,
+        "shape": "circularImage",
+        "image": "/entity.png"
+      },
+      {
+        "id": "18e38384-2d55-4c9e-88a4-5fb447cb2d7d",
+        "label": "1inch: Aggregation Router V6",
+        "title": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "layer": 1,
+        "addr": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "exg": 1,
+        "shape": "circularImage",
+        "image": "/entity.png"
+      },
+      {
+        "id": "8b16168e-65d0-4430-846b-25d00c44bd44",
+        "label": "KyberSwap: Aggregator",
+        "title": "0x6e4141d33021b52c91c28608403db4a0ffb50ec6",
+        "layer": -1,
+        "addr": "0x6e4141d33021b52c91c28608403db4a0ffb50ec6",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "exg": 1,
+        "shape": "circularImage",
+        "image": "/entity.png"
+      },
+      {
+        "id": "932eab4c-f081-471f-b1be-ff019ff69463",
+        "label": "",
+        "title": "0x421fa2f1fe768d9f7c95be7949bee96d3e3d6fe2",
+        "layer": -1,
+        "addr": "0x421fa2f1fe768d9f7c95be7949bee96d3e3d6fe2",
+        "track": "one",
+        "pid": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "expanded": false,
+        "malicious": 1,
+        "shape": "circularImage",
+        "image": "/malicious.png"
+      }
+    ],
+    "edge_list": [
+      {
+        "from": "f0932d3f-52a0-4b95-a885-1d4045778088",
+        "to": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "label": "0.001 BNB",
+        "val": 0.001,
+        "tx_hash_list": [
+          "0xad342fa679b852009c5887201fb657151589bdb78e727f68c40929f6eaf4e9b6"
+        ],
+        "tx_time": "2025-07-05 01:57",
+        "color": {
+          "color": "#99b4d7",
+          "highlight": "#99b4d7"
+        }
+      },
+      {
+        "from": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "to": "33745a5d-46ce-4ef9-8d88-38c71138b2af",
+        "label": "2711.0479 BNB",
+        "val": 2711.0479,
+        "tx_time": "2025-07-03 04:54",
+        "tx_hash_list": [
+          "0x32c950ddcafe5484a33d0f67088cd35bb534339642af6bee0b95130cf65ff258",
+          "0x5d1f2a809e89ba51875480fa647136f96a5699ca826a83e0a812234f9a2a51c7",
+          "0xc2e855315ca76aa4c6305dd76272935a7fac7e54fe3baf8a217de5ecac0c87d9",
+          "0xf9dcf97bc8b713cdd7aa52979029aee743a3fbc41e889eb1077d8ca1baf432bf",
+          "0xfd169f85edb9a843ff39d9cf30d4fb02ccca7697b2ca2d7a125fa0703a8ebfa9",
+          "0xb987faaea81891e2f74d9baf97fc861328332fcb669dc0ec9549ade01e9d70bc",
+          "0x854cda4aacf794d33be4d3b64322c1f66a698631ae4878ee482d02a3d244529f"
+        ]
+      },
+      {
+        "from": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "to": "c4ea0b04-824f-46ef-9a05-a9a737eaf3d7",
+        "label": "100.0 BNB",
+        "val": 100.0,
+        "tx_time": "2025-07-03 04:41",
+        "tx_hash_list": [
+          "0x875cf6ae04e453749b0cef972bb9b9bb83feb6e718645374fbb47f0ddaf841bb"
+        ]
+      },
+      {
+        "from": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "to": "25dd6ad2-dd24-4f49-a609-69270dc6d6a2",
+        "label": "2800.0 BNB",
+        "val": 2800.0,
+        "tx_time": "2025-07-03 04:37",
+        "tx_hash_list": [
+          "0x50da112db3b0233dd059dd3bc0ca22f227e0cb7387ff116bc9c0b5cd31329d61",
+          "0x89f3b2238f7815b25ce129ba44830f56eaaeddf39ae46e28670fb3492c3e40af",
+          "0x12f5ee19468596e14acf312757d9659e46aa70b21bf6318ab17e6d9a42d02669",
+          "0xf53a66c353073a592f6262c1ce679bda3c8f1733214df1d2c7b515ec332a19be",
+          "0x33a03037fd697f11b6fc06f68d8e47c40b99cd2c5d2074a519849e74f5ef45af",
+          "0x868a9dcdcbf34d2f48277af26bbde5eb38d640b6796960617a25ea5039a5dcdc",
+          "0xacec308bc74e5ec37cbe45ebff85564dac5544a374790f679af454346b2cc833",
+          "0xe466862c9a2751710c2754e8fc18d009c2a102153a9787a423ed970a376840db",
+          "0x9f85a7fb5eec91d5eb5ba9a1ff7cbbfa0aba80bbd52537e32817b8db5ea2c0ae",
+          "0xe9c6b57251646d394cc20a7055b1d9b7779f356feed99ae37998a346c32e3e56"
+        ]
+      },
+      {
+        "from": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "to": "18e38384-2d55-4c9e-88a4-5fb447cb2d7d",
+        "label": "1399.0 BNB",
+        "val": 1399.0,
+        "tx_time": "2025-07-03 04:30",
+        "tx_hash_list": [
+          "0xa01365e6dd30193facd065aa097874009077767a24594f7c53bf0831c4e02afa",
+          "0xedd104aec7246e50819f48131a937a72d79ad2f02c05bb456fcf805efabfd452",
+          "0x28af553ef896425d4dad3b115d712763fdfd926ebeb03d99945a4d3f8adfb739",
+          "0xc292e9bf84c861555c953c27e841a64eaa82cf2a7f28e3d223c6d74d64ab16c2"
+        ]
+      },
+      {
+        "from": "8b16168e-65d0-4430-846b-25d00c44bd44",
+        "to": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "label": "4770.7029 BNB",
+        "val": 4770.7029,
+        "tx_hash_list": [
+          "0x8fc699eebc8242ccb90c9385fe7daeb9e3ed84c202a3c01960477ac51b81a0e4",
+          "0xcec3e225771c8cad304ee2a86988feffdeb2dc61947dd530507b4daae2102655",
+          "0xe361d7e2ff10292e312eb91eae60011859e6f51dace598dbfdcf93cb1aa46309",
+          "0x57e50e757335171902a8be48875a800e6bee4b16581d40525757e5f60fe05cdd"
+        ],
+        "tx_time": "2025-07-03 04:27",
+        "color": {
+          "color": "#99b4d7",
+          "highlight": "#99b4d7"
+        }
+      },
+      {
+        "from": "932eab4c-f081-471f-b1be-ff019ff69463",
+        "to": "5c1655f7-472f-42af-b57d-96a08d6f67e3",
+        "label": "2239.351 BNB",
+        "val": 2239.351,
+        "tx_hash_list": [
+          "0x6be21e3744fb6be4cacb7855d3826e1df15586f378e1b065d193b543dcf7fea5",
+          "0xf88ecfcaca73a64463493190c9d98c61e4f1152daebf7750ec92d647dd065d4c",
+          "0xfe8e3237d0c58700b635a607a5b98f22920c2d57ded684c0521a628b1cc3cf98"
+        ],
+        "tx_time": "2025-07-03 04:19",
+        "color": {
+          "color": "#99b4d7",
+          "highlight": "#99b4d7"
+        }
+      }
+    ],
+    "tx_count": 30,
+    "first_tx_datetime": "2025-07-03 04:06",
+    "latest_tx_datetime": "2025-07-05 01:57",
+    "address_first_tx_datetime": "2025-07-03 04:06",
+    "address_latest_tx_datetime": "2025-07-05 01:57"
+  }
+}
