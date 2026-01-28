@@ -8,7 +8,7 @@ from flask_cors import CORS
 import logging
 import os
 
-from routes import register_routes
+from .routes import register_routes
 
 
 def create_app(config_name='development'):

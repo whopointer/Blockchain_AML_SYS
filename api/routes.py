@@ -7,8 +7,8 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import logging
 
-from controllers.prediction_controller import PredictionController
-from schemas.prediction_schemas import (
+from .controllers.prediction_controller import PredictionController
+from .schemas.prediction_schemas import (
     PredictionRequest, PredictionResponse, BatchPredictionResponse,
     ModelInfo, ErrorResponse, HealthResponse, StatisticsResponse
 )

@@ -20,15 +20,27 @@ import numpy as np
 
 from data import EllipticDataset, load_inference_data, load_val_data
 from models.two_stage_dgi_rf import create_two_stage_dgi_rf
-from config.logging_config import setup_training_logger, log_system_info, log_model_info
+from config.logging_config import setup_training_logger, log_system_info, log_model_info,setup_evaluation_logger, setup_inference_logger
 
 
-def setup_server_logging():
-    """设置服务器训练日志"""
-    from config.logging_config import setup_training_logger, log_system_info, log_model_info
+def setup_server_logging(mode: str):
+    """设置按模式分类的服务器日志"""
     
-    # 创建训练日志
-    logger = setup_training_logger(
+    # 根据模式选择合适的日志设置函数
+    logger_setup_map = {
+        'gnn_dgi_rf': setup_training_logger,
+        'training': setup_training_logger,
+        'eval': setup_evaluation_logger,
+        'evaluation': setup_evaluation_logger,
+        'inference': setup_inference_logger
+    }
+    
+    if mode not in logger_setup_map:
+        raise ValueError(f"不支持的运行模式: {mode}")
+    
+    # 使用对应的日志设置函数
+    setup_func = logger_setup_map[mode]
+    logger = setup_func(
         experiment_name=f"server_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         log_dir="logs",
         log_level="INFO"
@@ -221,8 +233,8 @@ def main():
 
     args = parser.parse_args()
     
-    # 设置日志
-    logger = setup_server_logging()
+    # 设置按模式分类的日志
+    logger = setup_server_logging(args.mode)
     logger.info("=" * 80)
     logger.info("区块链AML反洗钱系统启动")
     logger.info(f"运行模式: {args.mode}")

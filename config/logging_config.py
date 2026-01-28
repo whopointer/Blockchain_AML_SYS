@@ -89,6 +89,51 @@ def get_logger(name: str = "blockchain_aml") -> logging.Logger:
     return logging.getLogger(name)
 
 
+def setup_mode_logger(
+    mode: str,
+    experiment_name: str,
+    log_dir: str = "logs",
+    log_level: str = "INFO"
+) -> logging.Logger:
+    """
+    按运行模式设置专用日志
+    
+    Args:
+        mode: 运行模式 ("training", "evaluation", "inference")
+        experiment_name: 实验名称
+        log_dir: 日志根目录
+        log_level: 日志级别
+    
+    Returns:
+        配置好的模式logger
+    """
+    # 根据模式确定子目录
+    mode_dir_map = {
+        "training": "training",
+        "eval": "evaluation", 
+        "evaluation": "evaluation",
+        "inference": "inference"
+    }
+    
+    if mode not in mode_dir_map:
+        raise ValueError(f"不支持的运行模式: {mode}，支持的模式: {list(mode_dir_map.keys())}")
+    
+    # 构建模式专用目录
+    mode_log_dir = os.path.join(log_dir, mode_dir_map[mode])
+    os.makedirs(mode_log_dir, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_name = f"{mode}_{experiment_name}_{timestamp}"
+    
+    return setup_logging(
+        log_level=log_level,
+        log_dir=mode_log_dir,
+        log_name=log_name,
+        console_output=True,
+        file_output=True
+    )
+
+
 def setup_training_logger(
     experiment_name: str,
     log_dir: str = "logs",
@@ -105,15 +150,11 @@ def setup_training_logger(
     Returns:
         配置好的训练logger
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_name = f"training_{experiment_name}_{timestamp}"
-    
-    return setup_logging(
-        log_level=log_level,
+    return setup_mode_logger(
+        mode="training",
+        experiment_name=experiment_name,
         log_dir=log_dir,
-        log_name=log_name,
-        console_output=True,
-        file_output=True
+        log_level=log_level
     )
 
 
@@ -133,15 +174,35 @@ def setup_inference_logger(
     Returns:
         配置好的推理logger
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_name = f"inference_{experiment_name}_{timestamp}"
-    
-    return setup_logging(
-        log_level=log_level,
+    return setup_mode_logger(
+        mode="inference",
+        experiment_name=experiment_name,
         log_dir=log_dir,
-        log_name=log_name,
-        console_output=True,
-        file_output=True
+        log_level=log_level
+    )
+
+
+def setup_evaluation_logger(
+    experiment_name: str,
+    log_dir: str = "logs",
+    log_level: str = "INFO"
+) -> logging.Logger:
+    """
+    设置评估专用日志
+    
+    Args:
+        experiment_name: 实验名称
+        log_dir: 日志目录
+        log_level: 日志级别
+    
+    Returns:
+        配置好的评估logger
+    """
+    return setup_mode_logger(
+        mode="evaluation",
+        experiment_name=experiment_name,
+        log_dir=log_dir,
+        log_level=log_level
     )
 
 
@@ -211,7 +272,9 @@ DEFAULT_LOG_CONFIG = {
 __all__ = [
     'setup_logging',
     'get_logger', 
+    'setup_mode_logger',
     'setup_training_logger',
+    'setup_evaluation_logger',
     'setup_inference_logger',
     'log_system_info',
     'log_model_info',
