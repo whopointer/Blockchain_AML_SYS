@@ -1,0 +1,90 @@
+digraph FlowGraph {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  edge [fontsize=10];
+
+  // 节点定义
+  "0x25DEc5437326331b7555837013F77a5f525f68d0" [
+    label="SRC: 0x25DE...68d0";
+    width=0.50;
+    height=0.30;
+    fillcolor="#f0eae1";
+    style="filled,rounded";
+    tooltip="地址: 0x25DEc5437326331b7555837013F77a5f525f68d0\\n流入: 0.00 USD\\n流出: 580076.04 USD\\n剩余: -580076.04 USD";
+    URL="https://etherscan.io/address/0x25DEc5437326331b7555837013F77a5f525f68d0";
+  ];
+
+  "0x2Abc22eb9A09EbBE7b41737CCde147F586EfeB6A" [
+    label="0x2Abc...eB6A";
+    width=2.00;
+    height=1.20;
+    fillcolor="#ffcccc";
+    style="filled,rounded";
+    tooltip="地址: 0x2Abc22eb9A09EbBE7b41737CCde147F586EfeB6A\\n流入: 580043.07 USD\\n流出: 0.00 USD\\n剩余: 580043.07 USD";
+    URL="https://etherscan.io/address/0x2Abc22eb9A09EbBE7b41737CCde147F586EfeB6A";
+  ];
+
+  "0x904450202F2320cBb64E3AdFc79ab3D03625D995" [
+    label="0x9044...D995";
+    width=2.00;
+    height=1.20;
+    fillcolor="#ccffcc";
+    style="filled,rounded";
+    tooltip="地址: 0x904450202F2320cBb64E3AdFc79ab3D03625D995\\n流入: 580073.40 USD\\n流出: 580059.22 USD\\n剩余: 14.17 USD";
+    URL="https://etherscan.io/address/0x904450202F2320cBb64E3AdFc79ab3D03625D995";
+  ];
+
+  "0x6f6C4A439b464b1dE9E2856b4b5a07526fB8107a" [
+    label="0x6f6C...107a";
+    width=2.00;
+    height=1.20;
+    fillcolor="#ccffcc";
+    style="filled,rounded";
+    tooltip="地址: 0x6f6C4A439b464b1dE9E2856b4b5a07526fB8107a\\n流入: 580059.22 USD\\n流出: 580043.07 USD\\n剩余: 16.16 USD";
+    URL="https://etherscan.io/address/0x6f6C4A439b464b1dE9E2856b4b5a07526fB8107a";
+  ];
+
+  "0x6e34FAa64A9FA9d9759480Bf168D54a77e8fB3fD" [
+    label="0x6e34...B3fD";
+    width=2.00;
+    height=1.20;
+    fillcolor="#ccffcc";
+    style="filled,rounded";
+    tooltip="地址: 0x6e34FAa64A9FA9d9759480Bf168D54a77e8fB3fD\\n流入: 580076.04 USD\\n流出: 580073.40 USD\\n剩余: 2.64 USD";
+    URL="https://etherscan.io/address/0x6e34FAa64A9FA9d9759480Bf168D54a77e8fB3fD";
+  ];
+
+  // 边定义
+  "0x25DEc5437326331b7555837013F77a5f525f68d0" -> "0x6e34FAa64A9FA9d9759480Bf168D54a77e8fB3fD" [
+    penwidth=6.50;
+    color="#5873e0";
+    label="580K";
+    tooltip="金额: 580076.04 USD\n跳数: 1\n交易: ";
+    URL="https://etherscan.io/tx/";
+  ];
+
+  "0x6e34FAa64A9FA9d9759480Bf168D54a77e8fB3fD" -> "0x904450202F2320cBb64E3AdFc79ab3D03625D995" [
+    penwidth=6.50;
+    color="#8b73e0";
+    label="580K";
+    tooltip="金额: 580073.40 USD\n跳数: 2\n交易: ";
+    URL="https://etherscan.io/tx/";
+  ];
+
+  "0x904450202F2320cBb64E3AdFc79ab3D03625D995" -> "0x6f6C4A439b464b1dE9E2856b4b5a07526fB8107a" [
+    penwidth=6.50;
+    color="#b873e0";
+    label="580K";
+    tooltip="金额: 580059.22 USD\n跳数: 3\n交易: ";
+    URL="https://etherscan.io/tx/";
+  ];
+
+  "0x6f6C4A439b464b1dE9E2856b4b5a07526fB8107a" -> "0x2Abc22eb9A09EbBE7b41737CCde147F586EfeB6A" [
+    penwidth=6.50;
+    color="#d0d0d0";
+    label="580K";
+    tooltip="金额: 580043.08 USD\n跳数: 4\n交易: ";
+    URL="https://etherscan.io/tx/";
+  ];
+
+}

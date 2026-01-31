@@ -1,0 +1,14 @@
+# ===============================
+# Ethereum Mainnet – Major Tokens
+# One token per line
+# Format:
+# <contract_address> # <symbol> – <token name>
+# ===============================
+# -------- Stablecoins --------
+0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 # USDC – USD Coin
+0xdAC17F958D2ee523a2206206994597C13D831ec7 # USDT – Tether USD
+0x6B175474E89094C44Da98b954EedeAC495271d0F # DAI – Dai Stablecoin
+# -------- Wrapped Assets --------
+0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 # WETH – Wrapped Ether
+# ETH（原生代币）
+0x0000000000000000000000000000000000000000
