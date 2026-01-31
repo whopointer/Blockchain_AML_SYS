@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: blockchain-aml-gateway
+
+python:
+  api:
+    base-url: http://localhost:5001/api/v1/
+
+server:
+  port: 8080
