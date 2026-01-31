@@ -1,0 +1,7 @@
+
+# tracer outputs (DO NOT COMMIT)
+Tracer/codes/tools/output/
+Tracer/codes/tools/output_eth/
+*.csv
+*.parquet
+*.db
