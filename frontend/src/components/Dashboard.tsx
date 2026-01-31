@@ -7,7 +7,6 @@ const Dashboard: React.FC = () => {
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [statistics, setStatistics] = useState<StatisticsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [modelLoading, setModelLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -35,20 +34,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleLoadModel = async () => {
-    setModelLoading(true);
-    try {
-      setError('');
-      await api.loadModel();
-      await loadDashboardData();
-    } catch (err: any) {
-      console.error('模型加载错误:', err);
-      setError(err.response?.data?.error || '模型加载失败，请检查后端服务');
-    } finally {
-      setModelLoading(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="text-center p-4">
@@ -64,7 +49,7 @@ const Dashboard: React.FC = () => {
         <h2>系统仪表板</h2>
         <p className="text-secondary">区块链AML反洗钱系统实时监控</p>
       </div>
-      
+
       {error && <Alert variant="danger">{error}</Alert>}
 
       <Row className="g-4 mb-4">
@@ -168,33 +153,6 @@ const Dashboard: React.FC = () => {
                   </div>
                 </>
               )}
-              {!health?.model_loaded && (
-                <div className="text-center mt-3">
-                  <Button 
-                    variant="primary" 
-                    onClick={handleLoadModel} 
-                    className="w-100"
-                    disabled={modelLoading}
-                  >
-                    {modelLoading ? (
-                      <>
-                        <Spinner 
-                          as="span" 
-                          animation="border" 
-                          size="sm" 
-                          className="me-2"
-                        />
-                        正在加载中...
-                      </>
-                    ) : (
-                      <>
-                        <span className="me-2">🚀</span>
-                        加载模型
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
             </Card.Body>
           </Card>
         </Col>
@@ -292,7 +250,7 @@ const Dashboard: React.FC = () => {
             <Col md={6}>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <span className="text-secondary">API端点</span>
-                <code>http://127.0.0.1:5001/api/v1</code>
+                <code>http://localhost:8080</code>
               </div>
               <div className="d-flex justify-content-between align-items-center">
                 <span className="text-secondary">系统状态</span>
