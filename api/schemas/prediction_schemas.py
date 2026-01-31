@@ -64,8 +64,7 @@ class PredictionResponse(BaseModel):
 
 
 class BatchPredictionResponse(BaseModel):
-    """批量预测响应"""
-    results: List[TransactionPrediction] = Field(..., description="预测结果列表")
+    """批量预测响应（只返回统计信息，避免数据量过大）"""
     statistics: Dict[str, Any] = Field(..., description="统计信息")
     timestamp: str = Field(..., description="响应时间戳")
 

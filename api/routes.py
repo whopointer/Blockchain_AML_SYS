@@ -3,22 +3,24 @@ API路由定义
 定义所有API端点的路由和处理逻辑
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 import logging
 
-from .controllers.prediction_controller import PredictionController
 from .schemas.prediction_schemas import (
-    PredictionRequest, PredictionResponse, BatchPredictionResponse,
+    PredictionRequest, PredictionResponse,
     ModelInfo, ErrorResponse, HealthResponse, StatisticsResponse
 )
 
 # 创建蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 
-# 创建控制器实例
-prediction_controller = PredictionController()
 logger = logging.getLogger(__name__)
+
+
+def get_service():
+    """从 app config 获取 PredictionService facade"""
+    return current_app.config.get('PREDICTION_SERVICE')
 
 
 def create_response(data, status_code=200):
@@ -41,7 +43,8 @@ def handle_error(error_msg, status_code=400):
 def health_check():
     """健康检查端点"""
     try:
-        model_loaded = prediction_controller.model is not None
+        service = get_service()
+        model_loaded = service.model is not None
         response = HealthResponse(
             status='healthy',
             timestamp=datetime.now().isoformat(),
@@ -61,16 +64,17 @@ def predict_transactions():
         data = request.get_json()
         if not data:
             return handle_error("请求数据不能为空")
-        
+
         # 验证输入
         try:
             prediction_request = PredictionRequest(**data)
         except Exception as e:
             return handle_error(f"输入验证失败: {str(e)}")
-        
+
         # 执行预测
-        results = prediction_controller.predict_transactions(prediction_request.tx_ids)
-        
+        service = get_service()
+        results = service.predict_transactions(prediction_request.tx_ids)
+
         # 构建响应
         suspicious_count = sum(1 for r in results if r['is_suspicious'])
         response = PredictionResponse(
@@ -79,9 +83,9 @@ def predict_transactions():
             suspicious_count=suspicious_count,
             timestamp=datetime.now().isoformat()
         )
-        
+
         return create_response(response.dict())
-        
+
     except Exception as e:
         logger.error(f"预测错误: {e}")
         return handle_error("预测失败", 500)
@@ -92,17 +96,17 @@ def batch_predict():
     """批量预测整个数据集"""
     try:
         # 执行批量预测
-        result = prediction_controller.batch_predict()
-        
-        # 构建响应
-        response = BatchPredictionResponse(
-            results=result['results'],
-            statistics=result['statistics'],
-            timestamp=result['timestamp']
-        )
-        
-        return create_response(response.dict())
-        
+        service = get_service()
+        result = service.batch_predict()
+
+        # 构建响应（statistics 已包含所有信息）
+        response = {
+            "statistics": result['statistics'],
+            "timestamp": result['timestamp'],
+        }
+
+        return create_response(response)
+
     except Exception as e:
         logger.error(f"批量预测错误: {e}")
         return handle_error("批量预测失败", 500)
@@ -112,14 +116,15 @@ def batch_predict():
 def get_model_info():
     """获取模型信息"""
     try:
-        model_info = prediction_controller.get_model_info()
-        
+        service = get_service()
+        model_info = service.get_model_info()
+
         if 'error' in model_info:
             return handle_error(model_info['error'], 503)
-        
+
         response = ModelInfo(**model_info)
         return create_response(response.dict())
-        
+
     except Exception as e:
         logger.error(f"获取模型信息错误: {e}")
         return handle_error("获取模型信息失败", 500)
@@ -129,8 +134,9 @@ def get_model_info():
 def load_model():
     """加载模型"""
     try:
-        success = prediction_controller.load_model()
-        
+        service = get_service()
+        success = service.load_model()
+
         if success:
             return create_response({
                 'message': '模型加载成功',
@@ -138,7 +144,7 @@ def load_model():
             })
         else:
             return handle_error("模型加载失败", 500)
-            
+
     except Exception as e:
         logger.error(f"模型加载错误: {e}")
         return handle_error("模型加载失败", 500)
@@ -148,7 +154,8 @@ def load_model():
 def get_statistics():
     """获取系统统计信息"""
     try:
-        model_loaded = prediction_controller.model is not None
+        service = get_service()
+        model_loaded = service.model is not None
         response = StatisticsResponse(
             system_status='running',
             model_loaded=model_loaded,
@@ -156,7 +163,7 @@ def get_statistics():
             version='1.0.0'
         )
         return create_response(response.dict())
-        
+
     except Exception as e:
         logger.error(f"获取统计信息错误: {e}")
         return handle_error("获取统计信息失败", 500)
@@ -170,15 +177,16 @@ def get_prediction_summary():
         data = request.get_json()
         if not data or 'results' not in data:
             return handle_error("请提供预测结果数据")
-        
+
         results = data['results']
-        summary = prediction_controller.get_prediction_summary(results)
-        
+        service = get_service()
+        summary = service.get_prediction_summary(results)
+
         if 'error' in summary:
             return handle_error(summary['error'])
-        
+
         return create_response(summary)
-        
+
     except Exception as e:
         logger.error(f"获取预测摘要错误: {e}")
         return handle_error("获取预测摘要失败", 500)
