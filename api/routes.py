@@ -18,9 +18,9 @@ api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 logger = logging.getLogger(__name__)
 
 
-def get_service():
-    """从 app config 获取 PredictionService facade"""
-    return current_app.config.get('PREDICTION_SERVICE')
+def get_facade():
+    """从 app config 获取 ServiceFacade"""
+    return current_app.config.get('SERVICE_FACADE')
 
 
 def create_response(data, status_code=200):
@@ -43,12 +43,12 @@ def handle_error(error_msg, status_code=400):
 def health_check():
     """健康检查端点"""
     try:
-        service = get_service()
-        model_loaded = service.model is not None
+        facade = get_facade()
+        health = facade.get_health_status()
         response = HealthResponse(
-            status='healthy',
-            timestamp=datetime.now().isoformat(),
-            model_loaded=model_loaded
+            status=health['status'],
+            timestamp=health['timestamp'],
+            model_loaded=health['model_loaded']
         )
         return create_response(response.dict())
     except Exception as e:
@@ -60,22 +60,20 @@ def health_check():
 def predict_transactions():
     """预测指定交易的异常情况"""
     try:
-        # 验证请求数据
         data = request.get_json()
         if not data:
             return handle_error("请求数据不能为空")
 
-        # 验证输入
         try:
             prediction_request = PredictionRequest(**data)
         except Exception as e:
             return handle_error(f"输入验证失败: {str(e)}")
 
-        # 执行预测
-        service = get_service()
-        results = service.predict_transactions(prediction_request.tx_ids)
+        facade = get_facade()
+        results = facade.prediction_service.predict_transactions(
+            prediction_request.tx_ids
+        )
 
-        # 构建响应
         suspicious_count = sum(1 for r in results if r['is_suspicious'])
         response = PredictionResponse(
             results=results,
@@ -95,11 +93,9 @@ def predict_transactions():
 def batch_predict():
     """批量预测整个数据集"""
     try:
-        # 执行批量预测
-        service = get_service()
-        result = service.batch_predict()
+        facade = get_facade()
+        result = facade.prediction_service.batch_predict()
 
-        # 构建响应（statistics 已包含所有信息）
         response = {
             "statistics": result['statistics'],
             "timestamp": result['timestamp'],
@@ -116,8 +112,8 @@ def batch_predict():
 def get_model_info():
     """获取模型信息"""
     try:
-        service = get_service()
-        model_info = service.get_model_info()
+        facade = get_facade()
+        model_info = facade.get_model_info()
 
         if 'error' in model_info:
             return handle_error(model_info['error'], 503)
@@ -130,35 +126,15 @@ def get_model_info():
         return handle_error("获取模型信息失败", 500)
 
 
-@api_bp.route('/model/load', methods=['POST'])
-def load_model():
-    """加载模型"""
-    try:
-        service = get_service()
-        success = service.load_model()
-
-        if success:
-            return create_response({
-                'message': '模型加载成功',
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            return handle_error("模型加载失败", 500)
-
-    except Exception as e:
-        logger.error(f"模型加载错误: {e}")
-        return handle_error("模型加载失败", 500)
-
-
 @api_bp.route('/statistics', methods=['GET'])
 def get_statistics():
     """获取系统统计信息"""
     try:
-        service = get_service()
-        model_loaded = service.model is not None
+        facade = get_facade()
+        health = facade.get_health_status()
         response = StatisticsResponse(
             system_status='running',
-            model_loaded=model_loaded,
+            model_loaded=health['model_loaded'],
             timestamp=datetime.now().isoformat(),
             version='1.0.0'
         )
@@ -173,14 +149,13 @@ def get_statistics():
 def get_prediction_summary():
     """获取预测结果摘要"""
     try:
-        # 验证请求数据
         data = request.get_json()
         if not data or 'results' not in data:
             return handle_error("请提供预测结果数据")
 
         results = data['results']
-        service = get_service()
-        summary = service.get_prediction_summary(results)
+        facade = get_facade()
+        summary = facade.prediction_service.get_prediction_summary(results)
 
         if 'error' in summary:
             return handle_error(summary['error'])

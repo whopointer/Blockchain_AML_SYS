@@ -230,7 +230,7 @@ class DGIWithGIN(nn.Module):
 
 
 
-def create_dgi_with_gin(num_features: int, hidden_channels: int = 128, 
+def create_dgi_with_gin(num_features: int, hidden_channels: int = 128,
                        num_layers: int = 3, **kwargs) -> DGIWithGIN:
     """
     工厂函数：创建DGI with GIN模型

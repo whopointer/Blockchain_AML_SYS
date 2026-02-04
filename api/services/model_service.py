@@ -12,7 +12,7 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from models import create_two_stage_dgi_rf
+from models.dgi_gin_rf import create_two_stage_dgi_rf
 
 
 class ModelService:
