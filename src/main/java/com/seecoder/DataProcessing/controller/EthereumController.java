@@ -28,6 +28,13 @@ public class EthereumController {
 
     // ============= 区块相关接口 =============
 
+    @GetMapping("/test/graph")
+    public ApiResponse<String> testGraphConnection() {
+        return ethereumDataService.testGraphConnection();
+    }
+
+
+
     /**
      * 获取区块列表（按高度范围）
      * GET /api/ethereum/blocks?startHeight=100000&endHeight=100100&limit=10

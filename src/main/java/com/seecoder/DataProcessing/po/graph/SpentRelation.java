@@ -1,19 +1,23 @@
-// 第二种关系：地址 → 交易（SPENT）
-// com/seecoder/DataProcessing/po/graph/SpentRelation.java
 package com.seecoder.DataProcessing.po.graph;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.neo4j.ogm.annotation.*;
+import lombok.EqualsAndHashCode;
+import org.neo4j.ogm.annotation.EndNode;
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.RelationshipEntity;
+import org.neo4j.ogm.annotation.StartNode;
+
 import java.math.BigDecimal;
 
-@RelationshipEntity(type = "SPENT")
 @Data
-@NoArgsConstructor
+@RelationshipEntity(type = "SPENT")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class SpentRelation {
 
     @Id
     @GeneratedValue
+    @EqualsAndHashCode.Include
     private Long id;
 
     @StartNode
@@ -22,9 +26,6 @@ public class SpentRelation {
     @EndNode
     private TransactionNode transaction;
 
-    @Property(name = "amount")
     private BigDecimal amount;
-
-    @Property(name = "index")
     private Integer index;
 }

@@ -1,69 +1,82 @@
-// com/seecoder/DataProcessing/po/graph/AddressNode.java
 package com.seecoder.DataProcessing.po.graph;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
 import org.neo4j.ogm.annotation.GeneratedValue;
 import org.neo4j.ogm.annotation.Id;
 import org.neo4j.ogm.annotation.NodeEntity;
-import org.neo4j.ogm.annotation.Property;
 import org.neo4j.ogm.annotation.Relationship;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
-@NodeEntity(label = "Address")
 @Data
-@NoArgsConstructor
+@NodeEntity(label = "Address")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class AddressNode {
 
     @Id
     @GeneratedValue
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @Property(name = "chain")
     private String chain;
 
-    @Property(name = "address")
+    @EqualsAndHashCode.Include
     private String address;
 
-    @Property(name = "address_id")
-    private String addressId;
-
-    @Property(name = "first_seen")
     private LocalDateTime firstSeen;
-
-    @Property(name = "last_seen")
     private LocalDateTime lastSeen;
-
-    @Property(name = "tag")
+    private Integer riskLevel;
     private String tag;
 
-    @Property(name = "risk_level")
-    private Integer riskLevel;
-
-    // 出边关系：地址发起的转账
+    // 修改为List
     @Relationship(type = "TRANSFER", direction = Relationship.OUTGOING)
-    private Set<TransferRelation> outgoingTransfers = new HashSet<>();
+    private List<TransferRelation> outgoingTransfers = new ArrayList<>();
 
-    // 入边关系：地址接收的转账
     @Relationship(type = "TRANSFER", direction = Relationship.INCOMING)
-    private Set<TransferRelation> incomingTransfers = new HashSet<>();
+    private List<TransferRelation> incomingTransfers = new ArrayList<>();
 
-    // 发送的交易关系（更细粒度）
     @Relationship(type = "SPENT", direction = Relationship.OUTGOING)
-    private Set<SpentRelation> spentTransactions = new HashSet<>();
+    private List<SpentRelation> spentTransactions = new ArrayList<>();
 
-    // 接收的交易关系（更细粒度）- OUTPUT关系的反向
     @Relationship(type = "OUTPUT", direction = Relationship.INCOMING)
-    private Set<OutputRelation> receivedTransactions = new HashSet<>();
+    private List<OutputRelation> receivedTransactions = new ArrayList<>();
+
+    public AddressNode() {}
 
     public AddressNode(String chain, String address) {
         this.chain = chain;
         this.address = address;
-        this.firstSeen = LocalDateTime.now();
-        this.lastSeen = LocalDateTime.now();
-        this.riskLevel = 0;
+    }
+
+    // 确保集合不为null的getter方法
+    public List<TransferRelation> getOutgoingTransfers() {
+        if (outgoingTransfers == null) {
+            outgoingTransfers = new ArrayList<>();
+        }
+        return outgoingTransfers;
+    }
+
+    public List<TransferRelation> getIncomingTransfers() {
+        if (incomingTransfers == null) {
+            incomingTransfers = new ArrayList<>();
+        }
+        return incomingTransfers;
+    }
+
+    public List<SpentRelation> getSpentTransactions() {
+        if (spentTransactions == null) {
+            spentTransactions = new ArrayList<>();
+        }
+        return spentTransactions;
+    }
+
+    public List<OutputRelation> getReceivedTransactions() {
+        if (receivedTransactions == null) {
+            receivedTransactions = new ArrayList<>();
+        }
+        return receivedTransactions;
     }
 }

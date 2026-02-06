@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface GraphService {
+    public ApiResponse<Map<String, Object>> testNeo4jConnection();
 
     // 保存交易到图数据库（两种关系都保存）
     void saveTransactionToGraph(ChainTx chainTx);

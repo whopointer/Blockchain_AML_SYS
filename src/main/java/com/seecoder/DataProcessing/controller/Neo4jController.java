@@ -24,6 +24,11 @@ public class Neo4jController {
     @Autowired
     private GraphService graphService;
 
+    @GetMapping("/test/neo4j")
+    public ApiResponse<Map<String, Object>> testNeo4jConnection() {
+        return graphService.testNeo4jConnection();
+    }
+
     @GetMapping("/path")
     @ApiOperation("查找交易路径")
     public ApiResponse<List<Map<String, Object>>> findTransactionPath(

@@ -1,20 +1,24 @@
-// 第一种关系：地址 → 地址
-// com/seecoder/DataProcessing/po/graph/TransferRelation.java
+// 修改 TransferRelation.java
 package com.seecoder.DataProcessing.po.graph;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.neo4j.ogm.annotation.*;
-import java.math.BigDecimal;
+import lombok.EqualsAndHashCode;
+import org.neo4j.ogm.annotation.EndNode;
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.RelationshipEntity;
+import org.neo4j.ogm.annotation.StartNode;
+
 import java.time.LocalDateTime;
 
-@RelationshipEntity(type = "TRANSFER")
 @Data
-@NoArgsConstructor
+@RelationshipEntity(type = "TRANSFER")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class TransferRelation {
 
     @Id
     @GeneratedValue
+    @EqualsAndHashCode.Include
     private Long id;
 
     @StartNode
@@ -23,12 +27,7 @@ public class TransferRelation {
     @EndNode
     private AddressNode toAddress;
 
-    @Property(name = "tx_hash")
     private String txHash;
-
-    @Property(name = "amount")
-    private BigDecimal amount;
-
-    @Property(name = "time")
+    private Double amount;  // 修改：BigDecimal -> Double
     private LocalDateTime time;
 }

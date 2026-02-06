@@ -1,19 +1,22 @@
-// 第二种关系：交易 → 地址（OUTPUT）
-// com/seecoder/DataProcessing/po/graph/OutputRelation.java
+// 修改 OutputRelation.java
 package com.seecoder.DataProcessing.po.graph;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.neo4j.ogm.annotation.*;
-import java.math.BigDecimal;
+import lombok.EqualsAndHashCode;
+import org.neo4j.ogm.annotation.EndNode;
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.RelationshipEntity;
+import org.neo4j.ogm.annotation.StartNode;
 
-@RelationshipEntity(type = "OUTPUT")
 @Data
-@NoArgsConstructor
+@RelationshipEntity(type = "OUTPUT")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class OutputRelation {
 
     @Id
     @GeneratedValue
+    @EqualsAndHashCode.Include
     private Long id;
 
     @StartNode
@@ -22,9 +25,6 @@ public class OutputRelation {
     @EndNode
     private AddressNode toAddress;
 
-    @Property(name = "amount")
-    private BigDecimal amount;
-
-    @Property(name = "index")
+    private Double amount;  // 修改：BigDecimal -> Double
     private Integer index;
 }

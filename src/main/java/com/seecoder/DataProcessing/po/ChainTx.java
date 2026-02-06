@@ -54,7 +54,17 @@ public class ChainTx {
     @Column(name = "to_address", length = 128)
     private String toAddress;
 
+    public Double getTotalInputAsDouble() {
+        return totalInput != null ? totalInput.doubleValue() : 0.0;
+    }
 
+    public Double getTotalOutputAsDouble() {
+        return totalOutput != null ? totalOutput.doubleValue() : 0.0;
+    }
+
+    public Double getFeeAsDouble() {
+        return fee != null ? fee.doubleValue() : 0.0;
+    }
 
 
     @PrePersist

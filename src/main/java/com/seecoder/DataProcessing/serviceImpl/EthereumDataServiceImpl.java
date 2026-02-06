@@ -5,6 +5,7 @@ import com.google.cloud.bigquery.*;
 import com.seecoder.DataProcessing.po.*;
 import com.seecoder.DataProcessing.repository.*;
 import com.seecoder.DataProcessing.service.EthereumDataService;
+import com.seecoder.DataProcessing.service.GraphService;
 import com.seecoder.DataProcessing.vo.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,9 @@ public class EthereumDataServiceImpl implements EthereumDataService {
 
     @Autowired
     private ChainTxOutputRepository chainTxOutputRepository;
+
+    @Autowired
+    private GraphService graphService;
 
     private static final DateTimeFormatter BIGQUERY_TIMESTAMP_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -143,20 +147,24 @@ public class EthereumDataServiceImpl implements EthereumDataService {
         }
     }
 
+    // 修改 syncTransactionsByDateRange 方法，移除 transaction_index < 20 限制
     private int syncTransactionsByDateRange(LocalDate startDate, LocalDate endDate) {
         try {
             int totalSaved = 0;
             LocalDate currentDate = startDate;
+            List<ChainTx> batchForGraph = new ArrayList<>(); // 批量保存到图数据库
 
             while (!currentDate.isAfter(endDate)) {
+                // 移除 transaction_index < 20 限制
                 String query = String.format(
                         "SELECT `hash`, `block_number`, `block_timestamp`, `from_address`, `to_address`, `value`, " +
                                 "`gas_price`, `receipt_gas_used`, `gas`, `nonce`, `input`, `transaction_index`, " +
                                 "`receipt_status` " +
                                 "FROM `bigquery-public-data.crypto_ethereum.transactions` " +
                                 "WHERE DATE(`block_timestamp`) = '%s' " +
-                                "  AND `transaction_index` < 20 " +
-                                "ORDER BY `block_number` DESC, `transaction_index` ",
+                                // "  AND `transaction_index` < 20 " + // 移除这个限制
+                                "ORDER BY `block_number` DESC, `transaction_index` " +
+                                "LIMIT 1000", // 添加限制避免数据量过大
                         currentDate.toString()
                 );
 
@@ -172,11 +180,33 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                             ChainTx savedTx = chainTxRepository.save(tx);
                             savedCount++;
 
+                            batchForGraph.add(savedTx);
                             // 保存输入输出
                             saveTransactionInputOutput(savedTx);
                         }
                     } catch (Exception e) {
                         log.error("保存交易失败: {}", tx.getTxHash().substring(0, 16), e);
+                    }
+                }
+
+                // 图数据库保存 - 批量保存
+                if (!batchForGraph.isEmpty() && graphService != null) {
+                    try {
+                        log.info("开始批量保存 {} 笔交易到图数据库", batchForGraph.size());
+                        graphService.saveTransactionsToGraph(batchForGraph);
+                        log.info("图数据库批量保存完成");
+                        batchForGraph.clear(); // 清空批次
+                    } catch (Exception e) {
+                        log.error("批量保存到图数据库失败，尝试逐笔保存", e);
+                        // 如果批量失败，尝试逐笔保存
+                        for (ChainTx tx : batchForGraph) {
+                            try {
+                                graphService.saveTransactionToGraph(tx);
+                            } catch (Exception ex) {
+                                log.error("逐笔保存交易失败: {}", tx.getTxHash(), ex);
+                            }
+                        }
+                        batchForGraph.clear();
                     }
                 }
 
@@ -191,6 +221,24 @@ public class EthereumDataServiceImpl implements EthereumDataService {
         } catch (Exception e) {
             log.error("同步交易失败: {} - {}", startDate, endDate, e);
             return 0;
+        }
+    }
+
+    // 添加一个新的方法来测试图数据库连接和保存
+// 简化测试方法
+    @Override
+    public ApiResponse<String> testGraphConnection() {
+        try {
+            if (graphService == null) {
+                return ApiResponse.error(500, "GraphService未初始化");
+            }
+
+            log.info("测试图数据库连接...");
+            return ApiResponse.success("图数据库服务已注入", null);
+
+        } catch (Exception e) {
+            log.error("测试图数据库连接失败", e);
+            return ApiResponse.error(500, "测试图数据库连接失败: " + e.getMessage());
         }
     }
 
@@ -215,6 +263,17 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                 output.setValue(tx.getTotalOutput() != null ? tx.getTotalOutput() : BigDecimal.ZERO);
                 chainTxOutputRepository.save(output);
             }
+
+            // 新增：异步保存到图数据库
+//            if (graphService != null) {
+//                try {
+//                    graphService.saveTransactionsToGraph();
+//                } catch (Exception e) {
+//                    log.warn("保存到图数据库失败，继续执行: {}", tx.getTxHash(), e);
+//                }
+//            }
+
+
         } catch (Exception e) {
             log.error("保存交易输入输出失败: txHash={}", tx.getTxHash(), e);
         }
@@ -346,6 +405,8 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             TableResult result = executeBigQuery(query);
             List<ChainTx> transactions = mapToChainTxs(result);
 
+            List<ChainTx> batchForGraph = new ArrayList<>();
+
             int savedCount = 0;
             for (ChainTx tx : transactions) {
                 try {
@@ -355,11 +416,21 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                         ChainTx savedTx = chainTxRepository.save(tx);
                         savedCount++;
 
+                        batchForGraph.add(savedTx);
+
                         // 保存输入输出
                         saveTransactionInputOutput(savedTx);
                     }
                 } catch (Exception e) {
                     log.error("保存交易失败: {}", tx.getTxHash().substring(0, 16), e);
+                }
+            }
+
+            if (!batchForGraph.isEmpty() && graphService != null) {
+                try {
+                    graphService.saveTransactionsToGraph(batchForGraph);
+                } catch (Exception e) {
+                    log.error("批量保存到图数据库失败", e);
                 }
             }
 
