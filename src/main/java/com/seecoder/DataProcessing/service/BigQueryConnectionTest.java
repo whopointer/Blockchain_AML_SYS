@@ -21,6 +21,12 @@ public class BigQueryConnectionTest implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
 
+        if (bigQuery == null) {
+            log.warn("⚠️ BigQuery客户端未配置，跳过连接测试");
+            log.warn("在开发环境中可以暂时跳过BigQuery配置");
+            return;
+        }
+
         try {
             // 执行一个简单的查询测试连接
             String query = "SELECT 1 as test";

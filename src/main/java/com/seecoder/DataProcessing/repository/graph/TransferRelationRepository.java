@@ -38,7 +38,7 @@ public interface TransferRelationRepository extends Neo4jRepository<TransferRela
 
     @Query("MATCH (a:Address)-[r:TRANSFER]->(b:Address) " +
             "WHERE r.time >= $startTime AND r.time <= $endTime " +
-            "RETURN a.address as fromAddress, b.address as toAddress, r.amount as amount, r.tx_hash as txHash, r.time as time " +
+            "RETURN a.address as fromAddress, b.address as toAddress, r.amount as amount, CASE WHEN 'txHash' IN keys(r) THEN toString(r['txHash']) ELSE '' END as txHash, CASE WHEN 'time' IN keys(r) THEN toString(r['time']) ELSE '' END as time " +
             "ORDER BY r.amount DESC " +
             "LIMIT $limit")
     List<Map<String, Object>> findLargeTransfers(@Param("startTime") String startTime,

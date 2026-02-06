@@ -31,11 +31,32 @@ public class Neo4jController {
 
     @GetMapping("/path")
     @ApiOperation("查找交易路径")
-    public ApiResponse<List<Map<String, Object>>> findTransactionPath(
+    public ApiResponse<Map<String, Object>> findTransactionPath(
             @RequestParam String fromAddress,
             @RequestParam String toAddress,
             @RequestParam(defaultValue = "5") Integer maxHops) {
-        return graphService.findNhopTransactionPath(fromAddress, toAddress, maxHops);
+        ApiResponse<Map<String, Object>> response = graphService.findNhopTransactionPath(fromAddress, toAddress, maxHops);
+        
+        if (response.getCode() != 200) {
+            return ApiResponse.error(response.getCode(), response.getMessage());
+        }
+        
+        // 直接返回graph_dic的内容
+        Map<String, Object> result = response.getData();
+        
+        if (result == null) {
+            // 如果没有找到路径，返回空的graph_dic结构
+            result = new java.util.HashMap<>();
+            result.put("node_list", new java.util.ArrayList<>());
+            result.put("edge_list", new java.util.ArrayList<>());
+            result.put("tx_count", 0);
+            result.put("first_tx_datetime", "");
+            result.put("latest_tx_datetime", "");
+            result.put("address_first_tx_datetime", "");
+            result.put("address_latest_tx_datetime", "");
+        }
+        
+        return ApiResponse.success(result, response.getTotal());
     }
 
     @GetMapping("/address/hops")

@@ -7,6 +7,7 @@ import com.seecoder.DataProcessing.po.BlockData;
 import com.seecoder.DataProcessing.po.TokenTransferData;
 import com.seecoder.DataProcessing.service.BigQueryService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -17,10 +18,11 @@ import java.util.List;
 @Service
 public class BigQueryServiceImpl implements BigQueryService {
 
-    private final BigQuery bigQuery;
+    @Autowired(required = false)
+    private BigQuery bigQuery;
 
-    public BigQueryServiceImpl(BigQuery bigQuery) {
-        this.bigQuery = bigQuery;
+    public BigQueryServiceImpl() {
+        // 默认构造函数
     }
 
     @Override

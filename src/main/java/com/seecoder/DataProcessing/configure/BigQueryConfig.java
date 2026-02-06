@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -37,29 +38,35 @@ public class BigQueryConfig {
     }
 
     @Bean
-    public BigQuery bigQuery() throws IOException {
-        log.info("正在配置BigQuery客户端，使用HTTP代理: 127.0.0.1:7897");
+    public BigQuery bigQuery() {
+        try {
+            log.info("正在配置BigQuery客户端，使用HTTP代理: 127.0.0.1:7897");
 
-        // 1. 使用自定义的、带代理的传输层来加载凭证
-        //    关键：GoogleCredentials.fromStream 内部会发起HTTP请求获取令牌，现在它也会走代理了。
-        InputStream credentialsStream = new ClassPathResource("service-account-key.json").getInputStream();
-        GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream, () -> createProxiedHttpTransport());
-        credentialsStream.close();
+            // 1. 使用自定义的、带代理的传输层来加载凭证
+            InputStream credentialsStream = new ClassPathResource(credentialsPath).getInputStream();
+            GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream, () -> createProxiedHttpTransport());
+            credentialsStream.close();
 
-        // 2. 配置BigQuery服务本身的传输选项（查询请求走代理）
-        HttpTransportOptions transportOptions = HttpTransportOptions.newBuilder()
-                .setHttpTransportFactory(() -> createProxiedHttpTransport())
-                .build();
+            // 2. 配置BigQuery服务本身的传输选项（查询请求走代理）
+            HttpTransportOptions transportOptions = HttpTransportOptions.newBuilder()
+                    .setHttpTransportFactory(() -> createProxiedHttpTransport())
+                    .build();
 
-        // 3. 构建客户端
-        BigQuery bigQuery = BigQueryOptions.newBuilder()
-                .setProjectId(projectId)
-                .setCredentials(credentials)
-                .setTransportOptions(transportOptions)
-                .build()
-                .getService();
+            // 3. 构建客户端
+            BigQuery bigQuery = BigQueryOptions.newBuilder()
+                    .setProjectId(projectId)
+                    .setCredentials(credentials)
+                    .setTransportOptions(transportOptions)
+                    .build()
+                    .getService();
 
-        log.info("✅ BigQuery客户端初始化完成 (已统一启用代理)");
-        return bigQuery;
+            log.info("✅ BigQuery客户端初始化完成 (已统一启用代理)");
+            return bigQuery;
+        } catch (Exception e) {
+            log.warn("BigQuery客户端配置失败: {}", e.getMessage());
+            log.warn("在开发环境中可以暂时跳过BigQuery配置");
+            // 在开发环境中返回null，应用程序将使用模拟数据
+            return null;
+        }
     }
 }

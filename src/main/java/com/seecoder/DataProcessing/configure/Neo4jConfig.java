@@ -33,7 +33,7 @@ public class Neo4jConfig {
         Configuration configuration = new Configuration.Builder()
                 .uri(neo4jUri)
                 .credentials(username, password)
-                .autoIndex("update")
+                .autoIndex("none") // 禁用自动索引，避免调用db.constraints过程
                 .build();
         return configuration;
     }
