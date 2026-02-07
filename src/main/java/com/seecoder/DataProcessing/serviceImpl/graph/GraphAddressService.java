@@ -1,6 +1,5 @@
 package com.seecoder.DataProcessing.serviceImpl.graph;
 
-import com.seecoder.DataProcessing.po.graph.AddressNode;
 import com.seecoder.DataProcessing.vo.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.neo4j.ogm.session.Session;
@@ -10,13 +9,97 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
 public class GraphAddressService extends AbstractGraphService {
 
+    /**
+     * 缩短地址显示，格式为前5位+...+后5位
+     * @param address 完整地址
+     * @return 缩短后的地址
+     */
+    private String shortenAddress(String address) {
+        if (address == null || address.length() <= 8) {
+            return address;
+        }
+        return address.substring(0, 5) + "..." + address.substring(address.length() - 5);
+    }
+    
+    /**
+     * 格式化金额标签，根据链类型和金额大小选择不同的显示格式
+     * @param amount 金额
+     * @param chain 区块链类型
+     * @return 格式化后的金额标签
+     */
+    private String formatAmountLabel(double amount, String chain) {
+        String unit = (chain != null && chain.equalsIgnoreCase("ethereum")) ? "ETH" : "BNB";
+        if (amount >= 1.0) {
+            return String.format("%.3f %s", amount, unit);
+        } else {
+            return String.format("%.6f %s", amount, unit);
+        }
+    }
+    
+    /**
+     * 解析时间戳并转换为UTC时间字符串
+     * @param timestampStr 时间戳字符串，可以是数字格式或多种字符串格式
+     * @return 格式化后的UTC时间字符串，解析失败返回原始字符串
+     */
+    private String parseAndFormatTimestamp(String timestampStr) {
+        if (timestampStr == null || timestampStr.isEmpty()) {
+            return timestampStr;
+        }
+        
+        try {
+            if (timestampStr.matches("-?\\d+(\\.\\d+)?([Ee][+-]?\\d+)?")) {
+                double timestampDouble = Double.parseDouble(timestampStr);
+                long milliseconds = (long) (timestampDouble * 1000);
+                LocalDateTime utcDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(milliseconds), ZoneId.of("UTC"));
+                return utcDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } else {
+                LocalDateTime dateTime;
+                
+                String[] formats = {
+                        "yyyy-MM-dd HH:mm:ss",
+                        "yyyy-MM-dd'T'HH:mm:ss",
+                        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+                        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                };
+                
+                for (String format : formats) {
+                    try {
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+                        dateTime = LocalDateTime.parse(timestampStr, formatter);
+                        return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception e) {
+                    }
+                }
+                
+                dateTime = LocalDateTime.parse(timestampStr, DateTimeFormatter.ISO_DATE_TIME);
+                return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            }
+        } catch (Exception e) {
+            log.warn("无法解析时间戳: {}", timestampStr);
+            return timestampStr; // 解析失败时返回原始字符串
+        }
+    }
+
+    /**
+     * 查找两个地址之间的N跳交易路径
+     * @param fromAddress 起始地址
+     * @param toAddress 目标地址
+     * @param maxHops 最大跳数，默认3，范围1-5
+     * @return 包含路径节点、边、交易信息的响应
+     */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
     public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops) {
         try {
@@ -24,20 +107,18 @@ public class GraphAddressService extends AbstractGraphService {
                 return ApiResponse.error(400, "地址参数不能为空");
             }
 
-            if (maxHops == null || maxHops <= 0 || maxHops > 10) {
-                maxHops = 5;
+            if (maxHops == null || maxHops <= 0 || maxHops > 5) {
+                maxHops = 3;
             }
 
             Session session = getSession();
             try {
-                // 修改：使用更简单的查询方式来避免OGM映射问题
-                // 首先查找路径
-                String pathQuery = "MATCH path = shortestPath((a:Address {address: $fromAddress})" +
-                        "-[:TRANSFER*1.." + maxHops + "]->(b:Address {address: $toAddress})) " +
+                String pathQuery = "MATCH path = (a:Address {address: $fromAddress})" +
+                        "-[:TRANSFER*1.." + maxHops + "]->(b:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BNB')} ] AS nodeData, " +
                         "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData LIMIT 1";
+                        "RETURN nodeData, relData LIMIT 50";
 
                 Map<String, Object> params = new java.util.HashMap<>();
                 params.put("fromAddress", fromAddress);
@@ -51,30 +132,23 @@ public class GraphAddressService extends AbstractGraphService {
                     return ApiResponse.error(500, "查询执行失败: " + e.getMessage());
                 }
 
-                // 初始化默认返回值
                 Map<String, Object> graphDic = new java.util.HashMap<>();
-                graphDic.put("node_list", new java.util.ArrayList<>());
-                graphDic.put("edge_list", new java.util.ArrayList<>());
-                graphDic.put("tx_count", 0);
-                graphDic.put("first_tx_datetime", "");
-                graphDic.put("latest_tx_datetime", "");
-                graphDic.put("address_first_tx_datetime", "");
-                graphDic.put("address_latest_tx_datetime", "");
+                List<Map<String, Object>> allNodeList = new java.util.ArrayList<>();
+                List<Map<String, Object>> allEdgeList = new java.util.ArrayList<>();
+                int totalTxCount = 0;
+                String firstTime = null;
+                String latestTime = null;
 
+                List<List<Map<String, Object>>> allPaths = new ArrayList<>();
+                List<List<Map<String, Object>>> allPathRels = new ArrayList<>();
+                List<List<String>> allPathTimes = new ArrayList<>();
+                
                 for (Map<String, Object> result : queryResult) {
-                    // 添加调试日志来查看原始查询结果
-                    log.debug("Raw query result: {}", result);
-                    
-                    // 节点列表
-                    List<Map<String, Object>> nodeList = new java.util.ArrayList<>();
-                    
-                    // 安全转换节点列表 - 处理Neo4j OGM映射问题
                     Object rawNodeDataObj = result.get("nodeData");
                     List<Map<String, Object>> nodeData = new ArrayList<>();
                     if (rawNodeDataObj instanceof List) {
                         nodeData = (List<Map<String, Object>>) rawNodeDataObj;
                     } else if (rawNodeDataObj != null) {
-                        // 如果是数组类型（如 [Ljava.util.Collections$UnmodifiableMap;），则转换为List
                         if (rawNodeDataObj.getClass().isArray()) {
                             Object[] array = (Object[]) rawNodeDataObj;
                             for (Object obj : array) {
@@ -83,7 +157,6 @@ public class GraphAddressService extends AbstractGraphService {
                                 }
                             }
                         } else if (rawNodeDataObj instanceof Map) {
-                            // 如果是单个Map，添加到列表中
                             nodeData.add((Map<String, Object>) rawNodeDataObj);
                         } else {
                             log.warn("Unexpected data type for nodeData: {}", rawNodeDataObj.getClass().getName());
@@ -95,7 +168,6 @@ public class GraphAddressService extends AbstractGraphService {
                     if (rawRelDataObj instanceof List) {
                         relData = (List<Map<String, Object>>) rawRelDataObj;
                     } else if (rawRelDataObj != null) {
-                        // 如果是数组类型（如 [Ljava.util.Collections$UnmodifiableMap;），则转换为List
                         if (rawRelDataObj.getClass().isArray()) {
                             Object[] array = (Object[]) rawRelDataObj;
                             for (Object obj : array) {
@@ -104,25 +176,21 @@ public class GraphAddressService extends AbstractGraphService {
                                 }
                             }
                         } else if (rawRelDataObj instanceof Map) {
-                            // 如果是单个Map，添加到列表中
                             relData.add((Map<String, Object>) rawRelDataObj);
                         } else {
                             log.warn("Unexpected data type for relData: {}", rawRelDataObj.getClass().getName());
                         }
                     }
                     
-                    // 提取单独的列表
                     List<String> txHashes = new ArrayList<>();
                     List<Double> amounts = new ArrayList<>();
                     List<String> times = new ArrayList<>();
                     
                     for (Map<String, Object> rel : relData) {
-                        // 安全地转换 tx_hash 为字符串
                         Object txHashObj = rel.get("tx_hash");
                         String txHash = txHashObj != null ? txHashObj.toString() : "";
                         txHashes.add(txHash);
                         
-                        // 安全地转换 amount 为双精度浮点数
                         Object amountObj = rel.get("amount");
                         Double amount = 0.0;
                         if (amountObj != null) {
@@ -140,32 +208,50 @@ public class GraphAddressService extends AbstractGraphService {
                         }
                         amounts.add(amount);
                         
-                        // 安全地转换 time 为字符串
                         Object timeObj = rel.get("time");
                         String time = timeObj != null ? timeObj.toString() : "";
-                        times.add(time);
+                        times.add(parseAndFormatTimestamp(time));
                     }
                     
-                    // 创建地址到ID的映射
-                    Map<String, String> addressToId = new java.util.HashMap<>();
+                    allPaths.add(nodeData);
+                    allPathRels.add(relData);
+                    allPathTimes.add(times);
                     
+                    totalTxCount += Math.min(Math.min(txHashes.size(), amounts.size()), times.size());
+                    for (String t : times) {
+                        if (t != null && !t.isEmpty()) {
+                            if (firstTime == null || t.compareTo(firstTime) < 0) {
+                                firstTime = t;
+                            }
+                            if (latestTime == null || t.compareTo(latestTime) > 0) {
+                                latestTime = t;
+                            }
+                        }
+                    }
+                }
+                
+                Map<String, Integer> nodeLayers = calculateNodeLayers(allPaths, fromAddress, toAddress);
+                
+                Map<String, String> globalAddressToId = new java.util.HashMap<>();
+                
+                for (List<Map<String, Object>> nodeData : allPaths) {
                     for (int i = 0; i < nodeData.size(); i++) {
-                        // 从nodeData中提取数据
                         Map<String, Object> nodeMap = nodeData.get(i);
-                        // 安全地转换 address 为字符串
                         Object addressObj = nodeMap.get("address");
                         String address = addressObj != null ? addressObj.toString() : null;
                         
+                        if (address == null) {
+                            continue;
+                        }
+                        
                         Object riskLevelObj = nodeMap.get("risk_level");
                         Integer riskLevel = 0;
-                        
                         if (riskLevelObj != null) {
                             if (riskLevelObj instanceof Integer) {
                                 riskLevel = (Integer) riskLevelObj;
                             } else if (riskLevelObj instanceof Number) {
                                 riskLevel = ((Number) riskLevelObj).intValue();
                             } else {
-                                // 如果风险等级不是数字类型，尝试转换
                                 try {
                                     riskLevel = Integer.parseInt(riskLevelObj.toString());
                                 } catch (NumberFormatException e) {
@@ -174,91 +260,99 @@ public class GraphAddressService extends AbstractGraphService {
                             }
                         }
                         
-                        if (address == null) {
-                            continue; // 跳过没有地址的节点
+                        // 检查全局是否已有该地址的ID
+                        String nodeId = globalAddressToId.get(address);
+                        if (nodeId == null) {
+                            // 生成新的ID并记录到全局映射
+                            nodeId = java.util.UUID.randomUUID().toString();
+                            globalAddressToId.put(address, nodeId);
+                            
+                            Map<String, Object> nodeItem = new java.util.HashMap<>();
+                            nodeItem.put("id", nodeId);
+                            nodeItem.put("label", shortenAddress(address));
+                            nodeItem.put("title", address);
+                            nodeItem.put("addr", address);
+                            
+                            // 使用calculateNodeLayers方法计算出的连续层级
+                            int layer = nodeLayers.get(address);
+                            nodeItem.put("layer", layer);
+                            
+                            if (riskLevel > 0) {
+                                nodeItem.put("malicious", riskLevel);
+                            }
+                            
+                            // 避免重复添加节点
+                            boolean exists = false;
+                            for (Map<String, Object> existingNode : allNodeList) {
+                                if (existingNode.get("addr").equals(address)) {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!exists) {
+                                allNodeList.add(nodeItem);
+                            }
                         }
-                        
-                        // 生成唯一ID
-                        String nodeId = java.util.UUID.randomUUID().toString();
-                        addressToId.put(address, nodeId);
-                        
-                        Map<String, Object> nodeItem = new java.util.HashMap<>();
-                        nodeItem.put("id", nodeId);
-                        nodeItem.put("label", shortenAddress(address)); // 缩短显示的地址
-                        nodeItem.put("title", address); // 完整地址
-                        nodeItem.put("addr", address);
-                        
-                        // 设置层级：起始地址为0层，其他节点为相对层数
-                        int layer = i; // 根据位置分配层号
-                        nodeItem.put("layer", layer);
-                        
-                        // 如果是恶意地址（风险等级 > 0），则添加恶意标记
-                        if (riskLevel > 0) {
-                            nodeItem.put("malicious", riskLevel);
-                        }
-                        
-                        nodeList.add(nodeItem);
                     }
-                    
-                    // 边列表
-                    List<Map<String, Object>> edgeList = new java.util.ArrayList<>();
+                }
+                
+                // 第四步：创建边列表
+                for (int pathIdx = 0; pathIdx < allPaths.size(); pathIdx++) {
+                    List<Map<String, Object>> nodeData = allPaths.get(pathIdx);
+                    List<Map<String, Object>> relData = allPathRels.get(pathIdx);
+                    List<String> times = allPathTimes.get(pathIdx);
                     
                     for (int i = 0; i < nodeData.size() - 1 && i < relData.size(); i++) {
-                        if (i < nodeList.size() - 1) {
-                            // 获取对应的节点数据以获得地址信息
+                        if (i < nodeData.size() - 1) {
                             Map<String, Object> fromNodeData = nodeData.get(i);
                             Map<String, Object> toNodeData = nodeData.get(i + 1);
                             
-                            // 使用地址作为 from 和 to 的值
                             String fromAddr = fromNodeData != null ? fromNodeData.get("address").toString() : "";
                             String toAddr = toNodeData != null ? toNodeData.get("address").toString() : "";
                             
-                            Map<String, Object> linkItem = new java.util.HashMap<>();
-                            linkItem.put("from", fromAddr);
-                            linkItem.put("to", toAddr);
-                            // 获取源节点的链信息用于确定货币单位
-                            String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BNB";
-                            linkItem.put("label", formatAmountLabel(amounts.get(i), chain));
-                            linkItem.put("val", amounts.get(i));
-                            linkItem.put("tx_time", times.get(i));
+                            // 检查边是否已存在
+                            boolean edgeExists = allEdgeList.stream()
+                                .anyMatch(edge -> edge.get("from").equals(fromAddr) && edge.get("to").equals(toAddr));
                             
-                            // 将单个交易哈希包装成数组
-                            List<String> txHashList = new java.util.ArrayList<>();
-                            if (txHashes.get(i) != null && !txHashes.get(i).isEmpty()) {
-                                txHashList.add(txHashes.get(i));
+                            if (!edgeExists) {
+                                Map<String, Object> linkItem = new java.util.HashMap<>();
+                                linkItem.put("from", fromAddr);
+                                linkItem.put("to", toAddr);
+                                
+                                String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BNB";
+                                linkItem.put("label", formatAmountLabel(
+                                    relData.get(i) != null ? 
+                                        (Double) ((Map<String, Object>) relData.get(i)).get("amount") : 0.0, 
+                                    chain));
+                                linkItem.put("val", relData.get(i) != null ? 
+                                    (Double) ((Map<String, Object>) relData.get(i)).get("amount") : 0.0);
+                                linkItem.put("tx_time", i < times.size() ? times.get(i) : "");
+                                
+                                // 获取交易哈希
+                                List<String> txHashList = new java.util.ArrayList<>();
+                                if (relData.get(i) != null) {
+                                    Object txHashObj = ((Map<String, Object>) relData.get(i)).get("tx_hash");
+                                    String txHash = txHashObj != null ? txHashObj.toString() : "";
+                                    if (!txHash.isEmpty()) {
+                                        txHashList.add(txHash);
+                                    }
+                                }
+                                linkItem.put("tx_hash_list", txHashList);
+                                
+                                allEdgeList.add(linkItem);
                             }
-                            linkItem.put("tx_hash_list", txHashList);
-                            
-                            edgeList.add(linkItem);
                         }
                     }
-                    
-                    graphDic.put("node_list", nodeList);
-                    graphDic.put("edge_list", edgeList);
-                    
-                    // 添加调试日志来查看处理后的结果
-                    log.debug("Processed nodeData size: {}, relData size: {}", nodeData.size(), relData.size());
-                    log.debug("Generated nodeList size: {}, edgeList size: {}", nodeList.size(), edgeList.size());
-                    
-                    // 计算一些统计数据
-                    int txCount = Math.min(Math.min(txHashes.size(), amounts.size()), times.size());
-                    graphDic.put("tx_count", txCount);
-                    
-                    // 设置时间范围
-                    if (!times.isEmpty()) {
-                        graphDic.put("first_tx_datetime", times.get(0));
-                        graphDic.put("latest_tx_datetime", times.get(times.size() - 1));
-                        graphDic.put("address_first_tx_datetime", times.get(0));
-                        graphDic.put("address_latest_tx_datetime", times.get(times.size() - 1));
-                    } else {
-                        graphDic.put("first_tx_datetime", "");
-                        graphDic.put("latest_tx_datetime", "");
-                        graphDic.put("address_first_tx_datetime", "");
-                        graphDic.put("address_latest_tx_datetime", "");
-                    }
-                    
-                    break; // 只处理第一个结果
                 }
+                
+                graphDic.put("node_list", allNodeList);
+                graphDic.put("edge_list", allEdgeList);
+                graphDic.put("tx_count", totalTxCount);
+                graphDic.put("first_tx_datetime", firstTime != null ? firstTime : "");
+                graphDic.put("latest_tx_datetime", latestTime != null ? latestTime : "");
+                graphDic.put("address_first_tx_datetime", firstTime != null ? firstTime : "");
+                graphDic.put("address_latest_tx_datetime", latestTime != null ? latestTime : "");
 
                 Object nodeListObj = graphDic.get("node_list");
                 long nodeListSize = 0;
@@ -276,24 +370,215 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
     
-    // 辅助方法：缩短地址显示
-    private String shortenAddress(String address) {
-        if (address == null || address.length() <= 8) {
-            return address;
+
+
+    /**
+     * 计算节点层级的方法，处理多节点多路径（包括循环路径）的情况
+     * 保证起始节点层级为0，目标节点层级最大，其余节点合理分布
+     */
+    private Map<String, Integer> calculateNodeLayers(List<List<Map<String, Object>>> allPaths, String fromAddress, String toAddress) {
+        Map<String, Integer> nodeLayers = new HashMap<>();
+
+        // 如果没有路径，只设置起始节点为第0层
+        if (allPaths == null || allPaths.isEmpty()) {
+            nodeLayers.put(fromAddress, 0);
+            return nodeLayers;
         }
-        return address.substring(0, 5) + "..." + address.substring(address.length() - 5);
+
+        // 1. 初始化图结构，建立邻接关系，并收集所有节点
+        Map<String, Set<String>> forwardEdges = new HashMap<>(); // 前向边（正常流向）
+        Set<String> allNodes = new HashSet<>(); // 收集所有路径中的所有节点
+
+        for (List<Map<String, Object>> path : allPaths) {
+            for (int i = 0; i < path.size(); i++) {
+                String nodeAddr = getNodeAddress(path.get(i));
+                if (nodeAddr != null) {
+                    allNodes.add(nodeAddr);
+                }
+            }
+
+            for (int i = 0; i < path.size() - 1; i++) {
+                String fromNode = getNodeAddress(path.get(i));
+                String toNode = getNodeAddress(path.get(i + 1));
+
+                if (fromNode != null && toNode != null && !fromNode.equals(toNode)) {
+                    forwardEdges.computeIfAbsent(fromNode, k -> new HashSet<>()).add(toNode);
+                }
+            }
+        }
+
+        // 2. 使用广度优先搜索(BFS)从起始节点计算最短跳数（层级），确保起始节点为0
+        Map<String, Integer> distances = new HashMap<>();
+        java.util.Queue<String> queue = new java.util.LinkedList<>();
+        distances.put(fromAddress, 0);
+        queue.offer(fromAddress);
+
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            int curDist = distances.getOrDefault(cur, 0);
+            Set<String> nexts = forwardEdges.get(cur);
+            if (nexts == null) continue;
+            for (String nxt : nexts) {
+                int nd = curDist + 1;
+                if (!distances.containsKey(nxt) || nd < distances.get(nxt)) {
+                    distances.put(nxt, nd);
+                    queue.offer(nxt);
+                }
+            }
+        }
+
+        // 3. 对于未被BFS到达的节点，设置为 maxDistance + 1（保持它们位于右侧但不影响起始节点）
+        int maxDistance = distances.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        for (String n : allNodes) {
+            if (!distances.containsKey(n)) {
+                distances.put(n, maxDistance + 1);
+            }
+        }
+
+        // 4. 确保起始节点层级基准为0（防御性处理）并确保只有起始节点为0
+        int startLayer = distances.getOrDefault(fromAddress, 0);
+        // 将所有层级减去 startLayer，使起始节点为0
+        Map<String, Integer> shifted = new HashMap<>();
+        for (Map.Entry<String, Integer> e : distances.entrySet()) {
+            shifted.put(e.getKey(), e.getValue() - startLayer);
+        }
+
+        // 如果有其他节点也被减为0，则将它们升到1，保证起始节点唯一为0
+        for (Map.Entry<String, Integer> e : new HashMap<>(shifted).entrySet()) {
+            if (!e.getKey().equals(fromAddress) && e.getValue() <= 0) {
+                shifted.put(e.getKey(), 1);
+            }
+        }
+
+        // 5. 规范化为连续层级（0,1,2,...），并确保起始节点仍为0
+        Map<String, Integer> normalized = normalizeLayers(shifted);
+
+        // 如果因某些情况起始节点不为0，则整体平移使其为0
+        int normStart = normalized.getOrDefault(fromAddress, 0);
+        if (normStart != 0) {
+            Map<String, Integer> adjusted = new HashMap<>();
+            for (Map.Entry<String, Integer> e : normalized.entrySet()) {
+                adjusted.put(e.getKey(), e.getValue() - normStart);
+            }
+            // 再次确保只有起始节点为0
+            for (Map.Entry<String, Integer> e : new HashMap<>(adjusted).entrySet()) {
+                if (!e.getKey().equals(fromAddress) && e.getValue() <= 0) {
+                    adjusted.put(e.getKey(), 1);
+                }
+            }
+            normalized = normalizeLayers(adjusted);
+        }
+
+        // 6. 确保目标节点为最大层级（保持原有行为）
+        int maxLayer = normalized.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        if (normalized.containsKey(toAddress)) {
+            long countOfMaxLayerNodes = normalized.values().stream()
+                .filter(layer -> layer.equals(maxLayer)).count();
+
+            if (normalized.get(toAddress) < maxLayer || 
+                (normalized.get(toAddress).equals(maxLayer) && countOfMaxLayerNodes > 1)) {
+                normalized.put(toAddress, maxLayer + 1);
+                normalized = reassignLayersWithTargetAtMax(normalized, toAddress);
+                // 再次保证起始节点为0
+                if (normalized.containsKey(fromAddress) && normalized.get(fromAddress) != 0) {
+                    int shift = normalized.get(fromAddress);
+                    Map<String, Integer> tmp = new HashMap<>();
+                    for (Map.Entry<String, Integer> e : normalized.entrySet()) {
+                        tmp.put(e.getKey(), e.getValue() - shift);
+                    }
+                    normalized = normalizeLayers(tmp);
+                }
+            }
+        } else {
+            normalized.put(toAddress, maxLayer + 1);
+            normalized = reassignLayersWithTargetAtMax(normalized, toAddress);
+            if (normalized.containsKey(fromAddress) && normalized.get(fromAddress) != 0) {
+                int shift = normalized.get(fromAddress);
+                Map<String, Integer> tmp = new HashMap<>();
+                for (Map.Entry<String, Integer> e : normalized.entrySet()) {
+                    tmp.put(e.getKey(), e.getValue() - shift);
+                }
+                normalized = normalizeLayers(tmp);
+            }
+        }
+
+        return normalized;
     }
     
-    // 辅助方法：格式化金额标签
-    private String formatAmountLabel(double amount, String chain) {
-        String unit = (chain != null && chain.equalsIgnoreCase("ethereum")) ? "ETH" : "BNB";
-        if (amount >= 1.0) {
-            return String.format("%.3f %s", amount, unit);
-        } else {
-            return String.format("%.6f %s", amount, unit);
+    /**
+     * 重新分配层级，确保目标节点位于最大层级且层级连续
+     */
+    private Map<String, Integer> reassignLayersWithTargetAtMax(Map<String, Integer> nodeLayers, String targetAddress) {
+        // 分离目标节点和其他节点的层级
+        Integer targetLayer = nodeLayers.get(targetAddress);
+        if (targetLayer == null) {
+            return nodeLayers; // 目标节点不存在，直接返回
         }
+        
+        // 获取除目标节点外的所有其他层级
+        List<Integer> otherLayers = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : nodeLayers.entrySet()) {
+            if (!entry.getKey().equals(targetAddress)) {
+                otherLayers.add(entry.getValue());
+            }
+        }
+        
+        // 对其他层级进行排序并去重，创建连续映射
+        java.util.SortedSet<Integer> uniqueOtherLayers = new java.util.TreeSet<>(otherLayers);
+        Map<Integer, Integer> otherLayerMapping = new java.util.HashMap<>();
+        int layerIndex = 0;
+        for (Integer layer : uniqueOtherLayers) {
+            otherLayerMapping.put(layer, layerIndex++);
+        }
+        
+        // 创建新的层级映射
+        Map<String, Integer> result = new java.util.HashMap<>();
+        for (Map.Entry<String, Integer> entry : nodeLayers.entrySet()) {
+            if (entry.getKey().equals(targetAddress)) {
+                // 目标节点设置为最大层级（其他层级数量）
+                result.put(entry.getKey(), uniqueOtherLayers.size());
+            } else {
+                // 其他节点使用映射后的层级
+                result.put(entry.getKey(), otherLayerMapping.get(entry.getValue()));
+            }
+        }
+        
+        return result;
     }
-
+    
+    /**
+     * 将层级标准化为连续的整数序列（0, 1, 2, ...）
+     */
+    private Map<String, Integer> normalizeLayers(Map<String, Integer> nodeLayers) {
+        if (nodeLayers.isEmpty()) {
+            return nodeLayers;
+        }
+        
+        // 获取所有唯一层级值并排序
+        java.util.SortedSet<Integer> uniqueLayers = new java.util.TreeSet<>(nodeLayers.values());
+        Map<Integer, Integer> layerMapping = new java.util.HashMap<>();
+        
+        // 创建从旧层级到新连续层级的映射
+        int newLayerValue = 0;
+        for (Integer oldLayer : uniqueLayers) {
+            layerMapping.put(oldLayer, newLayerValue++);
+        }
+        
+        // 创建新映射
+        Map<String, Integer> normalizedLayers = new java.util.HashMap<>();
+        for (Map.Entry<String, Integer> entry : nodeLayers.entrySet()) {
+            normalizedLayers.put(entry.getKey(), layerMapping.get(entry.getValue()));
+        }
+        
+        return normalizedLayers;
+    }
+    
+    /**
+     * 查找指定地址N跳内的所有关联地址
+     * @param address 中心地址
+     * @param maxHops 最大跳数，默认3，范围1-6
+     * @return 关联地址列表及其基本信息
+     */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
     public ApiResponse<List<Map<String, Object>>> findAddressesWithinNHops(String address, Integer maxHops) {
         try {
@@ -345,6 +630,11 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
 
+    /**
+     * 获取地址转账统计信息
+     * @param address 地址
+     * @return 包含地址基本信息、转账统计和关联地址的响应
+     */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
     public ApiResponse<Map<String, Object>> getAddressTransferStats(String address) {
         try {
@@ -447,6 +737,11 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
 
+    /**
+     * 获取地址的直接连接（入度和出度地址）
+     * @param address 地址
+     * @return 包含出度和入度连接的响应
+     */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
     public ApiResponse<Map<String, Object>> getDirectConnections(String address) {
         try {
@@ -506,12 +801,17 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
 
+    /**
+     * 更新地址的风险等级
+     * @param address 地址
+     * @param riskLevel 风险等级
+     * @return 更新结果响应
+     */
     @Transactional(transactionManager = "neo4jTransactionManager")
     public ApiResponse<Void> updateAddressRiskLevel(String address, Integer riskLevel) {
         try {
             Session session = getSession();
             try {
-                // 先检查地址是否存在
                 String checkQuery = "MATCH (a:Address {address: $address}) RETURN a.address as address";
                 Map<String, Object> params = new HashMap<>();
                 params.put("address", address);
@@ -536,7 +836,6 @@ public class GraphAddressService extends AbstractGraphService {
                     return ApiResponse.error(404, "地址不存在: " + address);
                 }
 
-                // 更新风险等级
                 String updateQuery = "MATCH (a:Address {address: $address}) SET a.risk_level = $riskLevel";
                 params.put("riskLevel", riskLevel);
 
@@ -558,12 +857,17 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
 
+    /**
+     * 更新地址的标签
+     * @param address 地址
+     * @param tag 标签内容
+     * @return 更新结果响应
+     */
     @Transactional(transactionManager = "neo4jTransactionManager")
     public ApiResponse<Void> tagAddress(String address, String tag) {
         try {
             Session session = getSession();
             try {
-                // 先检查地址是否存在
                 String checkQuery = "MATCH (a:Address {address: $address}) RETURN a.address as address";
                 Map<String, Object> params = new HashMap<>();
                 params.put("address", address);
@@ -588,7 +892,6 @@ public class GraphAddressService extends AbstractGraphService {
                     return ApiResponse.error(404, "地址不存在: " + address);
                 }
 
-                // 更新标签
                 String updateQuery = "MATCH (a:Address {address: $address}) SET a.tag = $tag";
                 params.put("tag", tag);
 
@@ -608,5 +911,16 @@ public class GraphAddressService extends AbstractGraphService {
             log.error("更新地址标签失败: {}", address, e);
             return ApiResponse.error(500, "更新地址标签失败: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 辅助方法：从节点数据中提取地址
+     */
+    private String getNodeAddress(Map<String, Object> nodeData) {
+        if (nodeData == null) {
+            return null;
+        }
+        Object addrObj = nodeData.get("address");
+        return addrObj != null ? addrObj.toString() : null;
     }
 }
