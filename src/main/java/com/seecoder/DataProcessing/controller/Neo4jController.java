@@ -33,9 +33,8 @@ public class Neo4jController {
     @ApiOperation("查找交易路径")
     public ApiResponse<Map<String, Object>> findTransactionPath(
             @RequestParam String fromAddress,
-            @RequestParam String toAddress,
-            @RequestParam(defaultValue = "5") Integer maxHops) {
-        ApiResponse<Map<String, Object>> response = graphService.findNhopTransactionPath(fromAddress, toAddress, maxHops);
+            @RequestParam String toAddress) {
+        ApiResponse<Map<String, Object>> response = graphService.findNhopTransactionPath(fromAddress, toAddress);
         
         if (response.getCode() != 200) {
             return ApiResponse.error(response.getCode(), response.getMessage());
@@ -61,9 +60,9 @@ public class Neo4jController {
 
     @GetMapping("/address/hops")
     @ApiOperation("查找N跳内地址")
-    public ApiResponse<List<Map<String, Object>>> findAddressesWithinHops(
+    public ApiResponse<Map<String, Object>> findAddressesWithinHops(
             @RequestParam String address,
-            @RequestParam(defaultValue = "3") Integer maxHops) {
+            @RequestParam(defaultValue = "1") Integer maxHops) {
         return graphService.findAddressesWithinNHops(address, maxHops);
     }
 

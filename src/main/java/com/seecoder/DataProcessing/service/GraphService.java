@@ -18,11 +18,11 @@ public interface GraphService {
     // 批量保存交易
     void saveTransactionsToGraph(List<ChainTx> chainTxs);
 
-    // 查找N跳交易路径
-    ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops);
+    // 查找交易路径
+    ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress);
 
     // 查找地址N跳内的所有关联地址
-    ApiResponse<List<Map<String, Object>>> findAddressesWithinNHops(String address, Integer maxHops);
+    ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops);
 
     // 获取地址的转账统计
     ApiResponse<Map<String, Object>> getAddressTransferStats(String address);

@@ -39,13 +39,13 @@ public class GraphServiceImpl implements GraphService {
     }
 
     @Override
-    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops) {
+    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress) {
         // 调用GraphAddressService的实现
-        return addressService.findNhopTransactionPath(fromAddress, toAddress, maxHops);
+        return addressService.findNhopTransactionPath(fromAddress, toAddress);
     }
 
     @Override
-    public ApiResponse<List<Map<String, Object>>> findAddressesWithinNHops(String address, Integer maxHops) {
+    public ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops) {
         return addressService.findAddressesWithinNHops(address, maxHops);
     }
 
