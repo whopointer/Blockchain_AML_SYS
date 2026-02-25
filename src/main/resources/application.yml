@@ -52,6 +52,15 @@ transaction:
   default-timeout: 30
   rollback-on-commit-failure: true
 
+minio:
+  endpoint: http://localhost:9001
+  access-key: root
+  secret-key: 12345678
+  bucket-name: data-processing
+  archive:
+    enabled: true
+    keep-days: 30
+
 # 日志配置
 logging:
   level:

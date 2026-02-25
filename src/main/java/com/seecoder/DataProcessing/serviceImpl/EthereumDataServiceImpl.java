@@ -1,14 +1,17 @@
 // com/seecoder/DataProcessing/serviceImpl/EthereumDataServiceImpl.java
 package com.seecoder.DataProcessing.serviceImpl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.cloud.bigquery.*;
 import com.seecoder.DataProcessing.po.*;
 import com.seecoder.DataProcessing.repository.*;
 import com.seecoder.DataProcessing.service.EthereumDataService;
 import com.seecoder.DataProcessing.service.GraphService;
+import com.seecoder.DataProcessing.service.MinIOService;
 import com.seecoder.DataProcessing.vo.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
@@ -19,6 +22,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -27,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -50,6 +56,15 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     @Autowired
     private GraphService graphService;
 
+    @Autowired
+    private MinIOService minIOService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Value("${minio.archive.enabled:true}")
+    private boolean minioArchiveEnabled;
+
     private static final DateTimeFormatter BIGQUERY_TIMESTAMP_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FORMATTER =
@@ -62,6 +77,138 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     private static final int MAX_TRANSACTIONS_PER_QUERY = 10000;
     private static final String CHAIN_ETH = "ETH";
 
+    // ============= MinIO归档相关方法 =============
+
+    /**
+     * 归档BigQuery查询结果到MinIO
+     */
+    private void archiveBigQueryResult(String queryType, TableResult result) {
+        if (!minioArchiveEnabled) {
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<Map<String, Object>> dataList = new ArrayList<>();
+                for (FieldValueList row : result.iterateAll()) {
+                    Map<String, Object> rowData = new HashMap<>();
+                    for (Field field : result.getSchema().getFields()) {
+                        String fieldName = field.getName();
+                        FieldValue fieldValue = row.get(fieldName);
+
+                        if (!fieldValue.isNull()) {
+                            switch (fieldValue.getAttribute()) {
+                                case PRIMITIVE:
+                                    rowData.put(fieldName, fieldValue.getValue());
+                                    break;
+                                case RECORD:
+                                    // 处理嵌套记录
+                                    break;
+                                default:
+                                    rowData.put(fieldName, fieldValue.getValue());
+                            }
+                        }
+                    }
+                    dataList.add(rowData);
+                }
+
+                String jsonResponse = objectMapper.writeValueAsString(dataList);
+                minIOService.archiveRawBigQueryResponse(queryType, jsonResponse);
+
+            } catch (Exception e) {
+                log.error("归档BigQuery结果失败: {}", queryType, e);
+            }
+        });
+    }
+
+    /**
+     * 归档单笔交易数据到MinIO
+     */
+    private void archiveTransactionData(ChainTx tx) {
+        if (!minioArchiveEnabled) {
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Map<String, Object> txData = new HashMap<>();
+                txData.put("hash", tx.getTxHash());
+                txData.put("block_number", tx.getBlockHeight());
+                txData.put("from_address", tx.getFromAddress());
+                txData.put("to_address", tx.getToAddress());
+                txData.put("value", tx.getTotalOutput());
+                txData.put("fee", tx.getFee());
+                txData.put("block_time", tx.getBlockTime());
+                txData.put("tx_index", tx.getTxIndex());
+                txData.put("status", tx.getStatus());
+
+                String jsonData = objectMapper.writeValueAsString(txData);
+                minIOService.archiveTransactionData(tx.getTxHash(), jsonData);
+
+            } catch (Exception e) {
+                log.error("归档交易数据失败: {}", tx.getTxHash(), e);
+            }
+        });
+    }
+
+    /**
+     * 归档区块数据到MinIO
+     */
+    private void archiveBlockData(ChainBlock block) {
+        if (!minioArchiveEnabled) {
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Map<String, Object> blockData = new HashMap<>();
+                blockData.put("height", block.getHeight());
+                blockData.put("block_hash", block.getBlockHash());
+                blockData.put("prev_block_hash", block.getPrevBlockHash());
+                blockData.put("block_time", block.getBlockTime());
+                blockData.put("tx_count", block.getTxCount());
+                blockData.put("size_bytes", block.getRawSizeBytes());
+
+                String jsonData = objectMapper.writeValueAsString(blockData);
+                minIOService.archiveBlockData(block.getHeight(), jsonData);
+
+            } catch (Exception e) {
+                log.error("归档区块数据失败: {}", block.getHeight(), e);
+            }
+        });
+    }
+
+    /**
+     * 添加日志归档方法
+     */
+    private void archiveSyncLog(String operation, String details, boolean success) {
+        if (!minioArchiveEnabled) {
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Map<String, Object> logEntry = new HashMap<>();
+                logEntry.put("timestamp", LocalDateTime.now().toString());
+                logEntry.put("operation", operation);
+                logEntry.put("details", details);
+                logEntry.put("success", success);
+                logEntry.put("service", "EthereumDataService");
+
+                String logContent = objectMapper.writeValueAsString(logEntry);
+
+                if (success) {
+                    minIOService.archiveSyncLog("ETH", logContent);
+                } else {
+                    minIOService.archiveErrorLog(logContent);
+                }
+
+            } catch (Exception e) {
+                log.error("归档同步日志失败", e);
+            }
+        });
+    }
+
     // ============= 1. 分块加载历史数据 =============
 
     @Override
@@ -69,6 +216,8 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     public ApiResponse<String> syncHistoricalData(LocalDate startDate, LocalDate endDate, Integer batchDays) {
         try {
             log.info("开始同步历史数据: {} 到 {}", startDate, endDate);
+            archiveSyncLog("syncHistoricalData",
+                    String.format("开始同步历史数据: %s 到 %s", startDate, endDate), true);
 
             // 参数验证
             if (startDate == null) startDate = LocalDate.of(2026, 1, 20);
@@ -100,11 +249,17 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                 Thread.sleep(1000); // 避免请求过于频繁
             }
 
+            archiveSyncLog("syncHistoricalData",
+                    String.format("历史数据同步完成，共同步 %d 个区块，%d 笔交易",
+                            totalBlocks, totalTransactions), true);
+
             return ApiResponse.success(String.format("历史数据同步完成，共同步 %d 个区块，%d 笔交易",
                     totalBlocks, totalTransactions), null);
 
         } catch (Exception e) {
             log.error("同步历史数据失败", e);
+            archiveSyncLog("syncHistoricalData",
+                    String.format("同步失败: %s", e.getMessage()), false);
             return ApiResponse.error(500, "历史数据同步失败: " + e.getMessage());
         }
     }
@@ -120,6 +275,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult result = executeBigQuery(query);
+
+            // 归档原始查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("blocks_query", result);
+            }
+
             List<ChainBlock> blocks = mapToChainBlocks(result);
 
             int savedCount = 0;
@@ -130,6 +291,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     if (!existingBlock.isPresent()) {
                         block.setChain(CHAIN_ETH);
                         chainBlockRepository.save(block);
+
+                        // 归档区块数据
+                        archiveBlockData(block);
+
                         savedCount++;
                         log.debug("保存新区块: {}", block.getHeight());
                     }
@@ -169,6 +334,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                 );
 
                 TableResult result = executeBigQuery(query);
+
+                // 归档原始查询结果
+                if (minioArchiveEnabled) {
+                    archiveBigQueryResult("transactions_query", result);
+                }
+
                 List<ChainTx> transactions = mapToChainTxs(result);
 
                 int savedCount = 0;
@@ -181,6 +352,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                             savedCount++;
 
                             batchForGraph.add(savedTx);
+
+                            // 归档交易数据
+                            archiveTransactionData(savedTx);
+
                             // 保存输入输出
                             saveTransactionInputOutput(savedTx);
                         }
@@ -225,7 +400,7 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     }
 
     // 添加一个新的方法来测试图数据库连接和保存
-// 简化测试方法
+    // 简化测试方法
     @Override
     public ApiResponse<String> testGraphConnection() {
         try {
@@ -264,16 +439,6 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                 chainTxOutputRepository.save(output);
             }
 
-            // 新增：异步保存到图数据库
-//            if (graphService != null) {
-//                try {
-//                    graphService.saveTransactionsToGraph();
-//                } catch (Exception e) {
-//                    log.warn("保存到图数据库失败，继续执行: {}", tx.getTxHash(), e);
-//                }
-//            }
-
-
         } catch (Exception e) {
             log.error("保存交易输入输出失败: txHash={}", tx.getTxHash(), e);
         }
@@ -301,6 +466,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                             "WHERE DATE(`timestamp`) >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)";
 
             TableResult bqResult = executeBigQuery(latestBlockQuery);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("latest_block_query", bqResult);
+            }
+
             for (FieldValueList row : bqResult.iterateAll()) {
                 if (!row.get("max_height").isNull()) {
                     result.put("bq_latest_height", row.get("max_height").getLongValue());
@@ -342,6 +513,8 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             if (latestHeightInDB == null) latestHeightInDB = 0L;
 
             log.info("开始同步最新数据，数据库最新高度: {}，同步 {} 个区块", latestHeightInDB, blocksToSync);
+            archiveSyncLog("syncLatestData",
+                    String.format("开始同步最新数据，数据库最新高度: %s，同步 %s 个区块", latestHeightInDB, blocksToSync), true);
 
             // 获取最新区块
             String blocksQuery = String.format(
@@ -355,6 +528,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult blocksResult = executeBigQuery(blocksQuery);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("latest_blocks_query", blocksResult);
+            }
+
             List<ChainBlock> blocks = mapToChainBlocks(blocksResult);
 
             if (blocks.isEmpty()) {
@@ -371,6 +550,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     if (!existingBlock.isPresent()) {
                         block.setChain(CHAIN_ETH);
                         chainBlockRepository.save(block);
+
+                        // 归档区块数据
+                        archiveBlockData(block);
+
                         savedBlocks++;
 
                         // 同步该区块的交易
@@ -381,11 +564,15 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                 }
             }
 
+            archiveSyncLog("syncLatestData",
+                    String.format("同步完成，新增 %d 个区块，%d 笔交易", savedBlocks, savedTransactions), true);
+
             return ApiResponse.success(String.format("同步完成，新增 %d 个区块，%d 笔交易",
                     savedBlocks, savedTransactions), null);
 
         } catch (Exception e) {
             log.error("同步最新数据失败", e);
+            archiveSyncLog("syncLatestData", String.format("同步失败: %s", e.getMessage()), false);
             return ApiResponse.error(500, "同步最新数据失败: " + e.getMessage());
         }
     }
@@ -403,6 +590,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult result = executeBigQuery(query);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("block_transactions_query", result);
+            }
+
             List<ChainTx> transactions = mapToChainTxs(result);
 
             List<ChainTx> batchForGraph = new ArrayList<>();
@@ -417,6 +610,9 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                         savedCount++;
 
                         batchForGraph.add(savedTx);
+
+                        // 归档交易数据
+                        archiveTransactionData(savedTx);
 
                         // 保存输入输出
                         saveTransactionInputOutput(savedTx);
@@ -450,6 +646,7 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     public void scheduledSyncLatestData() {
         try {
             log.info("开始定时同步最新数据");
+            archiveSyncLog("scheduledSyncLatestData", "开始定时同步最新数据", true);
 
             Long latestHeightInDB = getLatestBlockHeightFromDB();
             if (latestHeightInDB == null) {
@@ -469,6 +666,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult blocksResult = executeBigQuery(blocksQuery);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("scheduled_blocks_query", blocksResult);
+            }
+
             List<ChainBlock> blocks = mapToChainBlocks(blocksResult);
 
             if (!blocks.isEmpty()) {
@@ -478,6 +681,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     if (!existingBlock.isPresent()) {
                         block.setChain(CHAIN_ETH);
                         chainBlockRepository.save(block);
+
+                        // 归档区块数据
+                        archiveBlockData(block);
+
                         savedBlocks++;
 
                         // 同步交易
@@ -485,12 +692,16 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     }
                 }
                 log.info("定时同步完成，新增 {} 个区块", savedBlocks);
+                archiveSyncLog("scheduledSyncLatestData",
+                        String.format("定时同步完成，新增 %s 个区块", savedBlocks), true);
             } else {
                 log.info("定时同步：无新数据");
             }
 
         } catch (Exception e) {
             log.error("定时同步失败", e);
+            archiveSyncLog("scheduledSyncLatestData",
+                    String.format("定时同步失败: %s", e.getMessage()), false);
         }
     }
 
@@ -694,6 +905,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult result = executeBigQuery(query);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("get_blocks_query", result);
+            }
+
             List<ChainBlock> blocksFromBQ = mapToChainBlocks(result);
 
             // 保存到数据库
@@ -703,6 +920,9 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     if (!existingBlock.isPresent()) {
                         block.setChain(CHAIN_ETH);
                         chainBlockRepository.save(block);
+
+                        // 归档区块数据
+                        archiveBlockData(block);
                     }
                 } catch (Exception e) {
                     log.error("保存区块失败: height={}", block.getHeight(), e);
@@ -762,6 +982,12 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             );
 
             TableResult result = executeBigQuery(query);
+
+            // 归档查询结果
+            if (minioArchiveEnabled) {
+                archiveBigQueryResult("get_transactions_query", result);
+            }
+
             List<ChainTx> transactionsFromBQ = mapToChainTxs(result);
 
             // 保存到数据库
@@ -771,6 +997,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
                     if (!existingTx.isPresent()) {
                         tx.setChain(CHAIN_ETH);
                         ChainTx savedTx = chainTxRepository.save(tx);
+
+                        // 归档交易数据
+                        archiveTransactionData(savedTx);
+
                         saveTransactionInputOutput(savedTx);
                     }
                 } catch (Exception e) {
