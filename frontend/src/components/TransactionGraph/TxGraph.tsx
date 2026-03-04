@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useState, useMemo } from "react";
 import * as d3 from "d3";
 import { NodeItem, LinkItem } from "./types";
 import TxDetail from "./TxDetail";
+import { formatEthValue } from "../../utils/ethUtils";
 
 interface TxGraphProps {
   nodes?: NodeItem[];
   links?: LinkItem[];
   width: number;
   height: number;
+  currencySymbol?: string;
   filter?: {
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -31,6 +33,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
   links,
   width,
   height,
+  currencySymbol,
   filter,
   onFilterChange,
 }) => {
@@ -288,14 +291,85 @@ const TxGraph: React.FC<TxGraphProps> = ({
       )
       .attr("stroke", "var(--text-muted)")
       .attr("stroke-width", 2)
+      .attr("cursor", "pointer")
       .on("click", function (event, d) {
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
       });
 
+    // 定义高亮方法
+    const highlightLink = (d: LinkItem) => {
+      // 高亮对应的路径线
+      g.selectAll("line.link")
+        .filter((ld: any) => ld === d)
+        .attr("stroke-width", 3)
+        .attr("stroke", "var(--primary-color)");
+
+      // 高亮对应的箭头
+      g.selectAll("polygon.link-arrow")
+        .filter((ad: any) => ad === d)
+        .each(function (ad: any) {
+          const poly = d3.select(this);
+          poly.attr("data-scale", "1.2");
+          poly.attr("fill", "var(--primary-color)");
+          const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
+          const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
+          const mx = (sNode.x + tNode.x) / 2;
+          const my = (sNode.y + tNode.y) / 2;
+          const angle =
+            (Math.atan2(tNode.y - sNode.y, tNode.x - sNode.x) * 180) / Math.PI;
+          poly.attr(
+            "transform",
+            `translate(${mx},${my}) rotate(${angle}) scale(1.2)`,
+          );
+        });
+
+      // 高亮连接线标签
+      g.selectAll("text.link-label")
+        .filter((ad: any) => ad === d)
+        .attr("font-weight", "bold")
+        .attr("font-size", 12)
+        .attr("fill", "var(--primary-color)");
+    };
+
+    // 定义恢复原始状态方法
+    const restoreLink = (d: LinkItem) => {
+      // 恢复路径线
+      g.selectAll("line.link")
+        .filter((ld: any) => ld === d)
+        .attr("stroke", "var(--text-muted)")
+        .attr("stroke-width", 2);
+
+      // 恢复箭头
+      g.selectAll("polygon.link-arrow")
+        .filter((ad: any) => ad === d)
+        .each(function (ad: any) {
+          const poly = d3.select(this);
+          poly.attr("fill", "var(--text-muted)").attr("data-scale", "1");
+          const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
+          const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
+          const mx = (sNode.x + tNode.x) / 2;
+          const my = (sNode.y + tNode.y) / 2;
+          const angle =
+            (Math.atan2(tNode.y - sNode.y, tNode.x - sNode.x) * 180) / Math.PI;
+          poly.attr(
+            "transform",
+            `translate(${mx},${my}) rotate(${angle}) scale(1)`,
+          );
+        });
+
+      // 恢复标签
+      g.selectAll("text.link-label")
+        .filter((ad: any) => ad === d)
+        .attr("font-weight", "normal")
+        .attr("font-size", 10)
+        .attr("fill", "var(--text-secondary)");
+    };
+
     // 在连线中点添加箭头（使用 polygon），并根据起点到终点角度旋转
-    g.selectAll("polygon.link-arrow")
+    const linkArrows = g
+      .selectAll("polygon.link-arrow")
       .data(layout.links)
       .enter()
       .append("polygon")
@@ -303,6 +377,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("points", "5,0 -10,6 -10,-6")
       .attr("fill", "var(--text-muted)")
       .attr("data-scale", "1")
+      .attr("cursor", "pointer")
       .attr("transform", (d: any) => {
         const s = layout.nodes.find((n) => n.id === d.from) as any;
         const t = layout.nodes.find((n) => n.id === d.to) as any;
@@ -315,15 +390,33 @@ const TxGraph: React.FC<TxGraphProps> = ({
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
+      })
+      .on("mouseover", function (event, d) {
+        highlightLink(d);
+      })
+      .on("mouseout", function (event, d) {
+        restoreLink(d);
       });
 
     // 在连线中点上方添加标签文本
-    g.selectAll("text.link-label")
+    const linkLabels = g
+      .selectAll("text.link-label")
       .data(layout.links)
       .enter()
       .append("text")
       .attr("class", "link-label")
-      .text((d: LinkItem) => d.label || "")
+      .text((d: LinkItem) => {
+        // Check if this is an ETH transaction and needs conversion
+        if (d.label && d.label.includes("ETH")) {
+          // Extract the numeric value from the label (e.g., "374708330000000000 ETH" -> "374708330000000000")
+          const ethMatch = d.label.match(/^([\d.]+)\s*ETH$/);
+          if (ethMatch) {
+            const weiValue = ethMatch[1];
+            return `${formatEthValue(weiValue)} ETH`;
+          }
+        }
+        return d.label || "";
+      })
       .attr("x", (d: any) => {
         const s = layout.nodes.find((n) => n.id === d.from) as any;
         const t = layout.nodes.find((n) => n.id === d.to) as any;
@@ -341,69 +434,30 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "var(--text-secondary)")
-      .attr("pointer-events", "none")
+      .attr("pointer-events", "all")
+      .attr("cursor", "pointer")
       .on("click", function (event, d) {
         setSelectedLink(d);
         setShowDetail(true);
         event.stopPropagation();
       });
 
-    // 让鼠标悬停同时高亮线与对应的中点箭头
+    // 让鼠标悬停同时高亮线与对应的中点箭头和标签
     linkLines
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("stroke-width", 4);
-        g.selectAll("polygon.link-arrow")
-          .filter((ad: any) => ad === d)
-          .each(function (ad: any) {
-            const poly = d3.select(this);
-            poly.attr("data-scale", "1.4");
-            const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
-            const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
-            const mx = (sNode.x + tNode.x) / 2;
-            const my = (sNode.y + tNode.y) / 2;
-            const angle =
-              (Math.atan2(tNode.y - sNode.y, tNode.x - sNode.x) * 180) /
-              Math.PI;
-            poly.attr(
-              "transform",
-              `translate(${mx},${my}) rotate(${angle}) scale(1.4)`,
-            );
-          });
-
-        // 高亮连接线标签
-        g.selectAll("text.link-label")
-          .filter((ad: any) => ad === d)
-          .attr("font-weight", "bold")
-          .attr("font-size", 12);
+        highlightLink(d);
       })
       .on("mouseout", function (event, d) {
-        d3.select(this)
-          .attr("stroke", "var(--text-muted)")
-          .attr("stroke-width", 2);
-        // 恢复箭头大小与颜色
-        g.selectAll("polygon.link-arrow")
-          .filter((ad: any) => ad === d)
-          .each(function (ad: any) {
-            const poly = d3.select(this);
-            poly.attr("fill", "var(--text-muted)").attr("data-scale", "1");
-            const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
-            const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
-            const mx = (sNode.x + tNode.x) / 2;
-            const my = (sNode.y + tNode.y) / 2;
-            const angle =
-              (Math.atan2(tNode.y - sNode.y, tNode.x - sNode.x) * 180) /
-              Math.PI;
-            poly.attr(
-              "transform",
-              `translate(${mx},${my}) rotate(${angle}) scale(1)`,
-            );
-          });
+        restoreLink(d);
+      });
 
-        g.selectAll("text.link-label")
-          .filter((ad: any) => ad === d)
-          .attr("font-weight", "normal")
-          .attr("font-size", 10)
-          .attr("fill", "var(--text-secondary)");
+    // 同样为标签文字添加悬停效果以保持一致性
+    linkLabels
+      .on("mouseover", function (event, d) {
+        highlightLink(d);
+      })
+      .on("mouseout", function (event, d) {
+        restoreLink(d);
       });
 
     // 节点
@@ -420,7 +474,14 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .attr("r", (d: any) => (d.layer === 0 ? 14 : 8))
       .attr("fill", (d: any) => colorForNode(d.malicious || 0, d.image || ""))
       .attr("stroke", "#222")
-      .attr("stroke-width", (d: any) => (d.layer === 0 ? 1.5 : 1));
+      .attr("stroke-width", (d: any) => (d.layer === 0 ? 1.5 : 1))
+      .style("cursor", "grab")
+      .on("mouseover", function (event, d) {
+        d3.select(this).style("cursor", "grab");
+      })
+      .on("mouseout", function (event, d) {
+        d3.select(this).style("cursor", "default");
+      });
 
     nodeGroup
       .append("text")
@@ -452,6 +513,8 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .on("start", function (event, d) {
         if (event.sourceEvent) (event.sourceEvent as any).stopPropagation();
         d3.select(this).raise();
+        // 选择当前节点组下的圆形元素并设置光标
+        d3.select(this).select("circle").style("cursor", "grabbing");
       })
       .on("drag", function (event, d) {
         d.x = event.x;
@@ -496,24 +559,27 @@ const TxGraph: React.FC<TxGraphProps> = ({
             const offset = 8;
             return (s.y + t.y) / 2 - (dx / distance) * offset;
           });
+      })
+      .on("end", function (event, d) {
+        d3.select(this).select("circle").style("cursor", "grab");
       });
 
     nodeGroup.call(dragHandler as any);
 
     // 缩放与拖拽（对 g 生效）
-    svg.call(
-      d3
-        .zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.5, 2])
-        .on("zoom", (event) => {
-          transformRef.current = {
-            x: event.transform.x,
-            y: event.transform.y,
-            k: event.transform.k,
-          };
-          g.attr("transform", event.transform as any);
-        }),
-    );
+    const zoomBehavior = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.5, 2])
+      .on("zoom", (event) => {
+        transformRef.current = {
+          x: event.transform.x,
+          y: event.transform.y,
+          k: event.transform.k,
+        };
+        g.attr("transform", event.transform as any);
+      });
+
+    svg.call(zoomBehavior as any);
 
     // 恢复之前保存的缩放和拖动位置
     const savedTransform = transformRef.current;
@@ -522,9 +588,12 @@ const TxGraph: React.FC<TxGraphProps> = ({
       savedTransform.x !== 0 ||
       savedTransform.y !== 0
     ) {
-      g.attr(
-        "transform",
-        `translate(${savedTransform.x},${savedTransform.y}) scale(${savedTransform.k})`,
+      // 使用 zoom 的 transform 方法来设置变换，这样 zoom 的内部状态会同步，后续交互不会重置位置
+      svg.call(
+        (zoomBehavior as any).transform,
+        d3.zoomIdentity
+          .translate(savedTransform.x, savedTransform.y)
+          .scale(savedTransform.k),
       );
     } else {
       const root = nodes
@@ -533,7 +602,19 @@ const TxGraph: React.FC<TxGraphProps> = ({
       if (root && root.x && root.x > 0) {
         const tx = width / 2 - root.x;
         const ty = height / 2 - root.y;
-        g.attr("transform", `translate(${tx},${ty})`);
+
+        // 如果不存在负层级节点，左移150px，并保存为当前的变换（以便后续重绘保留该位置）
+        const hasNegativeLayer = filteredNodes.some((n) => (n.layer ?? 0) < 0);
+        const xOffset = !hasNegativeLayer ? -150 : 0;
+
+        const newX = tx + xOffset;
+        const newY = ty;
+        // 保存当前的平移与缩放（缩放为1）并通过 zoomBehavior 设置 transform，保证内部状态同步
+        transformRef.current = { x: newX, y: newY, k: 1 };
+        svg.call(
+          (zoomBehavior as any).transform,
+          d3.zoomIdentity.translate(newX, newY).scale(1),
+        );
       }
     }
 
@@ -565,6 +646,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
         show={showDetail}
         onHide={handleCloseDetail}
         link={selectedLink}
+        currencySymbol={currencySymbol}
       />
     </>
   );

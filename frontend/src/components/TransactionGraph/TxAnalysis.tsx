@@ -3,12 +3,14 @@ import { LinkItem, NodeItem } from "./types";
 import { Input, Table, Typography, Space, Card } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "./TxDetail";
+import { formatEthValue } from "../../utils/ethUtils";
 
 const { Text } = Typography;
 
 interface TxAnalysisProps {
   nodes?: NodeItem[];
   links?: LinkItem[];
+  currencySymbol?: string;
 }
 
 interface AddressStat {
@@ -17,7 +19,11 @@ interface AddressStat {
   totalValue: number;
 }
 
-const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
+const TxAnalysis: React.FC<TxAnalysisProps> = ({
+  nodes = [],
+  links = [],
+  currencySymbol,
+}) => {
   const [searchText, setSearchText] = useState("");
   const [outgoingStats, setOutgoingStats] = useState<AddressStat[]>([]);
   const [incomingStats, setIncomingStats] = useState<AddressStat[]>([]);
@@ -54,23 +60,23 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
     if (isOutgoing) {
       // 查找从当前节点到指定地址的链接
       const targetNode = nodes.find(
-        (node) => (node.addr || node.title || node.id) === address
+        (node) => (node.addr || node.title || node.id) === address,
       );
 
       if (targetNode) {
         foundLink = links.find(
-          (link) => link.from === nodes[0]?.id && link.to === targetNode.id
+          (link) => link.from === nodes[0]?.id && link.to === targetNode.id,
         );
       }
     } else {
       // 查找从指定地址到当前节点的链接
       const sourceNode = nodes.find(
-        (node) => (node.addr || node.title || node.id) === address
+        (node) => (node.addr || node.title || node.id) === address,
       );
 
       if (sourceNode) {
         foundLink = links.find(
-          (link) => link.from === sourceNode.id && link.to === nodes[0]?.id
+          (link) => link.from === sourceNode.id && link.to === nodes[0]?.id,
         );
       }
     }
@@ -112,7 +118,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
               };
             }
             outgoingMap[targetAddr].count += link.tx_hash_list.length;
-            outgoingMap[targetAddr].totalValue += link.val;
+            outgoingMap[targetAddr].totalValue += link.val || 0;
           }
         }
       }
@@ -133,7 +139,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
               };
             }
             incomingMap[sourceAddr].count += link.tx_hash_list.length;
-            incomingMap[sourceAddr].totalValue += link.val;
+            incomingMap[sourceAddr].totalValue += link.val || 0;
           }
         }
       }
@@ -182,13 +188,18 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
       ),
     },
     {
-      title: "BNB",
+      title: currencySymbol || "BNB",
       dataIndex: "totalValue",
       key: "totalValue",
       width: 100,
       sorter: (a: AddressStat, b: AddressStat) => a.totalValue - b.totalValue,
       showSorterTooltip: false,
-      render: (value: number) => `${value}`,
+      render: (value: number) => {
+        if (currencySymbol === "ETH") {
+          return value.toFixed(6);
+        }
+        return `${value}`;
+      },
     },
   ];
 
@@ -225,13 +236,18 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
       ),
     },
     {
-      title: "BNB",
+      title: currencySymbol || "BNB",
       dataIndex: "totalValue",
       key: "totalValue",
       width: 100,
       sorter: (a: AddressStat, b: AddressStat) => a.totalValue - b.totalValue,
       showSorterTooltip: false,
-      render: (value: number) => `${value}`,
+      render: (value: number) => {
+        if (currencySymbol === "ETH") {
+          return value.toFixed(6);
+        }
+        return `${value}`;
+      },
     },
   ];
 
@@ -313,6 +329,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({ nodes = [], links = [] }) => {
         show={showTxDetail}
         onHide={() => setShowTxDetail(false)}
         link={selectedLink}
+        currencySymbol={currencySymbol}
       />
     </Card>
   );

@@ -12,10 +12,8 @@ import {
 } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
-import {
-  TransactionDetail,
-  transactionApi,
-} from "../../services/transaction/index";
+import { transactionApi } from "../../services/transaction/index";
+import { formatEthValue } from "../../utils/ethUtils";
 
 // 自定义函数用于在文本中间添加省略号
 const truncateMiddle = (str: string, maxLength: number = 15) => {
@@ -35,19 +33,33 @@ interface TxDetailProps {
   show: boolean;
   onHide: () => void;
   link: LinkItem | null;
+  currencySymbol?: string;
 }
 
-const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
-  // 测试用的交易哈希列表
-  const testTxHashes = useMemo(
-    () => [
-      "0x000109f8e4760f085ddc9df66f891e24b0b219a3d258aba479c7cdb0a9a1cd9f",
-      "0x00019497573dedae9387f8b3eb3a4e1a0622eb473f527c3e673811599ba25d86",
-    ],
+const TxDetail: React.FC<TxDetailProps> = ({
+  show,
+  onHide,
+  link,
+  currencySymbol,
+}) => {
+  // 交易哈希列表来自所选链接参数
+  const txHashes = useMemo(() => link?.tx_hash_list || [], [link]);
+
+  // 定义统一的交易详情类型
+  interface UnifiedTransactionDetail {
+    time: string;
+    from: string;
+    to: string;
+    value: number;
+    tx_hash: string;
+    timestamp: number;
+    from_label?: string;
+    to_label?: string;
+  }
+
+  const [transactions, setTransactions] = useState<UnifiedTransactionDetail[]>(
     [],
   );
-
-  const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   // 复制文本到剪贴板的函数
@@ -68,14 +80,66 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
       const fetchTransactionDetails = async () => {
         setLoading(true);
         try {
-          const response = await transactionApi.getTransactionDetails({
-            tx_hash_list: testTxHashes,
+          // 并行获取所有交易详情
+          const transactionPromises = txHashes.map(async (txHash) => {
+            // 根据交易哈希判断是哪种类型的交易（这里假设以太坊交易以0x开头）
+            if (txHash.startsWith("0x")) {
+              try {
+                const response =
+                  await transactionApi.getEthereumTransactionDetail(txHash);
+                if (response.success && response.data) {
+                  // 新的接口在 data.transaction 下才是真正的字段
+                  const ethData = response.data;
+                  const txObj = ethData.transaction;
+                  return {
+                    time: new Date(txObj.blockTime).toISOString(),
+                    from: txObj.fromAddress,
+                    to: txObj.toAddress,
+                    // 如果外层有 value 字段就使用，否则降级到 transaction 内的输出
+                    value:
+                      typeof ethData.value === "number"
+                        ? ethData.value
+                        : txObj.getTotalOutputAsDouble || 0,
+                    tx_hash: txObj.txHash,
+                    // 将 blockTime 转成 unix 时间戳
+                    timestamp: new Date(txObj.blockTime).getTime() / 1000,
+                  };
+                }
+              } catch (error) {
+                console.error(`获取以太坊交易详情失败 ${txHash}:`, error);
+              }
+            } else {
+              // 假设其他格式为比特币交易
+              try {
+                const response =
+                  await transactionApi.getBitcoinTransactionDetail(txHash);
+                if (response.success && response.data) {
+                  const btcData = response.data;
+                  const txObj = btcData.transaction;
+                  // 有些比特币接口可能不带 fromAddress/toAddress inside
+                  return {
+                    time: new Date(txObj.blockTime).toISOString(),
+                    from: btcData.fromAddress || txObj.fromAddress || "Unknown",
+                    to: btcData.toAddress || txObj.toAddress || "Unknown",
+                    value:
+                      typeof btcData.value === "number" ? btcData.value : 0,
+                    tx_hash: txObj.txHash,
+                    timestamp: new Date(txObj.blockTime).getTime() / 1000,
+                  };
+                }
+              } catch (error) {
+                console.error(`获取比特币交易详情失败 ${txHash}:`, error);
+              }
+            }
+            return null;
           });
-          if (response.success) {
-            setTransactions(response.tx_detail_list);
-          } else {
-            message.error(`获取交易详情失败: ${response.msg}`);
-          }
+
+          const results = await Promise.all(transactionPromises);
+          const validTransactions = results.filter(
+            (result) => result !== null,
+          ) as UnifiedTransactionDetail[];
+
+          setTransactions(validTransactions);
         } catch (error) {
           console.error("获取交易详情出错:", error);
           message.error("获取交易详情失败，请稍后重试");
@@ -86,7 +150,7 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
 
       fetchTransactionDetails();
     }
-  }, [show, link, testTxHashes]);
+  }, [show, link, txHashes]);
 
   // 如果没有选中的边，返回空内容
   if (!link) {
@@ -173,7 +237,16 @@ const TxDetail: React.FC<TxDetailProps> = ({ show, onHide, link }) => {
       sorter: (a: any, b: any) => a.value - b.value,
       sortDirections: ["descend", "ascend"],
       showSorterTooltip: false,
-      render: (value: number) => <Tag color="#667eea">{value} BNB</Tag>,
+      render: (value: number) => {
+        const isETH = currencySymbol === "ETH";
+        const displayValue = isETH ? formatEthValue(value) : value;
+        const displayCurrency = currencySymbol || "BNB";
+        return (
+          <Tag color="#667eea">
+            {displayValue} {displayCurrency}
+          </Tag>
+        );
+      },
     },
     {
       title: "交易Hash",
