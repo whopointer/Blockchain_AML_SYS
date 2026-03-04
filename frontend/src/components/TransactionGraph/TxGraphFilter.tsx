@@ -1,7 +1,8 @@
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
 import { Select, Row, Col, InputNumber, DatePicker, Slider, Space } from "antd";
 import dayjs, { Dayjs } from "dayjs";
-import graphAnalysisData from "./address_graph_analysis.json";
+import { Card } from "antd";
+import { LinkItem } from "./types";
 
 const { Option } = Select;
 
@@ -17,9 +18,10 @@ interface FilterValue {
 interface Props {
   value?: FilterValue;
   onChange?: (v: FilterValue) => void;
+  links?: LinkItem[]; // transaction links used for computing time range
 }
 
-const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
+const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
   const lastUpdateRef = useRef<{
     startDate?: dayjs.Dayjs | null;
     endDate?: dayjs.Dayjs | null;
@@ -27,21 +29,26 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const firstTxTime = useMemo(() => {
-    const timeStr = graphAnalysisData.graph_dic.first_tx_datetime;
-    return dayjs(timeStr + ":00");
-  }, []);
+  // derive earliest/latest times from provided link data; fall back to now when missing
+  const { firstTxTime, latestTxTime } = useMemo(() => {
+    if (links && links.length > 0) {
+      const times = links.map((l) => dayjs(l.tx_time));
+      const sorted = times.sort((a, b) => a.valueOf() - b.valueOf());
+      return {
+        firstTxTime: sorted[0],
+        latestTxTime: sorted[sorted.length - 1],
+      };
+    }
+    const now = dayjs();
+    return { firstTxTime: now, latestTxTime: now };
+  }, [links]);
 
-  const latestTxTime = useMemo(() => {
-    const timeStr = graphAnalysisData.graph_dic.latest_tx_datetime;
-    return dayjs(timeStr + ":00");
-  }, []);
   const firstTxTimeMs = useMemo(() => firstTxTime.valueOf(), [firstTxTime]);
   const latestTxTimeMs = useMemo(() => latestTxTime.valueOf(), [latestTxTime]);
 
   const totalSeconds = useMemo(
     () => (latestTxTimeMs - firstTxTimeMs) / 1000,
-    [latestTxTimeMs, firstTxTimeMs]
+    [latestTxTimeMs, firstTxTimeMs],
   );
 
   const debouncedOnChange = useCallback(
@@ -57,7 +64,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         }, 5);
       }
     },
-    [onChange]
+    [onChange],
   );
 
   useEffect(() => {
@@ -77,7 +84,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
       startDate: null,
       endDate: null,
     }),
-    []
+    [],
   );
 
   const sliderValue = useMemo((): [number, number] => {
@@ -129,7 +136,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         endDate: newEndDate,
       };
     },
-    [debouncedOnChange, firstTxTimeMs, value, defaultValue]
+    [debouncedOnChange, firstTxTimeMs, value, defaultValue],
   );
 
   const handleStartDateChange = useCallback(
@@ -143,7 +150,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
       const currentFilterValue = value || defaultValue;
       debouncedOnChange({ ...currentFilterValue, startDate: startOfDay });
     },
-    [value, defaultValue, debouncedOnChange]
+    [value, defaultValue, debouncedOnChange],
   );
 
   const handleEndDateChange = useCallback(
@@ -157,17 +164,16 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
       const currentFilterValue = value || defaultValue;
       debouncedOnChange({ ...currentFilterValue, endDate: endOfDay });
     },
-    [value, defaultValue, debouncedOnChange]
+    [value, defaultValue, debouncedOnChange],
   );
 
   return (
     <>
-      <div
+      <Card
         style={{
           backgroundColor: "white",
           color: "#222",
           borderRadius: 8,
-          padding: 16,
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -299,7 +305,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                   formatter: (value) => {
                     if (value === undefined) return "";
                     return dayjs(firstTxTimeMs + value * 1000).format(
-                      "YYYY-MM-DD HH:mm:ss"
+                      "YYYY-MM-DD HH:mm:ss",
                     );
                   },
                 }}
@@ -307,7 +313,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
             </Space>
           </Col>
         </Row>
-      </div>
+      </Card>
     </>
   );
 };
