@@ -20,63 +20,97 @@ public class GraphLayerCalculator {
             return nodeLayers;
         }
 
-        // 1. 初始化图结构，建立邻接关系，并收集所有节点
-        Map<String, Set<String>> forwardEdges = new HashMap<>(); // 前向边（正常流向）
-        Set<String> allNodes = new HashSet<>(); // 收集所有路径中的所有节点
-
+        // 1. 收集所有节点
+        Set<String> allNodes = new HashSet<>();
         for (List<Map<String, Object>> path : allPaths) {
-            for (int i = 0; i < path.size(); i++) {
-                String nodeAddr = getNodeAddress(path.get(i));
+            for (Map<String, Object> node : path) {
+                String nodeAddr = getNodeAddress(node);
                 if (nodeAddr != null) {
                     allNodes.add(nodeAddr);
                 }
             }
-
-            for (int i = 0; i < path.size() - 1; i++) {
-                String fromNode = getNodeAddress(path.get(i));
-                String toNode = getNodeAddress(path.get(i + 1));
-
-                if (fromNode != null && toNode != null && !fromNode.equals(toNode)) {
-                    forwardEdges.computeIfAbsent(fromNode, k -> new HashSet<>()).add(toNode);
-                }
-            }
         }
 
-        // 2. 使用广度优先搜索(BFS)从起始节点计算最短跳数（层级），确保起始节点为0
-        Map<String, Integer> distances = new HashMap<>();
-        Queue<String> queue = new LinkedList<>();
-        Set<String> visited = new HashSet<>();
-
-        queue.offer(fromAddress);
-        visited.add(fromAddress);
-        distances.put(fromAddress, 0);
-
-        while (!queue.isEmpty()) {
-            String current = queue.poll();
-
-            // 获取当前节点的所有前向邻居
-            Set<String> neighbors = forwardEdges.get(current);
-            if (neighbors != null) {
-                for (String neighbor : neighbors) {
-                    if (!visited.contains(neighbor)) {
-                        visited.add(neighbor);
-                        distances.put(neighbor, distances.get(current) + 1);
-                        queue.offer(neighbor);
+        // 2. 计算每个节点的最大可能层级
+        Map<String, Integer> maxDistances = new HashMap<>();
+        
+        // 初始化所有节点的层级为-1
+        for (String node : allNodes) {
+            maxDistances.put(node, -1);
+        }
+        
+        // 设置起始节点层级为0
+        maxDistances.put(fromAddress, 0);
+        
+        // 遍历所有路径，计算每个节点的最大层级
+        for (List<Map<String, Object>> path : allPaths) {
+            // 构建路径中节点的地址列表
+            List<String> pathNodes = new ArrayList<>();
+            for (Map<String, Object> node : path) {
+                String nodeAddr = getNodeAddress(node);
+                if (nodeAddr != null) {
+                    pathNodes.add(nodeAddr);
+                }
+            }
+            
+            // 找到起始节点在路径中的位置
+            int startIndex = -1;
+            for (int i = 0; i < pathNodes.size(); i++) {
+                if (pathNodes.get(i).equals(fromAddress)) {
+                    startIndex = i;
+                    break;
+                }
+            }
+            
+            if (startIndex != -1) {
+                // 从起始节点开始，计算路径中每个节点的层级
+                for (int i = 0; i < pathNodes.size(); i++) {
+                    String currentNode = pathNodes.get(i);
+                    int distance = Math.abs(i - startIndex);
+                    
+                    // 如果当前计算的层级大于已有的层级，则更新
+                    if (distance > maxDistances.get(currentNode)) {
+                        maxDistances.put(currentNode, distance);
                     }
                 }
             }
         }
-
-        // 3. 处理未访问到的节点（可能在反向路径或其他组件中）
+        
+        // 3. 确保目标节点的层级是最大的
+        int maxLayer = 0;
         for (String node : allNodes) {
-            if (!distances.containsKey(node)) {
-                // 对于未访问的节点，尝试从目标节点反向BFS找到其层级
-                // 或者简单地将其层级设为比目标节点更深一层
-                distances.put(node, distances.getOrDefault(toAddress, allPaths.size()) + 1);
+            if (maxDistances.get(node) > maxLayer) {
+                maxLayer = maxDistances.get(node);
+            }
+        }
+        
+        // 如果目标节点的层级不是最大的，将其设置为最大层级
+        if (maxDistances.get(toAddress) < maxLayer) {
+            maxDistances.put(toAddress, maxLayer);
+        }
+        
+        // 4. 处理未访问到的节点（层级仍为-1的节点）
+        for (String node : allNodes) {
+            if (maxDistances.get(node) == -1) {
+                // 对于未访问的节点，设置为目标节点的层级+1
+                maxDistances.put(node, maxDistances.get(toAddress) + 1);
             }
         }
 
-        return distances;
+        // 5. 重新映射层级到从1开始的连续整数
+        Set<Integer> uniqueLayers = new HashSet<>(maxDistances.values());
+        List<Integer> sortedLayers = new ArrayList<>(uniqueLayers);
+        Collections.sort(sortedLayers);
+        Map<Integer, Integer> layerMap = new HashMap<>();
+        for (int i = 0; i < sortedLayers.size(); i++) {
+            layerMap.put(sortedLayers.get(i), i + 1);
+        }
+        Map<String, Integer> remappedLayers = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : maxDistances.entrySet()) {
+            remappedLayers.put(entry.getKey(), layerMap.get(entry.getValue()));
+        }
+
+        return remappedLayers;
     }
 
     /**
@@ -158,7 +192,20 @@ public class GraphLayerCalculator {
             }
         }
 
-        return nodeLayers;
+        // 重新映射层级到从1开始的连续整数
+        Set<Integer> uniqueLayers = new HashSet<>(nodeLayers.values());
+        List<Integer> sortedLayers = new ArrayList<>(uniqueLayers);
+        Collections.sort(sortedLayers);
+        Map<Integer, Integer> layerMap = new HashMap<>();
+        for (int i = 0; i < sortedLayers.size(); i++) {
+            layerMap.put(sortedLayers.get(i), i + 1);
+        }
+        Map<String, Integer> remappedLayers = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : nodeLayers.entrySet()) {
+            remappedLayers.put(entry.getKey(), layerMap.get(entry.getValue()));
+        }
+
+        return remappedLayers;
     }
 
     /**
