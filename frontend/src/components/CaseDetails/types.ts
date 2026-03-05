@@ -1,5 +1,5 @@
 import { Dayjs } from "dayjs";
-import { NodeItem, LinkItem } from "../TransactionGraph/types";
+import { NodeItem, LinkItem } from "../GraphCommon/types";
 
 export interface GraphSnapshot {
   id: string;

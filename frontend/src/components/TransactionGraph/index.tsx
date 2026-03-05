@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import TxGraph from "./TxGraph";
+import TxGraph from "../GraphCommon/TxGraph";
 import TxAnalysis from "./TxAnalysis";
-import TxGraphFilter from "./TxGraphFilter";
-import AddressInfo from "./AddressInfo";
-import GraphSnapshotButton from "./GraphSnapshotButton";
+import TxGraphFilter from "../GraphCommon/TxGraphFilter";
+import AddressInfo from "../GraphCommon/AddressInfo";
+import GraphSnapshotButton from "../GraphCommon/GraphSnapshotButton";
 import SearchBar from "./SearchBar";
 import TransactionGraphSearch from "./TransactionGraphSearch";
-import { NodeItem, LinkItem } from "./types";
+import { NodeItem, LinkItem } from "../GraphCommon/types";
 import { Row, Col, message, Card, Spin } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -24,7 +24,7 @@ const TransactionGraph: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   // Determine currency symbol and validate crypto parameter
-  const currencySymbol = crypto?.toLowerCase() === "eth" ? "ETH" : "BNB";
+  const currencySymbol = crypto?.toLowerCase() === "eth" ? "ETH" : "BTC";
 
   const [searchHops, setSearchHops] = useState<number>(
     parseInt(searchParams.get("hops") || "1"),
@@ -115,7 +115,7 @@ const TransactionGraph: React.FC = () => {
           const fromNode = convertedNodes.find((n) => n.addr === edge.from);
           const toNode = convertedNodes.find((n) => n.addr === edge.to);
 
-          // 处理交易值 - 如果是ETH则从wei转换为eth，如果是BNB则保持原样
+          // 处理交易值 - 如果是ETH则从wei转换为eth，如果是BTC则保持原样
           let processedVal = edge.val || edge.value || 0;
           let processedLabel = edge.label || "";
 
@@ -130,7 +130,7 @@ const TransactionGraph: React.FC = () => {
               processedLabel ||
               `${formatEthValue(edge.val || edge.value || 0)} ${currencySymbol}`;
           } else {
-            // BNB或其他货币，保持原样
+            // BTC或其他货币，保持原样
             processedLabel =
               processedLabel || `${processedVal} ${currencySymbol}`;
           }

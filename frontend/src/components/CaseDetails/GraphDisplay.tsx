@@ -5,8 +5,8 @@ import {
   DeleteOutlined,
   EditOutlined,
 } from "@ant-design/icons";
-import TxGraph from "../TransactionGraph/TxGraph";
-import TxGraphFilter from "../TransactionGraph/TxGraphFilter";
+import TxGraph from "../GraphCommon/TxGraph";
+import TxGraphFilter from "../GraphCommon/TxGraphFilter";
 import { GraphSnapshot } from "./types";
 import dayjs from "dayjs";
 

@@ -18,6 +18,7 @@ import BatchAnalysis from "./components/BatchAnalysis";
 import MoneyLaunderingTrace from "./components/MoneyLaunderingTrace";
 import TransactionGraph from "./components/TransactionGraph";
 import CaseDetails from "./components/CaseDetails";
+import PathTracking from "./components/PathTracking";
 import { PredictionResponse } from "./services/api";
 
 // 自定义导航链接组件，用于激活状态样式
@@ -91,6 +92,7 @@ function App() {
               <CustomNavLink to="/prediction">交易检测</CustomNavLink>
               <CustomNavLink to="/batch">批量分析</CustomNavLink>
               <CustomNavLink to="/transaction-graph">交易图谱</CustomNavLink>
+              <CustomNavLink to="/path-tracking">路径追踪</CustomNavLink>
               <CustomNavLink to="/case-details">案件详情</CustomNavLink>
             </Nav>
           </Navbar.Collapse>
@@ -112,6 +114,8 @@ function App() {
                 element={<TransactionGraph />}
               />
               <Route path="/case-details" element={<CaseDetails />} />
+              <Route path="/path-tracking" element={<PathTracking />} />
+              <Route path="/path-tracking/:crypto" element={<PathTracking />} />
               {/* 处理无效路径 */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

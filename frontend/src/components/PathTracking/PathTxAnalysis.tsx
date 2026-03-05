@@ -3,11 +3,10 @@ import { LinkItem, NodeItem } from "../GraphCommon/types";
 import { Input, Table, Typography, Space, Card } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "../GraphCommon/TxDetail";
-import { formatEthValue } from "../../utils/ethUtils";
 
 const { Text } = Typography;
 
-interface TxAnalysisProps {
+interface PathTxAnalysisProps {
   nodes?: NodeItem[];
   links?: LinkItem[];
   currencySymbol?: string;
@@ -19,7 +18,7 @@ interface AddressStat {
   totalValue: number;
 }
 
-const TxAnalysis: React.FC<TxAnalysisProps> = ({
+const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
   nodes = [],
   links = [],
   currencySymbol,
@@ -58,26 +57,22 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
     let foundLink: LinkItem | undefined;
 
     if (isOutgoing) {
-      // 查找从当前节点到指定地址的链接
-      const targetNode = nodes.find(
-        (node) => (node.addr || node.title || node.id) === address,
-      );
-
-      if (targetNode) {
-        foundLink = links.find(
-          (link) => link.from === nodes[0]?.id && link.to === targetNode.id,
-        );
-      }
-    } else {
-      // 查找从指定地址到当前节点的链接
+      // 查找从指定地址发出的链接
       const sourceNode = nodes.find(
         (node) => (node.addr || node.title || node.id) === address,
       );
 
       if (sourceNode) {
-        foundLink = links.find(
-          (link) => link.from === sourceNode.id && link.to === nodes[0]?.id,
-        );
+        foundLink = links.find((link) => link.from === sourceNode.id);
+      }
+    } else {
+      // 查找发送到指定地址的链接
+      const targetNode = nodes.find(
+        (node) => (node.addr || node.title || node.id) === address,
+      );
+
+      if (targetNode) {
+        foundLink = links.find((link) => link.to === targetNode.id);
       }
     }
 
@@ -89,7 +84,6 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
 
   // 计算地址统计数据
   useEffect(() => {
-    // 发送地址和接收地址统计: 去除nodes[0]本身
     if (!nodes.length || !links.length) {
       setOutgoingStats([]);
       setIncomingStats([]);
@@ -99,49 +93,35 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
     const outgoingMap: Record<string, AddressStat> = {};
     const incomingMap: Record<string, AddressStat> = {};
 
-    const currentNodeAddr = nodes[0]?.addr || nodes[0]?.title || nodes[0]?.id;
-
     links.forEach((link) => {
-      // 发送地址统计（来自当前节点的链接）
-      if (link.from === nodes[0]?.id) {
-        const targetNode = nodes.find((node) => node.id === link.to);
-        if (targetNode) {
-          const targetAddr =
-            targetNode.addr || targetNode.title || targetNode.id;
-          // 排除当前节点自身
-          if (targetAddr !== currentNodeAddr) {
-            if (!outgoingMap[targetAddr]) {
-              outgoingMap[targetAddr] = {
-                address: targetAddr,
-                count: 0,
-                totalValue: 0,
-              };
-            }
-            outgoingMap[targetAddr].count += link.tx_hash_list.length;
-            outgoingMap[targetAddr].totalValue += link.val || 0;
-          }
+      // 发送地址统计
+      const sourceNode = nodes.find((node) => node.id === link.from);
+      if (sourceNode) {
+        const sourceAddr = sourceNode.addr || sourceNode.title || sourceNode.id;
+        if (!outgoingMap[sourceAddr]) {
+          outgoingMap[sourceAddr] = {
+            address: sourceAddr,
+            count: 0,
+            totalValue: 0,
+          };
         }
+        outgoingMap[sourceAddr].count += link.tx_hash_list.length;
+        outgoingMap[sourceAddr].totalValue += link.val || 0;
       }
 
-      // 接收地址统计（发送到当前节点的链接）
-      if (link.to === nodes[0]?.id) {
-        const sourceNode = nodes.find((node) => node.id === link.from);
-        if (sourceNode) {
-          const sourceAddr =
-            sourceNode.addr || sourceNode.title || sourceNode.id;
-          // 排除当前节点自身
-          if (sourceAddr !== currentNodeAddr) {
-            if (!incomingMap[sourceAddr]) {
-              incomingMap[sourceAddr] = {
-                address: sourceAddr,
-                count: 0,
-                totalValue: 0,
-              };
-            }
-            incomingMap[sourceAddr].count += link.tx_hash_list.length;
-            incomingMap[sourceAddr].totalValue += link.val || 0;
-          }
+      // 接收地址统计
+      const targetNode = nodes.find((node) => node.id === link.to);
+      if (targetNode) {
+        const targetAddr = targetNode.addr || targetNode.title || targetNode.id;
+        if (!incomingMap[targetAddr]) {
+          incomingMap[targetAddr] = {
+            address: targetAddr,
+            count: 0,
+            totalValue: 0,
+          };
         }
+        incomingMap[targetAddr].count += link.tx_hash_list.length;
+        incomingMap[targetAddr].totalValue += link.val || 0;
       }
     });
 
@@ -270,9 +250,8 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
           fontWeight: 500,
         }}
       >
-        交易分析
+        路径交易分析
       </p>
-      {/* 当前节点 */}
       <p
         style={{
           marginTop: 0,
@@ -281,9 +260,7 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
           color: "#666",
         }}
       >
-        {nodes.length > 0
-          ? `${nodes[0].addr || nodes[0].title || nodes[0].id}`
-          : ""}
+        分析所有地址的交易情况
       </p>
 
       <div style={{ marginBottom: 16 }}>
@@ -335,4 +312,4 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
   );
 };
 
-export default TxAnalysis;
+export default PathTxAnalysis;

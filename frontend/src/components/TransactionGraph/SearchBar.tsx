@@ -10,7 +10,7 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
-  defaultCrypto = "BNB",
+  defaultCrypto = "BTC",
   defaultAddress = "",
   defaultHops = 1,
 }) => {
@@ -51,7 +51,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           borderBottomRightRadius: 0,
         }}
         options={[
-          { value: "BNB", label: "BNB" },
+          { value: "BTC", label: "BTC" },
           { value: "ETH", label: "ETH" },
         ]}
         size="large"
@@ -63,7 +63,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         onKeyPress={handleKeyPress}
         style={{
           flex: 1,
-borderTopLeftRadius: 0,
+          borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
         }}
         size="large"

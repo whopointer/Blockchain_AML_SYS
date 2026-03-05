@@ -240,7 +240,7 @@ const TxDetail: React.FC<TxDetailProps> = ({
       render: (value: number) => {
         const isETH = currencySymbol === "ETH";
         const displayValue = isETH ? formatEthValue(value) : value;
-        const displayCurrency = currencySymbol || "BNB";
+        const displayCurrency = currencySymbol || "BTC";
         return (
           <Tag color="#667eea">
             {displayValue} {displayCurrency}
