@@ -1,51 +1,51 @@
 /**
- * Utility functions for handling ETH values
- * ETH values come in Wei from the backend and need to be converted for display
+ * ETH值处理工具函数
+ * 后端返回的ETH值为Wei单位，需要转换为显示格式
  */
 
 /**
- * Convert Wei to ETH
- * @param weiValue - Value in Wei (as string or number)
- * @returns Value in ETH as string with appropriate decimal places
+ * 将Wei转换为ETH
+ * @param weiValue - Wei值（字符串或数字）
+ * @returns ETH值字符串，保留适当的小数位
  */
 export function weiToEth(weiValue: string | number | bigint): string {
-  // Convert input to bigint for precise calculation
+  // 将输入转换为bigint以确保精确计算
   let weiBigInt: bigint;
 
   if (typeof weiValue === "bigint") {
     weiBigInt = weiValue;
   } else if (typeof weiValue === "string") {
-    // Remove decimal point if present and convert to BigInt
+    // 移除可能存在的小数点并转换为BigInt
     const cleanedValue = weiValue.split(".")[0];
     weiBigInt = BigInt(cleanedValue);
   } else if (typeof weiValue === "number") {
-    // Check if the number is safe to convert to BigInt
+    // 检查数字是否可以安全转换为BigInt
     if (!Number.isInteger(weiValue) || !Number.isSafeInteger(weiValue)) {
-      // Convert to integer string to avoid decimal issues
+      // 转换为整数字符串以避免小数问题
       const intValue = Math.floor(weiValue).toString();
       weiBigInt = BigInt(intValue);
     } else {
       weiBigInt = BigInt(weiValue);
     }
   } else {
-    throw new Error("Invalid input type for wei value");
+    throw new Error("无效的wei值输入类型");
   }
 
   // 1 ETH = 10^18 Wei
   const divisor = BigInt(10 ** 18);
 
-  // Calculate whole ETH part
+  // 计算整数部分
   const ethPart = weiBigInt / divisor;
-  // Calculate fractional part (remainder in Wei)
+  // 计算小数部分（Wei余数）
   const remainder = weiBigInt % divisor;
 
-  // Convert to number for decimal calculation, but keep precision
+  // 转换为字符串，保持精度
   let result = ethPart.toString();
 
   if (remainder > 0) {
-    // Convert remainder to decimal part of ETH
+    // 将余数转换为ETH的小数部分
     let remainderStr = remainder.toString().padStart(18, "0");
-    // Remove trailing zeros
+    // 移除末尾的零
     remainderStr = remainderStr.replace(/0+$/, "");
 
     if (remainderStr.length > 0) {
@@ -57,10 +57,10 @@ export function weiToEth(weiValue: string | number | bigint): string {
 }
 
 /**
- * Format ETH value for display
- * @param weiValue - Value in Wei
- * @param decimals - Number of decimal places to show (default: 6)
- * @returns Formatted ETH value as string
+ * 格式化ETH值用于显示
+ * @param weiValue - Wei值
+ * @param decimals - 显示的小数位数（默认：6）
+ * @returns 格式化后的ETH值字符串
  */
 export function formatEthValue(
   weiValue: string | number | bigint,
@@ -68,26 +68,26 @@ export function formatEthValue(
 ): string {
   const ethValue = weiToEth(weiValue);
 
-  // Convert to number and format with specified decimals
+  // 转换为数字并按指定小数位格式化
   const numValue = parseFloat(ethValue);
   if (isNaN(numValue)) {
     return "0";
   }
 
-  // Handle very small values
+  // 处理非常小的值
   if (numValue === 0) {
     return "0";
   }
 
-  // Use toFixed to limit decimal places, but remove trailing zeros
+  // 使用toFixed限制小数位，然后移除末尾的零
   const fixedValue = numValue.toFixed(decimals);
   return parseFloat(fixedValue).toString();
 }
 
 /**
- * Convert ETH to Wei
- * @param ethValue - Value in ETH
- * @returns Value in Wei as bigint
+ * 将ETH转换为Wei
+ * @param ethValue - ETH值
+ * @returns Wei值（bigint）
  */
 export function ethToWei(ethValue: number | string): bigint {
   const ethNum = typeof ethValue === "string" ? parseFloat(ethValue) : ethValue;

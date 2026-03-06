@@ -1,14 +1,5 @@
 import React from "react";
-import {
-  Table,
-  Button,
-  Space,
-  Tag,
-  Input,
-  Select,
-  Row,
-  Col,
-} from "antd";
+import { Table, Button, Space, Tag, Input, Select, Row, Col } from "antd";
 import {
   DeleteOutlined,
   EyeOutlined,
@@ -30,26 +21,26 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
   onDownloadSnapshot,
   onClearFilters,
 }) => {
-  const getRiskLevelColor = (riskLevel: "low" | "medium" | "high"): string => {
+  const getRiskLevelColor = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
-      case "high":
+      case "HIGH":
         return "red";
-      case "medium":
+      case "MEDIUM":
         return "orange";
-      case "low":
+      case "LOW":
         return "green";
       default:
         return "blue";
     }
   };
 
-  const getRiskLevelLabel = (riskLevel: "low" | "medium" | "high"): string => {
+  const getRiskLevelLabel = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
-      case "high":
+      case "HIGH":
         return "高风险";
-      case "medium":
+      case "MEDIUM":
         return "中风险";
-      case "low":
+      case "LOW":
         return "低风险";
       default:
         return "未知";
@@ -80,7 +71,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
       dataIndex: "riskLevel",
       key: "riskLevel",
       width: "12%",
-      render: (riskLevel: "low" | "medium" | "high") => (
+      render: (riskLevel: "LOW" | "MEDIUM" | "HIGH") => (
         <Tag color={getRiskLevelColor(riskLevel)}>
           {getRiskLevelLabel(riskLevel)}
         </Tag>

@@ -1,5 +1,5 @@
-import React from "react";
-import { Tag, Space, Button, Descriptions, Input, Select } from "antd";
+import React, { useEffect, useState } from "react";
+import { Tag, Space, Button, Descriptions, Input, Select, Spin } from "antd";
 import {
   DownloadOutlined,
   DeleteOutlined,
@@ -8,6 +8,8 @@ import {
 import TxGraph from "../GraphCommon/TxGraph";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
 import { GraphSnapshot } from "./types";
+import { transactionApi } from "../../services/transaction/api";
+import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
 
 interface GraphDisplayProps {
@@ -35,26 +37,115 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   saveEdit,
   cancelEdit,
 }) => {
-  const getRiskLevelColor = (riskLevel: "low" | "medium" | "high"): string => {
+  const [graphData, setGraphData] = useState<{
+    nodes?: NodeItem[];
+    links?: LinkItem[];
+  }>({ nodes: [], links: [] });
+  const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchGraphData = async () => {
+      setLoading(true);
+      setIsError(false);
+      try {
+        let response;
+
+        if (
+          selectedSnapshot.centerAddress &&
+          selectedSnapshot.hops !== undefined
+        ) {
+          // 使用 getNhopGraph 查询图谱
+          response = await transactionApi.getNhopGraph(
+            selectedSnapshot.centerAddress,
+            selectedSnapshot.hops,
+          );
+        } else if (selectedSnapshot.fromAddress && selectedSnapshot.toAddress) {
+          // 使用 getAllPath 查询图谱
+          response = await transactionApi.getAllPath(
+            selectedSnapshot.fromAddress,
+            selectedSnapshot.toAddress,
+          );
+        }
+
+        if (response && response.success && response.data) {
+          // 转换API返回的数据为组件需要的格式
+          const { node_list: nodes, edge_list: edges } = response.data;
+
+          // 转换节点数据 - 根据实际API响应结构调整
+          const convertedNodes: NodeItem[] = nodes.map((node: any, index) => ({
+            id: node.id || node.address,
+            label: node.label || node.address,
+            title: node.title || node.label || node.address,
+            addr: node.addr || node.address,
+            layer: node.layer || 0,
+            value: node.value || 0,
+            malicious: node.malicious || undefined,
+            shape: node.shape || undefined,
+            image: node.image || undefined,
+            expanded: index === 0, // 只展开主节点
+            track: node.track || "one",
+            pid: node.pid || undefined,
+            color: node.color || undefined,
+            exg: node.exg || undefined,
+          }));
+
+          // 转换边数据 - 根据实际API响应结构调整
+          const convertedLinks: LinkItem[] = edges.map((edge: any) => {
+            // 查找对应的节点ID
+            const fromNode = convertedNodes.find((n) => n.addr === edge.from);
+            const toNode = convertedNodes.find((n) => n.addr === edge.to);
+
+            return {
+              from: fromNode?.id || edge.from,
+              to: toNode?.id || edge.to,
+              label: edge.label || `${edge.value || edge.val}`,
+              val: edge.val || edge.value || 0,
+              tx_time: dayjs
+                .unix(parseInt(edge.tx_time || edge.timestamp))
+                .format("YYYY-MM-DD HH:mm"),
+              tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
+            };
+          });
+
+          setGraphData({ nodes: convertedNodes, links: convertedLinks });
+        } else {
+          setGraphData({ nodes: [], links: [] });
+        }
+      } catch (error) {
+        console.error("Failed to fetch graph data:", error);
+        setIsError(true);
+        setGraphData({ nodes: [], links: [] });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (selectedSnapshot) {
+      fetchGraphData();
+    }
+  }, [selectedSnapshot]);
+
+  const getRiskLevelColor = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
-      case "high":
+      case "HIGH":
         return "red";
-      case "medium":
+      case "MEDIUM":
         return "orange";
-      case "low":
+      case "LOW":
         return "green";
       default:
         return "blue";
     }
   };
 
-  const getRiskLevelLabel = (riskLevel: "low" | "medium" | "high"): string => {
+  const getRiskLevelLabel = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
-      case "high":
+      case "HIGH":
         return "高风险";
-      case "medium":
+      case "MEDIUM":
         return "中风险";
-      case "low":
+      case "LOW":
         return "低风险";
       default:
         return "未知";
@@ -191,8 +282,8 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           )}
         </Descriptions.Item>
 
-        <Descriptions.Item label="主地址">
-          <span className="address-text">{selectedSnapshot.mainAddress}</span>
+        <Descriptions.Item label="中心地址">
+          <span className="address-text">{selectedSnapshot.centerAddress}</span>
         </Descriptions.Item>
         <Descriptions.Item label="创建时间">
           {dayjs(selectedSnapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}
@@ -256,54 +347,55 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
       </Descriptions>
 
       {/* 图谱筛选信息和图谱快照 */}
-      {selectedSnapshot?.graphData && (
-        <div style={{ marginTop: 20 }}>
-          <h3 style={{ color: "#ffffff", marginBottom: 16 }}>图谱筛选信息</h3>
-          <TxGraphFilter
-            value={
-              selectedSnapshot.filterConfig
-                ? {
-                    ...selectedSnapshot.filterConfig,
-                    startDate: selectedSnapshot.filterConfig.startDate
-                      ? dayjs(selectedSnapshot.filterConfig.startDate)
-                      : null,
-                    endDate: selectedSnapshot.filterConfig.endDate
-                      ? dayjs(selectedSnapshot.filterConfig.endDate)
-                      : null,
-                  }
-                : undefined
-            }
-            onChange={() => {}} // 禁用更改功能，只用于展示
-          />
+      <div style={{ marginTop: 20 }}>
+        <h3 style={{ color: "#ffffff", marginBottom: 16 }}>图谱筛选信息</h3>
+        <TxGraphFilter
+          value={
+            selectedSnapshot.filterConfig
+              ? {
+                  ...selectedSnapshot.filterConfig,
+                  startDate: selectedSnapshot.filterConfig.startDate
+                    ? dayjs(selectedSnapshot.filterConfig.startDate)
+                    : null,
+                  endDate: selectedSnapshot.filterConfig.endDate
+                    ? dayjs(selectedSnapshot.filterConfig.endDate)
+                    : null,
+                }
+              : undefined
+          }
+          onChange={() => {}} // 禁用更改功能，只用于展示
+        />
 
-          <h3
-            style={{
-              color: "#ffffff",
-              marginBottom: 16,
-              marginTop: 20,
-            }}
-          >
-            图谱快照
-          </h3>
-          <div
-            style={{
-              height: "500px",
-              border: "1px solid #3a5f7f",
-              borderRadius: 8,
-            }}
-          >
+        <h3
+          style={{
+            color: "#ffffff",
+            marginBottom: 16,
+            marginTop: 20,
+          }}
+        >
+          图谱快照
+        </h3>
+        <div
+          style={{
+            height: "500px",
+            // border: "1px solid #3a5f7f",
+            // borderRadius: 8,
+            position: "relative",
+          }}
+        >
+          {!isError ? (
             <TxGraph
-              nodes={selectedSnapshot.graphData.nodes}
-              links={selectedSnapshot.graphData.links}
-              width={680}
-              height={480}
+              nodes={graphData.nodes}
+              links={graphData.links}
+              width={740}
+              height={500}
               filter={
                 selectedSnapshot.filterConfig
                   ? {
                       ...selectedSnapshot.filterConfig,
                       startDate: selectedSnapshot.filterConfig.startDate
                         ? dayjs(
-                            selectedSnapshot.filterConfig.startDate
+                            selectedSnapshot.filterConfig.startDate,
                           ).toDate()
                         : null,
                       endDate: selectedSnapshot.filterConfig.endDate
@@ -321,9 +413,41 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               }
               onFilterChange={() => {}} // 禁用更改功能，只用于展示
             />
-          </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100%",
+                backgroundColor: "#f5f5f5",
+                borderRadius: "8px",
+              }}
+            >
+              <span style={{ color: "red" }}>数据加载失败，请刷新重试</span>
+            </div>
+          )}
+          {loading && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                zIndex: 10,
+                borderRadius: "8px",
+              }}
+            >
+              <Spin size="large" tip="正在加载交易图谱数据..." />
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

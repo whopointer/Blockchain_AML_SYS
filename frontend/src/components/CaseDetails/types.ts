@@ -1,5 +1,4 @@
 import { Dayjs } from "dayjs";
-import { NodeItem, LinkItem } from "../GraphCommon/types";
 
 export interface GraphSnapshot {
   id: string;
@@ -7,14 +6,13 @@ export interface GraphSnapshot {
   description: string;
   tags: string[];
   createTime: Dayjs | string;
-  mainAddress: string;
   nodeCount: number;
   linkCount: number;
-  riskLevel: "low" | "medium" | "high";
-  graphData?: {
-    nodes: NodeItem[];
-    links: LinkItem[];
-  };
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  centerAddress?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  hops?: number;
   filterConfig?: {
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -23,11 +21,15 @@ export interface GraphSnapshot {
     startDate?: Dayjs | null;
     endDate?: Dayjs | null;
   };
+  graphData?: {
+    nodes: import("../GraphCommon/types").NodeItem[];
+    links: import("../GraphCommon/types").LinkItem[];
+  };
 }
 
 export interface FilterConfig {
   title: string;
-  riskLevel: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
   tags: string[];
   dateRange: [Dayjs | null, Dayjs | null];
 }

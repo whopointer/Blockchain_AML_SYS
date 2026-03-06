@@ -12,6 +12,7 @@ import { Row, Col, message, Card, Spin } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import { transactionApi } from "../../services/transaction/index";
+import { graphSnapshotApi } from "../../services/graph-snapshot/api";
 import { formatEthValue } from "../../utils/ethUtils";
 
 dayjs.locale("zh-cn");
@@ -254,23 +255,57 @@ const TransactionGraph: React.FC = () => {
   // 获取当前地址信息（主节点）
   const mainNode = graphData.nodes?.find((node) => node.layer === 0);
 
-  const handleCreateSnapshot = (snapshotData: any) => {
-    // 创建图谱快照的逻辑
-    console.log("创建图谱快照", snapshotData);
+  const handleCreateSnapshot = async (snapshotData: any) => {
+    try {
+      // 创建图谱快照的逻辑
+      console.log("创建图谱快照", snapshotData);
 
-    // 打印当前图谱的节点和边信息
-    console.log("=== 图谱快照信息 ===");
-    console.log("快照元数据:", {
-      title: snapshotData.title,
-      description: snapshotData.description,
-      tags: snapshotData.tags,
-    });
+      // 获取中心地址（通常是第0层节点，即查询的目标地址）
+      const centerAddress = mainNode?.addr || routeAddress || "";
 
-    console.log("节点信息 (Nodes):", graphData.nodes);
-    console.log("边信息 (Links):", graphData.links);
-    console.log("筛选条件 (Filter):", filter);
+      // 计算风险等级 - 基于恶意节点的数量
+      let riskLevel: "low" | "medium" | "high" = "low";
+      const maliciousNodes =
+        graphData.nodes?.filter((node) => node.malicious === 1) || [];
+      if (maliciousNodes.length > 0) {
+        riskLevel = maliciousNodes.length > 3 ? "high" : "medium";
+      }
 
-    message.success("图谱快照创建成功！");
+      // 将前端风险等级转换为后端所需的大写格式
+      const backendRiskLevel: "LOW" | "MEDIUM" | "HIGH" =
+        riskLevel === "low"
+          ? "LOW"
+          : riskLevel === "medium"
+            ? "MEDIUM"
+            : "HIGH";
+
+      // 构建快照请求数据
+      const snapshotRequest = {
+        title: snapshotData.title,
+        description: snapshotData.description,
+        tags: snapshotData.tags,
+        nodeCount: graphData.nodes?.length || 0,
+        linkCount: graphData.links?.length || 0,
+        riskLevel: backendRiskLevel,
+        centerAddress,
+        hops: searchHops,
+        filterConfig: filter,
+      };
+
+      // 调用后端API创建快照
+      const response = await graphSnapshotApi.createSnapshot(snapshotRequest);
+
+      if (response.success) {
+        message.success(response.msg || "图谱快照创建成功！");
+        console.log("图谱快照创建成功:", response.data);
+      } else {
+        message.error(response.msg || "图谱快照创建失败");
+        console.error("图谱快照创建失败:", response);
+      }
+    } catch (error) {
+      console.error("创建图谱快照时发生错误:", error);
+      message.error("创建图谱快照失败，请稍后重试");
+    }
   };
 
   // 检查是否有路由参数

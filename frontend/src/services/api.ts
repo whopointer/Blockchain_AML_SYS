@@ -1,12 +1,12 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = "http://localhost:8080";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -18,7 +18,7 @@ export interface PredictionResult {
   tx_id: string;
   is_suspicious: boolean;
   confidence: number;
-  risk_level: 'low' | 'medium' | 'high';
+  risk_level: "low" | "medium" | "high";
 }
 
 export interface PredictionResponse {
@@ -58,36 +58,44 @@ export interface StatisticsResponse {
 
 export const api = {
   // 健康检查
-  healthCheck: (): Promise<HealthResponse> => 
-    apiClient.get('/health').then(response => response.data),
+  healthCheck: (): Promise<HealthResponse> =>
+    apiClient.get("/health").then((response) => response.data),
 
   // 单个或多个交易预测
-  predictTransactions: (request: PredictionRequest): Promise<PredictionResponse> => 
-    apiClient.post('/predict', request).then(response => response.data),
+  predictTransactions: (
+    request: PredictionRequest,
+  ): Promise<PredictionResponse> =>
+    apiClient.post("/predict", request).then((response) => response.data),
 
   // 批量预测
-  batchPredict: (): Promise<any> => 
-    apiClient.post('/batch_predict').then(response => response.data),
+  batchPredict: (): Promise<any> =>
+    apiClient.post("/batch_predict").then((response) => response.data),
 
   // 获取模型信息
-  getModelInfo: (): Promise<ModelInfo> => 
-    apiClient.get('/model/info').then(response => response.data),
+  getModelInfo: (): Promise<ModelInfo> =>
+    apiClient.get("/model/info").then((response) => response.data),
 
   // 加载模型
-  loadModel: (): Promise<any> => 
-    apiClient.post('/model/load').then(response => response.data),
+  loadModel: (): Promise<any> =>
+    apiClient.post("/model/load").then((response) => response.data),
 
   // 获取统计信息
-  getStatistics: (): Promise<StatisticsResponse> => 
-    apiClient.get('/statistics').then(response => response.data),
+  getStatistics: (): Promise<StatisticsResponse> =>
+    apiClient.get("/statistics").then((response) => response.data),
 
   // 获取预测摘要
-  getPredictionSummary: (results: PredictionResult[]): Promise<any> => 
-    apiClient.post('/summary', { results }).then(response => response.data),
+  getPredictionSummary: (results: PredictionResult[]): Promise<any> =>
+    apiClient.post("/summary", { results }).then((response) => response.data),
 
   // 洗钱路径追踪
-  traceMoneyLaundering: (txId: string, maxDepth: number): Promise<any> => 
-    apiClient.post('/trace', { tx_id: txId, max_depth: maxDepth }).then(response => response.data),
+  traceMoneyLaundering: (txId: string, maxDepth: number): Promise<any> =>
+    apiClient
+      .post("/trace", { tx_id: txId, max_depth: maxDepth })
+      .then((response) => response.data),
 };
+
+// 导出所有API服务
+export { transactionApi } from "./transaction";
+export { graphSnapshotApi } from "./graph-snapshot";
 
 export default api;

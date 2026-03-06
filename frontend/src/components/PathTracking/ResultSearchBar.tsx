@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Select, Input, Button, Form, Row, Col, Card } from "antd";
 import { useSearchParams } from "react-router-dom";
 
-const { Option } = Select; // 从Select中解构Option组件
+const { Option } = Select;
 
 interface ResultSearchBarProps {
   defaultCrypto?: string;
@@ -17,15 +17,13 @@ const ResultSearchBar: React.FC<ResultSearchBarProps> = ({
   defaultToAddress = "",
 }) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // 获取URL参数
-  const [form] = Form.useForm(); // 创建表单实例
+  const [searchParams] = useSearchParams();
+  const [form] = Form.useForm();
 
-  // 从URL参数或props中获取默认值
   const routeCrypto = searchParams.get("crypto");
   const urlFromAddress = searchParams.get("fromAddress");
   const urlToAddress = searchParams.get("toAddress");
 
-  // 定义表单提交处理函数
   const onFinish = (values: any) => {
     const { currency, fromAddress, toAddress } = values;
     navigate(

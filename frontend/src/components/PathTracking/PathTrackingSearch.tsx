@@ -1,8 +1,5 @@
 import React from "react";
-import { Form, Input, Select, Button, Card, Row, Col } from "antd";
 import SearchBar from "./SearchBar";
-
-const { Option } = Select;
 
 interface PathTrackingSearchProps {
   form: any;

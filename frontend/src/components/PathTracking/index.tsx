@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import {
-  Row,
-  Col,
-  Form,
-  Input,
-  Select,
-  Button,
-  Card,
-  message,
-  Spin,
-} from "antd";
+import { useParams, useNavigate } from "react-router-dom";
+import { Row, Col, Form, Card, message, Spin } from "antd";
 import {
   transactionApi,
   GraphAnalysisResponse,
@@ -24,12 +14,10 @@ import PathTrackingSearch from "./PathTrackingSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import SearchBar from "./SearchBar";
+import { graphSnapshotApi } from "../../services/graph-snapshot/api";
 import ResultSearchBar from "./ResultSearchBar";
 
 dayjs.locale("zh-cn");
-
-const { Option } = Select;
 
 const PathTracking: React.FC = () => {
   const { crypto: routeCrypto } = useParams<{ crypto: string }>();
@@ -83,20 +71,16 @@ const PathTracking: React.FC = () => {
       }
     };
 
-    // 在组件挂载时立即计算一次尺寸
     updateDimensions();
 
-    // 添加防抖以避免频繁更新
     const handleResize = () => {
       setTimeout(() => {
         updateDimensions();
       }, 300);
     };
 
-    // 添加窗口大小变化事件监听器
     window.addEventListener("resize", handleResize);
 
-    // 使用ResizeObserver只监听宽度变化（不依赖高度）
     let resizeObserver: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined" && currentContainer) {
       resizeObserver = new ResizeObserver(() => {
@@ -105,7 +89,6 @@ const PathTracking: React.FC = () => {
       resizeObserver.observe(currentContainer);
     }
 
-    // 清理事件监听器和ResizeObserver
     return () => {
       window.removeEventListener("resize", handleResize);
       if (resizeObserver && currentContainer) {
@@ -150,13 +133,10 @@ const PathTracking: React.FC = () => {
       if (response.success) {
         console.log(response.data);
 
-        // 将API响应数据转换为组件所需的格式
         const { node_list: nodes, edge_list: edges } = response.data;
 
-        // 转换节点数据
-        // 服务器返回字段可能是 `addr` 或 `address`，先统一处理
         const convertedNodes: NodeItem[] = nodes.map((node: any, index) => {
-          const address = node.address || node.addr || ""; // 优先取 address，其次 addr
+          const address = node.address || node.addr || "";
           return {
             id: node.id || address,
             label:
@@ -168,7 +148,7 @@ const PathTracking: React.FC = () => {
             malicious: node.malicious || undefined,
             shape: node.shape || undefined,
             image: node.image || undefined,
-            expanded: index === 0, // 仅展开主节点
+            expanded: index === 0,
             track: node.track || "one",
             pid: node.pid || undefined,
             color: node.color || undefined,
@@ -176,23 +156,18 @@ const PathTracking: React.FC = () => {
           };
         });
 
-        // 转换边数据
         const convertedLinks: LinkItem[] = edges.map((edge: any) => {
-          // 查找对应的节点ID
           const fromNode = convertedNodes.find((n) => n.addr === edge.from);
           const toNode = convertedNodes.find((n) => n.addr === edge.to);
 
-          // 处理时间字段 - 服务器返回的是日期时间字符串，需要转换
           let formattedTime = edge.tx_time || "";
           if (edge.tx_time) {
             try {
-              // 检查是否为包含年份前缀的特殊格式（如 "+58073-07-30 22:16:22"）
               if (
                 typeof edge.tx_time === "string" &&
                 edge.tx_time.startsWith("+")
               ) {
-                // 提取日期时间部分（去掉前面的 "+" 和年份）
-                const dateTimeStr = edge.tx_time.substring(1); // 去掉开头的 "+"
+                const dateTimeStr = edge.tx_time.substring(1);
                 formattedTime = dayjs(dateTimeStr).format("YYYY-MM-DD HH:mm");
               } else if (typeof edge.tx_time === "string") {
                 formattedTime = dayjs(edge.tx_time).format("YYYY-MM-DD HH:mm");
@@ -231,7 +206,6 @@ const PathTracking: React.FC = () => {
   const onFinish = (values: any) => {
     setCurrency(values.currency);
 
-    // 使用navigate更新URL，包含币种路径参数和地址查询参数
     const params = new URLSearchParams();
     params.set("fromAddress", values.fromAddress);
     params.set("toAddress", values.toAddress);
@@ -241,26 +215,54 @@ const PathTracking: React.FC = () => {
     handleSearch(values.fromAddress, values.toAddress, values.currency);
   };
 
-  // 获取当前地址信息（主节点）
   const mainNode = graphData.nodes?.find((node) => node.layer === 0);
 
-  const handleCreateSnapshot = (snapshotData: any) => {
-    // 创建图谱快照的逻辑
-    console.log("创建图谱快照", snapshotData);
+  const handleCreateSnapshot = async (snapshotData: any) => {
+    try {
+      console.log("创建图谱快照", snapshotData);
 
-    // 打印当前图谱的节点和边信息
-    console.log("=== 图谱快照信息 ===");
-    console.log("快照元数据:", {
-      title: snapshotData.title,
-      description: snapshotData.description,
-      tags: snapshotData.tags,
-    });
+      const centerAddress = mainNode?.addr || urlFromAddress || "";
 
-    console.log("节点信息 (Nodes):", graphData.nodes);
-    console.log("边信息 (Links):", graphData.links);
-    console.log("筛选条件 (Filter):", filter);
+      let riskLevel: "low" | "medium" | "high" = "low";
+      const maliciousNodes =
+        graphData.nodes?.filter((node) => node.malicious === 1) || [];
+      if (maliciousNodes.length > 0) {
+        riskLevel = maliciousNodes.length > 3 ? "high" : "medium";
+      }
 
-    message.success("图谱快照创建成功！");
+      const backendRiskLevel: "LOW" | "MEDIUM" | "HIGH" =
+        riskLevel === "low"
+          ? "LOW"
+          : riskLevel === "medium"
+            ? "MEDIUM"
+            : "HIGH";
+
+      const snapshotRequest = {
+        title: snapshotData.title,
+        description: snapshotData.description,
+        tags: snapshotData.tags,
+        mainAddress: centerAddress,
+        nodeCount: graphData.nodes?.length || 0,
+        linkCount: graphData.links?.length || 0,
+        riskLevel: backendRiskLevel,
+        fromAddress: urlFromAddress || "",
+        toAddress: urlToAddress || "",
+        filterConfig: filter,
+      };
+
+      const response = await graphSnapshotApi.createSnapshot(snapshotRequest);
+
+      if (response.success) {
+        message.success(response.msg || "图谱快照创建成功！");
+        console.log("图谱快照创建成功:", response.data);
+      } else {
+        message.error(response.msg || "图谱快照创建失败");
+        console.error("图谱快照创建失败:", response);
+      }
+    } catch (error) {
+      console.error("创建图谱快照时发生错误:", error);
+      message.error("创建图谱快照失败，请稍后重试");
+    }
   };
 
   return (

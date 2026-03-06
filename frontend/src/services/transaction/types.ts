@@ -4,6 +4,8 @@ export interface GraphAnalysisNode {
   label?: string;
   type?: string;
   value?: number;
+  malicious?: number;
+  image?: string;
 }
 
 export interface GraphAnalysisEdge {
@@ -12,6 +14,7 @@ export interface GraphAnalysisEdge {
   value: number;
   timestamp: number;
   tx_hash: string;
+  label?: string;
 }
 
 export interface GraphAnalysisResponse {
