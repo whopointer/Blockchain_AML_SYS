@@ -547,8 +547,8 @@ public class GraphAddressService extends AbstractGraphService {
                     }
                 }
                 
-                // 计算节点层级，起始节点为0，收入侧为负值，支出侧为正值
-                Map<String, Integer> nodeLayers = GraphLayerCalculator.calculateNodeLayersWithDirection(allPaths, allPathDirections, address);
+                // 计算节点层级，中心节点为0，收入侧为负值，支出侧为正值
+                Map<String, Integer> nodeLayers = GraphLayerCalculator.calculateNodeLayersForNHops(allPaths, allPathDirections, address);
                 
                 Map<String, String> globalAddressToId = new HashMap<>();
                 

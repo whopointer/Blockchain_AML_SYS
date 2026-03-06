@@ -209,13 +209,80 @@ public class GraphLayerCalculator {
     }
 
     /**
-     * 辅助方法：从节点数据中提取地址
+     * 为N跳查询计算节点层级的方法，区分收入侧（负值）和支出侧（正值）
+     * 中心节点为0，收入侧为负值，支出侧为正值
+     * 适用于/api/neo4j/address/hops接口
      */
-    public static String getNodeAddress(Map<String, Object> nodeData) {
-        if (nodeData == null) {
-            return null;
+    public static Map<String, Integer> calculateNodeLayersForNHops(List<List<Map<String, Object>>> allPaths, List<String> directions, String centerAddress) {
+        Map<String, Integer> nodeLayers = new HashMap<>();
+        // 中心节点层级为0
+        nodeLayers.put(centerAddress, 0);
+
+        // 如果没有路径，只返回中心节点
+        if (allPaths == null || allPaths.isEmpty()) {
+            return nodeLayers;
         }
-        Object addrObj = nodeData.get("address");
-        return addrObj != null ? addrObj.toString() : null;
+
+        // 遍历所有路径，根据方向确定每个节点相对于中心节点的位置
+        for (int pathIdx = 0; pathIdx < allPaths.size(); pathIdx++) {
+            List<Map<String, Object>> path = allPaths.get(pathIdx);
+            String direction = directions.get(pathIdx);
+
+            // 找到中心节点在路径中的位置
+            int centerIndex = -1;
+            for (int i = 0; i < path.size(); i++) {
+                String nodeAddr = getNodeAddress(path.get(i));
+                if (nodeAddr != null && nodeAddr.equals(centerAddress)) {
+                    centerIndex = i;
+                    break;
+                }
+            }
+
+            // 遍历路径中的每个节点
+            for (int i = 0; i < path.size(); i++) {
+                String nodeAddr = getNodeAddress(path.get(i));
+                if (nodeAddr != null && !nodeAddr.equals(centerAddress)) {
+                    int layer = 0;
+                    
+                    if (centerIndex != -1) {
+                        // 如果中心节点在路径中，计算相对于中心节点的位置
+                        layer = i - centerIndex;
+                        
+                        if ("income".equals(direction) && layer > 0) {
+                            // 收入侧，但在中心节点右边的节点，转为负值
+                            layer = -layer;
+                        } else if ("outcome".equals(direction) && layer < 0) {
+                            // 支出侧，但在中心节点左边的节点，转为正值
+                            layer = -layer;
+                        }
+                    } else {
+                        // 如果中心节点不在路径中，根据方向分配层级
+                        if ("income".equals(direction)) {
+                            layer = -1; // 收入侧节点设为负值
+                        } else if ("outcome".equals(direction)) {
+                            layer = 1; // 支出侧节点设为正值
+                        }
+                    }
+
+                    // 如果节点已存在其他路径的层级，保留绝对值较小的那个（更接近中心节点）
+                    if (!nodeLayers.containsKey(nodeAddr) || Math.abs(layer) < Math.abs(nodeLayers.get(nodeAddr))) {
+                        nodeLayers.put(nodeAddr, layer);
+                    }
+                }
+            }
+        }
+
+        return nodeLayers;
     }
+
+    /**
+      * 辅助方法：从节点数据中提取地址
+      */
+      public static String getNodeAddress(Map<String, Object> nodeData) {
+          if (nodeData == null) {
+              return null;
+          }
+          Object addrObj = nodeData.get("address");
+          return addrObj != null ? addrObj.toString() : null;
+      }
 }

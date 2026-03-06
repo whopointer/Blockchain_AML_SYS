@@ -11,7 +11,8 @@ import java.util.Map;
 
 public interface GraphService {
     public ApiResponse<Map<String, Object>> testNeo4jConnection();
-
+    // 创建图谱快照，将快照对象持久化到 MySQL
+    ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> createGraphSnapshot(com.seecoder.DataProcessing.po.GraphSnapshot snapshot);
     // 保存交易到图数据库（两种关系都保存）
     void saveTransactionToGraph(ChainTx chainTx);
 
@@ -47,4 +48,13 @@ public interface GraphService {
 
     // 清理图数据
     void cleanGraphData(String chain);
+
+    // 获取所有图谱快照
+    ApiResponse<List<com.seecoder.DataProcessing.po.GraphSnapshot>> getAllGraphSnapshots();
+
+    // 修改图谱快照信息
+    ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> updateGraphSnapshot(Long id, com.seecoder.DataProcessing.po.GraphSnapshot snapshot);
+
+    // 删除图谱快照
+    ApiResponse<Void> deleteGraphSnapshot(Long id);
 }
