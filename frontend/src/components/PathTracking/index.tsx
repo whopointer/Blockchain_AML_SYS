@@ -20,9 +20,12 @@ import PathTxAnalysis from "./PathTxAnalysis";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
 import AddressInfo from "../GraphCommon/AddressInfo";
 import GraphSnapshotButton from "../GraphCommon/GraphSnapshotButton";
+import PathTrackingSearch from "./PathTrackingSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
+import SearchBar from "./SearchBar";
+import ResultSearchBar from "./ResultSearchBar";
 
 dayjs.locale("zh-cn");
 
@@ -56,6 +59,14 @@ const PathTracking: React.FC = () => {
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
   }>({ txType: "all", addrType: "all" });
+
+  const [showSearchBoxOnly, setShowSearchBoxOnly] = useState<boolean>(
+    !urlFromAddress || !urlToAddress,
+  );
+
+  useEffect(() => {
+    setShowSearchBoxOnly(!urlFromAddress || !urlToAddress);
+  }, [urlFromAddress, urlToAddress]);
 
   // 监听窗口大小变化，更新图表尺寸
   useEffect(() => {
@@ -253,197 +264,147 @@ const PathTracking: React.FC = () => {
   };
 
   return (
-    <div ref={containerRef} style={{ padding: 16 }}>
-      {/* 顶部搜索表单 */}
-      <Card
-        title="🔍 路径追踪搜索"
-        style={{ borderRadius: "8px", marginBottom: 16 }}
-      >
-        <Form
+    <div ref={containerRef}>
+      {/* 搜索框部分 - 当没有查询字符串时显示完整界面，否则只显示搜索框 */}
+      {showSearchBoxOnly ? (
+        <PathTrackingSearch
           form={form}
-          layout="vertical"
           onFinish={onFinish}
-          initialValues={{
-            currency: routeCrypto || "eth",
-            fromAddress: urlFromAddress || "",
-            toAddress: urlToAddress || "",
-          }}
-        >
-          <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item
-                label="币种筛选"
-                name="currency"
-                rules={[{ required: true, message: "请选择币种" }]}
-              >
-                <Select placeholder="选择币种">
-                  <Option value="eth">ETH (以太坊)</Option>
-                  <Option value="btc">BTC (比特币)</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item
-                label="起始地址"
-                name="fromAddress"
-                rules={[
-                  { required: true, message: "请输入起始地址" },
-                  {
-                    pattern:
-                      /^(0x)?[0-9a-fA-F]{40}$|^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/,
-                    message: "请输入有效的地址",
-                  },
-                ]}
-              >
-                <Input placeholder="请输入起始地址" />
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item
-                label="目标地址"
-                name="toAddress"
-                rules={[
-                  { required: true, message: "请输入目标地址" },
-                  {
-                    pattern:
-                      /^(0x)?[0-9a-fA-F]{40}$|^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/,
-                    message: "请输入有效的地址",
-                  },
-                ]}
-              >
-                <Input placeholder="请输入目标地址" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block>
-              搜索路径
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      {/* 地址基本信息 - 显示起始地址信息 */}
-      {hasSearched && mainNode && (
-        <AddressInfo
-          address={mainNode?.addr}
-          txCount={graphData.links?.length || 0}
-          firstTxTime={graphData.links?.[0]?.tx_time || ""}
-          latestTxTime={
-            graphData.links?.[graphData.links.length - 1]?.tx_time || ""
-          }
-          isMalicious={mainNode?.malicious === 1}
+          loading={loading}
+          routeCrypto={routeCrypto}
+          urlFromAddress={urlFromAddress}
+          urlToAddress={urlToAddress}
         />
+      ) : (
+        <div style={{ padding: "0 16px" }}>
+          <ResultSearchBar />
+        </div>
       )}
 
-      {/* 交易图谱主内容 */}
-      <Card
-        title={
-          <Row style={{ width: "100%", alignItems: "center" }}>
-            <Col flex={1} style={{ fontSize: 18 }}>
-              路径追踪结果
-            </Col>
-            <Col>
-              <Spin spinning={loading} size="small" />
-            </Col>
-            <Col>
-              <GraphSnapshotButton onCreateSnapshot={handleCreateSnapshot} />
-            </Col>
-          </Row>
-        }
-        style={{ margin: "16px 0", borderRadius: 8 }}
-        bordered={false}
-        bodyStyle={{ padding: 16 }}
-      >
-        {/* 图表内容 */}
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ flex: 1, position: "relative" }}>
-            {dimensions ? (
-              <TxGraph
-                nodes={graphData.nodes}
-                links={graphData.links}
-                width={dimensions.width}
-                height={dimensions.height}
-                currencySymbol={currency.toUpperCase()}
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  height: "500px",
-                  backgroundColor: "#f5f5f5",
-                  borderRadius: "8px",
-                }}
-              >
-                <span>正在计算图表尺寸...</span>
-              </div>
-            )}
-            {loading && dimensions && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "rgba(255, 255, 255, 0.7)",
-                  zIndex: 10,
-                  borderRadius: "8px",
-                }}
-              >
-                <Spin size="large" tip="正在搜索路径..." />
-              </div>
-            )}
-          </div>
-
-          {/* 交易分析（右侧） */}
-          <div
-            style={{
-              width: "400px",
-              minWidth: "400px",
-              marginLeft: 20,
-              position: "relative",
-            }}
-          >
-            <div style={{ marginBottom: 12 }}>
-              <TxGraphFilter
-                value={filter}
-                onChange={(v) => setFilter(v)}
-                links={graphData.links}
-              />
-            </div>
-            <PathTxAnalysis
-              nodes={graphData.nodes}
-              links={graphData.links}
-              currencySymbol={currency.toUpperCase()}
+      {!showSearchBoxOnly && (
+        <div style={{ padding: "0 16px" }}>
+          {/* 地址基本信息 - 显示起始地址信息 */}
+          {hasSearched && mainNode && (
+            <AddressInfo
+              address={mainNode?.addr}
+              txCount={graphData.links?.length || 0}
+              firstTxTime={graphData.links?.[0]?.tx_time || ""}
+              latestTxTime={
+                graphData.links?.[graphData.links.length - 1]?.tx_time || ""
+              }
+              isMalicious={mainNode?.malicious === 1}
             />
-            {loading && (
+          )}
+
+          {/* 交易图谱主内容 */}
+          <Card
+            title={
+              <Row style={{ width: "100%", alignItems: "center" }}>
+                <Col flex={1} style={{ fontSize: 18 }}>
+                  路径追踪结果
+                </Col>
+                <Col>
+                  <Spin spinning={loading} size="small" />
+                </Col>
+                <Col>
+                  <GraphSnapshotButton
+                    onCreateSnapshot={handleCreateSnapshot}
+                  />
+                </Col>
+              </Row>
+            }
+            style={{ margin: "16px 0", borderRadius: 8 }}
+            bordered={false}
+            bodyStyle={{ padding: 16 }}
+          >
+            {/* 图表内容 */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ flex: 1, position: "relative" }}>
+                {dimensions ? (
+                  <TxGraph
+                    nodes={graphData.nodes}
+                    links={graphData.links}
+                    width={dimensions.width}
+                    height={dimensions.height}
+                    currencySymbol={currency.toUpperCase()}
+                    filter={filter}
+                    onFilterChange={setFilter}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "500px",
+                      backgroundColor: "#f5f5f5",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <span>正在计算图表尺寸...</span>
+                  </div>
+                )}
+                {loading && dimensions && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
+                      zIndex: 10,
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <Spin size="large" tip="正在搜索路径..." />
+                  </div>
+                )}
+              </div>
+
+              {/* 交易分析（右侧） */}
               <div
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: "rgba(255, 255, 255, 0.7)",
-                  zIndex: 1,
-                  borderRadius: "8px",
+                  width: "400px",
+                  minWidth: "400px",
+                  marginLeft: 20,
+                  position: "relative",
                 }}
-              />
-            )}
-          </div>
+              >
+                <div style={{ marginBottom: 12 }}>
+                  <TxGraphFilter
+                    value={filter}
+                    onChange={(v) => setFilter(v)}
+                    links={graphData.links}
+                  />
+                </div>
+                <PathTxAnalysis
+                  nodes={graphData.nodes}
+                  links={graphData.links}
+                  currencySymbol={currency.toUpperCase()}
+                />
+                {loading && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
+                      zIndex: 1,
+                      borderRadius: "8px",
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
     </div>
   );
 };

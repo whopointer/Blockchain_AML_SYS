@@ -20,7 +20,6 @@ import { GraphSnapshot, SnapshotTableProps } from "./types";
 const { Search } = Input;
 
 const SnapshotTable: React.FC<SnapshotTableProps> = ({
-  snapshots,
   filteredSnapshots,
   loading,
   filterConfig,
