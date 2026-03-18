@@ -1,14 +1,14 @@
 package com.seecoder.DataProcessing.serviceImpl.graph;
 
 import com.seecoder.DataProcessing.po.ChainTx;
+import com.seecoder.DataProcessing.po.ChainTxInput;
+import com.seecoder.DataProcessing.po.ChainTxOutput;
 import lombok.extern.slf4j.Slf4j;
 import org.neo4j.ogm.session.Session;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -66,10 +66,17 @@ public class GraphTransactionService extends AbstractGraphService {
             }
 
             // 创建/更新交易节点
+            // 创建/更新交易节点
             cypher.append("MERGE (tx:Transaction {txHash: $txHash, chain: $chain}) ")
                     .append("ON CREATE SET tx.blockHeight = $blockHeight, tx.time = $blockTime, ")
                     .append("tx.totalInput = $totalInput, tx.totalOutput = $totalOutput, ")
-                    .append("tx.fee = $fee ");
+                    .append("tx.fee = $fee, ")
+                    .append("tx.numInputs = 1, ");  // 以太坊固定为1
+            if (chainTx.getToAddress() != null && !chainTx.getToAddress().isEmpty()) {
+                cypher.append("tx.numOutputs = 1 ");
+            } else {
+                cypher.append("tx.numOutputs = 0 ");
+            }
 
             // 创建关系
             if (chainTx.getToAddress() != null && !chainTx.getToAddress().isEmpty() && totalOutput > 0) {
@@ -187,10 +194,16 @@ public class GraphTransactionService extends AbstractGraphService {
             cypher.append("ON MATCH SET from.lastSeen = $blockTime ");
 
             // 2. 创建交易节点
-            cypher.append("MERGE (tx:Transaction {txHash: $txHash, chain: $chain}) ");
-            cypher.append("ON CREATE SET tx.blockHeight = $blockHeight, tx.time = $blockTime, ");
-            cypher.append("tx.totalInput = $totalInput, tx.totalOutput = $totalOutput, ");
-            cypher.append("tx.fee = $fee ");
+            cypher.append("MERGE (tx:Transaction {txHash: $txHash, chain: $chain}) ")
+                    .append("ON CREATE SET tx.blockHeight = $blockHeight, tx.time = $blockTime, ")
+                    .append("tx.totalInput = $totalInput, tx.totalOutput = $totalOutput, ")
+                    .append("tx.fee = $fee, ")
+                    .append("tx.numInputs = 1, ");  // 以太坊固定为1
+            if (chainTx.getToAddress() != null && !chainTx.getToAddress().isEmpty()) {
+                cypher.append("tx.numOutputs = 1 ");
+            } else {
+                cypher.append("tx.numOutputs = 0 ");
+            }
 
             // 3. 创建SPENT关系
             cypher.append("MERGE (from)-[:SPENT {amount: $totalInput, index: $txIndex}]->(tx) ");
@@ -223,6 +236,89 @@ public class GraphTransactionService extends AbstractGraphService {
         } catch (Exception e) {
             log.error("使用Cypher保存交易失败: {}", chainTx.getTxHash(), e);
             throw e;
+        }
+    }
+    // com/seecoder/DataProcessing/serviceImpl/graph/GraphTransactionService.java
+
+    @Transactional(transactionManager = "neo4jTransactionManager")
+    public void saveBitcoinTransactionToGraph(ChainTx tx, List<ChainTxInput> inputs, List<ChainTxOutput> outputs) {
+        if (tx == null) return;
+        Session session = getSession();
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("chain", tx.getChain());
+            params.put("txHash", tx.getTxHash());
+            params.put("blockHeight", tx.getBlockHeight());
+            params.put("blockTime", tx.getBlockTime() != null ? tx.getBlockTime().toString() : null);
+            params.put("totalInput", convertBigDecimal(tx.getTotalInput()));
+            params.put("totalOutput", convertBigDecimal(tx.getTotalOutput()));
+            params.put("fee", convertBigDecimal(tx.getFee()));
+
+            // 准备输入列表（每个元素为 Map，包含 address, amount, index）
+            List<Map<String, Object>> inputList = new ArrayList<>();
+            for (ChainTxInput in : inputs) {
+                if (in.getAddress() == null) continue;
+                Map<String, Object> inMap = new HashMap<>();
+                inMap.put("address", in.getAddress());
+                inMap.put("amount", convertBigDecimal(in.getValue()));
+                inMap.put("index", in.getInputIndex() != null ? in.getInputIndex() : 0);
+                inputList.add(inMap);
+            }
+            params.put("inputs", inputList);
+
+            // 准备输出列表
+            List<Map<String, Object>> outputList = new ArrayList<>();
+            for (ChainTxOutput out : outputs) {
+                if (out.getAddress() == null) continue;
+                Map<String, Object> outMap = new HashMap<>();
+                outMap.put("address", out.getAddress());
+                outMap.put("amount", convertBigDecimal(out.getValue()));
+                outMap.put("index", out.getOutputIndex() != null ? out.getOutputIndex() : 0);
+                outputList.add(outMap);
+            }
+            params.put("outputs", outputList);
+
+            // Cypher 查询：创建交易节点，并处理所有输入/输出关系
+            String cypher =
+                    "MERGE (tx:Transaction {txHash: $txHash, chain: $chain}) " +
+                            "ON CREATE SET tx.blockHeight = $blockHeight, tx.time = $blockTime, " +
+                            "              tx.totalInput = $totalInput, tx.totalOutput = $totalOutput, tx.fee = $fee " +
+                            "WITH tx " +
+                            "UNWIND $inputs AS input " +
+                            "MERGE (addr:Address {address: input.address, chain: $chain}) " +
+                            "ON CREATE SET addr.first_seen = $blockTime, addr.last_seen = $blockTime, " +
+                            "              addr.risk_level = 0, addr.tag = '' " +
+                            "ON MATCH SET addr.last_seen = $blockTime " +
+                            "MERGE (addr)-[:SPENT {amount: input.amount, index: input.index}]->(tx) " +
+                            "WITH tx " +
+                            "UNWIND $outputs AS output " +
+                            "MERGE (addr:Address {address: output.address, chain: $chain}) " +
+                            "ON CREATE SET addr.first_seen = $blockTime, addr.last_seen = $blockTime, " +
+                            "              addr.risk_level = 0, addr.tag = '' " +
+                            "ON MATCH SET addr.last_seen = $blockTime " +
+                            "MERGE (tx)-[:OUTPUT {amount: output.amount, index: output.index}]->(addr)";
+
+            session.query(cypher, params);
+        } finally {
+            closeSession(session);
+        }
+    }
+
+
+    @Transactional(transactionManager = "neo4jTransactionManager")
+    public void saveBitcoinTransactionsToGraph(List<ChainTx> txs,
+                                               Map<String, List<ChainTxInput>> inputsMap,
+                                               Map<String, List<ChainTxOutput>> outputsMap) {
+        if (txs == null || txs.isEmpty()) return;
+        // 分批处理，每批 50 笔
+        int batchSize = 50;
+        for (int i = 0; i < txs.size(); i += batchSize) {
+            List<ChainTx> batch = txs.subList(i, Math.min(i + batchSize, txs.size()));
+            for (ChainTx tx : batch) {
+                List<ChainTxInput> inputs = inputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+                List<ChainTxOutput> outputs = outputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+                saveBitcoinTransactionToGraph(tx, inputs, outputs);
+            }
         }
     }
 }

@@ -6,12 +6,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.seecoder.DataProcessing.service.MinIOService;
 import com.seecoder.DataProcessing.util.MinIOUtil;
 import com.seecoder.DataProcessing.vo.ApiResponse;
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
+import io.minio.UploadObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,6 +34,9 @@ public class MinIOServiceImpl implements MinIOService {
 
     @Value("${minio.archive.enabled:true}")
     private boolean archiveEnabled;
+
+    @Autowired
+    private MinioClient minioClient;
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -215,6 +223,31 @@ public class MinIOServiceImpl implements MinIOService {
 
         } catch (Exception e) {
             log.error("定时归档应用日志失败", e);
+        }
+    }
+
+
+    @Override
+    public void uploadFile(String fileName) throws IOException {
+        try {
+            String bucketName = "ethereum-csv"; // 建议从配置文件读取
+            // 确保 bucket 存在
+            boolean found = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build());
+            if (!found) {
+                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
+            }
+            // 上传文件
+            minioClient.uploadObject(
+                    UploadObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(fileName)  // 对象名（可包含路径）
+                            .filename(fileName) // 本地文件
+                            .build()
+            );
+            log.info("文件上传成功: {}", fileName);
+        } catch (Exception e) {
+            log.error("文件上传失败: {}", fileName, e);
+            throw new IOException("MinIO上传失败", e);
         }
     }
 

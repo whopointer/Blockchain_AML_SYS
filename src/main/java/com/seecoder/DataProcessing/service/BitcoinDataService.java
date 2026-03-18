@@ -6,6 +6,7 @@ import com.seecoder.DataProcessing.po.ChainTx;
 import com.seecoder.DataProcessing.po.ChainTxInput;
 import com.seecoder.DataProcessing.po.ChainTxOutput;
 import com.seecoder.DataProcessing.vo.ApiResponse;
+import org.springframework.data.domain.Page;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,6 +14,11 @@ import java.util.List;
 import java.util.Map;
 
 public interface BitcoinDataService {
+    ApiResponse<String> syncHistoricalData(Long startHeight, Long endHeight, Integer batchSize);
+
+    // 查询地址余额
+    ApiResponse<Map<String, Object>> getAddressBalance(String address);
+
 
     // 获取区块数据
     ApiResponse<List<ChainBlock>> getBlocks(Long startHeight, Long endHeight, Integer limit);
@@ -38,8 +44,21 @@ public interface BitcoinDataService {
     // 数据统计
     ApiResponse<Map<String, Object>> getBlockchainStats();
 
-    // 数据同步
-    ApiResponse<String> syncLatestBlocks(Integer limit);
 
-    ApiResponse<String> syncHistoricalData(Long startHeight, Long endHeight, Integer batchSize);
+    ApiResponse<Map<String, Object>> getLatestData();
+
+    ApiResponse<String> syncLatestData(Integer blocksToSync);
+
+    ApiResponse<Page<ChainBlock>> getBlocksPage(Integer page, Integer size);
+
+    ApiResponse<Page<ChainTx>> getTransactionsPage(Integer page, Integer size);
+
+    ApiResponse<List<ChainTx>> getTransactionsByAddress(String address, Integer limit);
+
+
+    ApiResponse<List<Map<String, Object>>> getDailyStats(Integer days);
+
+    void clearAllCache();
+
+    ApiResponse<Long> getBlockNumber();
 }

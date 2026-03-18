@@ -25,6 +25,8 @@ public abstract class AbstractGraphService {
     @Autowired
     protected TransferRelationRepository transferRelationRepository;
 
+
+
     // 获取Session
     protected Session getSession() {
         return sessionFactory.openSession();

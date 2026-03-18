@@ -45,8 +45,7 @@ spring:
 # BigQuery配置
 bigquery:
   project-id: dataprocessingamlsys
-  credentials-path: classpath:service-account-key.json
-
+  credentials-path: service-account-key.json   # 去掉 classpath: 前缀
 # 事务管理器配置（重要！）
 transaction:
   default-timeout: 30
@@ -70,7 +69,10 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql: TRACE
     org.hibernate.stat: DEBUG
-
+clickhouse:
+  jdbc-url: jdbc:clickhouse://172.27.32.44:8123/data_processing
+  username: ccroot
+  password: 123456
 # 服务器配置
 server:
   port: 8080

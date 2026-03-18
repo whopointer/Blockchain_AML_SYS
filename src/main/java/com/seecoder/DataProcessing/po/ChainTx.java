@@ -1,9 +1,9 @@
-// com/seecoder/DataProcessing/po/ChainTx.java
 package com.seecoder.DataProcessing.po;
 
 import lombok.Data;
 import javax.persistence.*;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 
 @Data
@@ -18,7 +18,7 @@ public class ChainTx {
     private Long id;
 
     @Column(name = "chain", nullable = false, length = 16)
-    private String chain = "BTC"; // 默认改为 ETH
+    private String chain ;
 
     @Column(name = "tx_hash", nullable = false, length = 80)
     private String txHash;
@@ -47,13 +47,33 @@ public class ChainTx {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    // ============ 新增的以太坊字段 ============
+    // ============ 以太坊字段 ============
     @Column(name = "from_address", length = 128)
     private String fromAddress;
 
     @Column(name = "to_address", length = 128)
     private String toAddress;
 
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
+
+    @Column(name = "lock_time")
+    private Long locktime;
+
+    @Column(name = "gas_price", precision = 38, scale = 18)
+    private BigDecimal gasPrice;
+
+    @Column(name = "gas_used")
+    private Long gasUsed;
+
+    @Column(name = "input_data", columnDefinition = "TEXT")
+    private String inputData;
+
+    // ============ 新增字段：wei 值 ============
+    @Column(name = "value_wei", precision = 38, scale = 0)
+    private BigInteger valueWei;          // 交易金额（wei），用于CSV导出
+
+    // ============ 辅助方法 ============
     public Double getTotalInputAsDouble() {
         return totalInput != null ? totalInput.doubleValue() : 0.0;
     }
@@ -65,7 +85,6 @@ public class ChainTx {
     public Double getFeeAsDouble() {
         return fee != null ? fee.doubleValue() : 0.0;
     }
-
 
     @PrePersist
     protected void onCreate() {

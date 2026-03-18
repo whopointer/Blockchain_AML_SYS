@@ -3,12 +3,16 @@ package com.seecoder.DataProcessing.serviceImpl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.cloud.bigquery.*;
+import com.opencsv.CSVWriter;
 import com.seecoder.DataProcessing.po.*;
 import com.seecoder.DataProcessing.repository.*;
+import com.seecoder.DataProcessing.repository.clickhouse.ClickHouseStatsRepository;
+import com.seecoder.DataProcessing.service.ClickHouseAggregationService;
 import com.seecoder.DataProcessing.service.EthereumDataService;
 import com.seecoder.DataProcessing.service.GraphService;
 import com.seecoder.DataProcessing.service.MinIOService;
 import com.seecoder.DataProcessing.vo.ApiResponse;
+import com.seecoder.DataProcessing.vo.ExploreTaskStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,13 +22,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,6 +41,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -62,6 +72,17 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private ClickHouseStatsRepository clickHouseStatsRepository;
+
+    @Autowired
+    private ClickHouseAggregationService clickHouseAggregationService;
+
+    @Autowired
+    private ChainTokenTransferRepository chainTokenTransferRepository;
+
+    private final Map<String, ExploreTaskStatus> taskStatusMap = new ConcurrentHashMap<>();
+
     @Value("${minio.archive.enabled:true}")
     private boolean minioArchiveEnabled;
 
@@ -76,6 +97,9 @@ public class EthereumDataServiceImpl implements EthereumDataService {
     private static final int MAX_BLOCKS_PER_QUERY = 1000;
     private static final int MAX_TRANSACTIONS_PER_QUERY = 10000;
     private static final String CHAIN_ETH = "ETH";
+
+
+
 
     // ============= MinIO归档相关方法 =============
 
@@ -641,7 +665,7 @@ public class EthereumDataServiceImpl implements EthereumDataService {
 
     // ============= 3. 定时同步 =============
 
-    @Scheduled(fixedDelay = 300000) // 每5分钟执行一次
+    @Scheduled(fixedDelay = 3000000) // 每5分钟执行一次
     @Transactional
     public void scheduledSyncLatestData() {
         try {
@@ -1053,22 +1077,48 @@ public class EthereumDataServiceImpl implements EthereumDataService {
         for (FieldValueList row : result.iterateAll()) {
             try {
                 ChainTx tx = new ChainTx();
+
+                // 处理 value 字段（wei），安全转换为 BigInteger
+                FieldValue valueField = row.get("value");
+                BigInteger valueWei;
+                if (!valueField.isNull()) {
+                    if (valueField.getAttribute() == FieldValue.Attribute.PRIMITIVE) {
+                        // 尝试获取长整型（适用于较小数值）
+                        try {
+                            valueWei = BigInteger.valueOf(valueField.getLongValue());
+                        } catch (Exception e) {
+                            // 如果溢出或类型不匹配，使用字符串
+                            valueWei = new BigInteger(valueField.getStringValue());
+                        }
+                    } else {
+                        // 其他类型（如 NUMERIC）直接使用字符串
+                        valueWei = new BigInteger(valueField.getStringValue());
+                    }
+                } else {
+                    valueWei = BigInteger.ZERO;
+                }
+                tx.setValueWei(valueWei);
+                BigDecimal valueEth = convertWeiToEth(new BigDecimal(valueWei));
+                tx.setTotalOutput(valueEth);
+
+                // 交易哈希
                 tx.setTxHash(row.get("hash").getStringValue());
+
+                // 区块号
                 tx.setBlockHeight(row.get("block_number").getLongValue());
 
+                // 区块时间戳
                 String timestampStr = row.get("block_timestamp").getStringValue();
                 LocalDateTime blockTime = parseBigQueryTimestamp(timestampStr);
                 tx.setBlockTime(blockTime);
 
+                // 发送地址
                 tx.setFromAddress(row.get("from_address").getStringValue());
+
+                // 接收地址（可能为空）
                 if (!row.get("to_address").isNull()) {
                     tx.setToAddress(row.get("to_address").getStringValue());
                 }
-
-                // 以太坊金额（单位转换：wei -> ETH）
-                BigDecimal valueWei = BigDecimal.valueOf(row.get("value").getDoubleValue());
-                BigDecimal valueEth = convertWeiToEth(valueWei);
-                tx.setTotalOutput(valueEth);
 
                 // 交易索引
                 if (!row.get("transaction_index").isNull()) {
@@ -1087,13 +1137,23 @@ public class EthereumDataServiceImpl implements EthereumDataService {
 
                 // 计算手续费和总输入
                 if (!row.get("gas_price").isNull() && !row.get("receipt_gas_used").isNull()) {
-                    BigDecimal gasPriceWei = BigDecimal.valueOf(row.get("gas_price").getDoubleValue());
-                    BigDecimal gasUsed = BigDecimal.valueOf(row.get("receipt_gas_used").getDoubleValue());
-                    BigDecimal feeWei = gasPriceWei.multiply(gasUsed);
-                    BigDecimal feeEth = convertWeiToEth(feeWei);
+                    // gas_price 和 receipt_gas_used 可能返回 NUMERIC 类型，使用字符串转换
+                    FieldValue gasPriceField = row.get("gas_price");
+                    FieldValue gasUsedField = row.get("receipt_gas_used");
+                    BigInteger gasPriceWei = new BigInteger(gasPriceField.getStringValue());
+                    BigInteger gasUsed = new BigInteger(gasUsedField.getStringValue());
+                    BigInteger feeWei = gasPriceWei.multiply(gasUsed);
+                    BigDecimal feeEth = convertWeiToEth(new BigDecimal(feeWei));
                     tx.setFee(feeEth);
                     tx.setTotalInput(valueEth.add(feeEth)); // 总输入 = 转账金额 + 手续费
                 }
+
+                // 交易大小（字节）
+                // 以太坊交易在 BigQuery 中无 size 字段，默认设为 0
+                tx.setSizeBytes(0L);
+
+                // 以太坊无 locktime，默认设为 0
+                tx.setLocktime(0L);
 
                 transactions.add(tx);
             } catch (Exception e) {
@@ -1102,6 +1162,419 @@ public class EthereumDataServiceImpl implements EthereumDataService {
         }
 
         return transactions;
+    }
+
+
+
+    // ============= 新增：异步地址探索方法 =============
+
+    @Override
+    @Async
+    public CompletableFuture<ApiResponse<List<String>>> exploreAndExport(String taskId,
+                                                                         List<String> sources,
+                                                                         List<String> allowed,
+                                                                         List<String> forbidden,
+                                                                         LocalDateTime startTime,
+                                                                         LocalDateTime endTime) {
+        log.info("开始地址探索任务 [{}]：源地址={}, 允许列表={}, 禁止列表={}, 时间范围={} - {}",
+                taskId, sources, allowed, forbidden, startTime, endTime);
+
+        // 初始化任务状态
+        ExploreTaskStatus status = new ExploreTaskStatus();
+        status.setTaskId(taskId);
+        status.setStartTime(LocalDateTime.now());
+        status.setStatus("RUNNING");
+        taskStatusMap.put(taskId, status);
+
+        try {
+            // 1. 地址探索，收集所有涉及的交易哈希
+            Set<String> allTxHashes = exploreAddressNetwork(sources, allowed, forbidden, startTime, endTime, status);
+            log.info("任务 [{}] 探索完成，共收集到 {} 笔交易哈希", taskId, allTxHashes.size());
+
+            // 2. 根据交易哈希获取完整的交易详情（从本地或BigQuery）
+            List<ChainTx> fullTxs = fetchTransactionsByHashes(allTxHashes, startTime, endTime);
+            log.info("任务 [{}] 获取到 {} 笔完整原生交易", taskId, fullTxs.size());
+
+            // 3. 获取这些交易对应的代币转账事件
+            List<ChainTokenTransfer> tokenTransfers = fetchTokenTransfersByTxHashes(allTxHashes, startTime, endTime);
+            log.info("任务 [{}] 获取到 {} 条代币转账事件", taskId, tokenTransfers.size());
+
+            // 4. 按区块范围分组（每100k个区块一组）
+            Map<Long, List<ChainTx>> nativeGroup = new HashMap<>();
+            Map<Long, List<ChainTokenTransfer>> tokenGroup = new HashMap<>();
+
+            for (ChainTx tx : fullTxs) {
+                long rangeStart = (tx.getBlockHeight() / 100000) * 100000;
+                nativeGroup.computeIfAbsent(rangeStart, k -> new ArrayList<>()).add(tx);
+            }
+            for (ChainTokenTransfer tt : tokenTransfers) {
+                long rangeStart = (tt.getBlockNumber() / 100000) * 100000;
+                tokenGroup.computeIfAbsent(rangeStart, k -> new ArrayList<>()).add(tt);
+            }
+
+            // 5. 合并所有出现的区块范围
+            Set<Long> allRanges = new HashSet<>();
+            allRanges.addAll(nativeGroup.keySet());
+            allRanges.addAll(tokenGroup.keySet());
+
+            List<String> generatedFiles = new ArrayList<>();
+            for (Long rangeStart : allRanges) {
+                long rangeEnd = rangeStart + 100000;
+                List<ChainTx> nativeList = nativeGroup.getOrDefault(rangeStart, Collections.emptyList());
+                List<ChainTokenTransfer> tokenList = tokenGroup.getOrDefault(rangeStart, Collections.emptyList());
+
+                // 生成CSV文件并上传到MinIO
+                List<String> files = generateAndUploadCsv(rangeStart, rangeEnd, nativeList, tokenList);
+                generatedFiles.addAll(files);
+
+                // 更新任务进度
+                status.setProgress((int) (generatedFiles.size() * 100 / allRanges.size()));
+            }
+
+            // 任务完成
+            status.setStatus("COMPLETED");
+            status.setEndTime(LocalDateTime.now());
+            status.setResult(generatedFiles);
+            status.setMessage("成功生成 " + generatedFiles.size() + " 个CSV文件");
+
+            // 注意：ApiResponse.success 有两个重载：success(T data) 和 success(T data, Long total)
+            // 这里我们使用 success(data)，因为 total 不是必需的
+            return CompletableFuture.completedFuture(ApiResponse.success(generatedFiles, (long) generatedFiles.size()));
+        } catch (Exception e) {
+            log.error("任务 [{}] 执行失败", taskId, e);
+            status.setStatus("FAILED");
+            status.setEndTime(LocalDateTime.now());
+            status.setMessage("失败：" + e.getMessage());
+            return CompletableFuture.completedFuture(ApiResponse.error(500, "探索任务失败: " + e.getMessage()));
+        }
+    }
+
+    // ============= 辅助方法：地址探索网络 =============
+
+    private Set<String> exploreAddressNetwork(List<String> sources,
+                                              List<String> allowed,
+                                              List<String> forbidden,
+                                              LocalDateTime startTime,
+                                              LocalDateTime endTime,
+                                              ExploreTaskStatus status) {
+        Set<String> toExplore = new HashSet<>(sources);
+        Set<String> explored = new HashSet<>();
+        Set<String> forbiddenSet = new HashSet<>(forbidden);
+        Set<String> allowedSet = new HashSet<>(allowed);
+        Set<String> allTxHashes = new HashSet<>();
+
+        while (!toExplore.isEmpty()) {
+            String addr = toExplore.iterator().next();
+            toExplore.remove(addr);
+            if (explored.contains(addr)) continue;
+            explored.add(addr);
+            status.setProcessedAddresses(explored.size());
+
+            // 1. 优先从Neo4j获取邻居地址和交易哈希
+            Set<String> neighbors = getNeighborsFromGraph(addr, startTime, endTime);
+            Set<String> txHashes = getTransactionHashesFromGraph(addr, startTime, endTime);
+
+            // 2. 如果Neo4j数据不完整，回退到数据库/BigQuery
+            if (neighbors.isEmpty() && txHashes.isEmpty()) {
+                // 从本地数据库或BigQuery获取该地址的交易，提取对手地址和哈希
+                List<ChainTx> txs = fetchTransactionsByAddressAndTime(addr, startTime, endTime);
+                neighbors = new HashSet<>();
+                txHashes = new HashSet<>();
+                for (ChainTx tx : txs) {
+                    txHashes.add(tx.getTxHash());
+                    String counterparty = tx.getFromAddress().equals(addr) ? tx.getToAddress() : tx.getFromAddress();
+                    if (counterparty != null) {
+                        neighbors.add(counterparty);
+                    }
+                }
+            }
+
+            // 收集交易哈希
+            allTxHashes.addAll(txHashes);
+
+            // 根据规则决定是否继续探索邻居
+            for (String neighbor : neighbors) {
+                if (explored.contains(neighbor) || toExplore.contains(neighbor)) continue;
+                boolean isForbidden = forbiddenSet.contains(neighbor);
+                boolean isAllowed = allowedSet.contains(neighbor);
+                if (!isForbidden || isAllowed) {
+                    toExplore.add(neighbor);
+                }
+            }
+
+            if (explored.size() % 100 == 0) {
+                log.info("探索进度：已探索 {} 个地址，累计收集 {} 个交易哈希", explored.size(), allTxHashes.size());
+            }
+        }
+
+        log.info("地址探索完成：共探索 {} 个地址，收集 {} 个交易哈希", explored.size(), allTxHashes.size());
+        return allTxHashes;
+    }
+
+    // ============= 与 Neo4j 交互的辅助方法 =============
+
+    private Set<String> getNeighborsFromGraph(String address, LocalDateTime start, LocalDateTime end) {
+        try {
+            return graphService.getNeighborAddresses(address, start, end);
+        } catch (Exception e) {
+            log.warn("从Neo4j获取邻居地址失败，将回退到数据库: {}", e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    private Set<String> getTransactionHashesFromGraph(String address, LocalDateTime start, LocalDateTime end) {
+        try {
+            return graphService.getTransactionHashes(address, start, end);
+        } catch (Exception e) {
+            log.warn("从Neo4j获取交易哈希失败，将回退到数据库: {}", e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    // ============= 从数据库获取地址交易 =============
+
+    private List<ChainTx> fetchTransactionsByAddressAndTime(String address, LocalDateTime start, LocalDateTime end) {
+        // 1. 从本地数据库查询
+        Sort sort = Sort.by(Sort.Direction.ASC, "blockHeight", "txIndex");
+        List<ChainTx> localTxs = chainTxRepository.findByAddressAndTimeRange(CHAIN_ETH, address, start, end, sort);
+
+        log.info("从本地数据库查询到地址 {} 的交易数：{}", address, localTxs.size());
+        return localTxs;
+/*
+        // 判断本地数据是否完整（简单规则：如果本地交易数量较少或时间范围较新，可能不全）
+        long localCount = chainTxRepository.countByAddressAndTimeRange(CHAIN_ETH, address, start, end);
+        long expectedMin = (end.toLocalDate().toEpochDay() - start.toLocalDate().toEpochDay()) * 5000; // 粗略估计
+        if (localCount >= expectedMin) {
+            return localTxs;
+        }
+
+        // 2. 从BigQuery拉取
+        List<ChainTx> bqTxs = fetchTransactionsFromBigQuery(address, start, end);
+
+        // 3. 保存新交易到数据库
+        Set<String> localHashes = localTxs.stream().map(ChainTx::getTxHash).collect(Collectors.toSet());
+        List<ChainTx> toSave = new ArrayList<>();
+        for (ChainTx tx : bqTxs) {
+            if (!localHashes.contains(tx.getTxHash())) {
+                toSave.add(tx);
+            }
+        }
+        if (!toSave.isEmpty()) {
+            chainTxRepository.saveAll(toSave);
+            // 异步归档到Neo4j
+            graphService.saveTransactionsToGraph(toSave);
+        }
+
+        // 合并结果并排序
+        List<ChainTx> merged = new ArrayList<>(localTxs);
+        merged.addAll(toSave);
+        merged.sort(Comparator.comparing(ChainTx::getBlockHeight).thenComparing(ChainTx::getTxIndex));
+        return merged;
+
+ */
+    }
+
+    private List<ChainTx> fetchTransactionsFromBigQuery(String address, LocalDateTime start, LocalDateTime end) {
+        String query = String.format(
+                "SELECT hash, block_number, block_timestamp, from_address, to_address, value, " +
+                        "gas_price, receipt_gas_used, gas, nonce, input, transaction_index, receipt_status " +
+                        "FROM `bigquery-public-data.crypto_ethereum.transactions` " +
+                        "WHERE (from_address = '%s' OR to_address = '%s') " +
+                        "  AND block_timestamp BETWEEN TIMESTAMP('%s') AND TIMESTAMP('%s')",
+                address, address, start.toString(), end.toString()
+        );
+        try {
+            TableResult result = executeBigQuery(query);
+            archiveBigQueryResult("address_txs_query", result);
+            return mapToChainTxs(result);
+        } catch (Exception e) {
+            log.error("从BigQuery拉取交易失败 address={}", address, e);
+            return Collections.emptyList();
+        }
+    }
+
+    // ============= 根据哈希列表获取完整交易 =============
+
+    private List<ChainTx> fetchTransactionsByHashes(Set<String> txHashes, LocalDateTime start, LocalDateTime end) {
+        if (txHashes.isEmpty()) return Collections.emptyList();
+
+        // 1. 从本地数据库查询已存在的
+        List<ChainTx> localTxs = chainTxRepository.findByChainAndTxHashIn(CHAIN_ETH, new ArrayList<>(txHashes));
+
+        Set<String> localHashSet = localTxs.stream().map(ChainTx::getTxHash).collect(Collectors.toSet());
+        Set<String> missingHashes = new HashSet<>(txHashes);
+        missingHashes.removeAll(localHashSet);
+
+        if (missingHashes.isEmpty()) {
+            return localTxs;
+        }
+        return localTxs;
+
+
+    }
+
+    // ============= 获取代币转账事件 =============
+
+    private List<ChainTokenTransfer> fetchTokenTransfersByTxHashes(Set<String> txHashes, LocalDateTime start, LocalDateTime end) {
+        if (txHashes.isEmpty()) return Collections.emptyList();
+
+        // 1. 从本地数据库查询
+        List<ChainTokenTransfer> localTTs = chainTokenTransferRepository.findByTransactionHashIn(new ArrayList<>(txHashes));
+
+        Set<String> localHashSet = localTTs.stream().map(ChainTokenTransfer::getTransactionHash).collect(Collectors.toSet());
+        Set<String> missingHashes = new HashSet<>(txHashes);
+        missingHashes.removeAll(localHashSet);
+
+        if (missingHashes.isEmpty()) {
+            return localTTs;
+        }
+
+        // 2. 从BigQuery分批拉取
+        List<ChainTokenTransfer> bqTTs = new ArrayList<>();
+        List<String> missingList = new ArrayList<>(missingHashes);
+        int batchSize = 500;
+        for (int i = 0; i < missingList.size(); i += batchSize) {
+            List<String> batch = missingList.subList(i, Math.min(i + batchSize, missingList.size()));
+            String inClause = String.join("','", batch);
+            String query = String.format(
+                    "SELECT block_number, block_timestamp, transaction_hash, log_index, token_address, from_address, to_address, value " +
+                            "FROM `bigquery-public-data.crypto_ethereum.token_transfers` " +
+                            "WHERE transaction_hash IN ('%s') " +
+                            "  AND block_timestamp BETWEEN TIMESTAMP('%s') AND TIMESTAMP('%s')",
+                    inClause, start.toString(), end.toString()
+            );
+            try {
+                TableResult result = executeBigQuery(query);
+                bqTTs.addAll(mapToChainTokenTransfers(result));
+            } catch (Exception e) {
+                log.error("批量拉取代币转账失败", e);
+            }
+        }
+
+        // 3. 保存到本地数据库
+        if (!bqTTs.isEmpty()) {
+            chainTokenTransferRepository.saveAll(bqTTs);
+        }
+
+        List<ChainTokenTransfer> allTTs = new ArrayList<>(localTTs);
+        allTTs.addAll(bqTTs);
+        return allTTs;
+    }
+
+    /**
+     * 将BigQuery结果映射为ChainTokenTransfer列表
+     */
+    private List<ChainTokenTransfer> mapToChainTokenTransfers(TableResult result) {
+        List<ChainTokenTransfer> list = new ArrayList<>();
+        for (FieldValueList row : result.iterateAll()) {
+            try {
+                ChainTokenTransfer tt = new ChainTokenTransfer();
+                tt.setBlockNumber(row.get("block_number").getLongValue());
+                tt.setBlockTimestamp(parseBigQueryTimestamp(row.get("block_timestamp").getStringValue()));
+                tt.setTransactionHash(row.get("transaction_hash").getStringValue());
+                tt.setLogIndex((int) row.get("log_index").getLongValue());
+                tt.setTokenAddress(row.get("token_address").getStringValue());
+                tt.setFromAddress(row.get("from_address").getStringValue());
+                tt.setToAddress(row.get("to_address").getStringValue());
+
+                // value 字段处理
+                FieldValue valueField = row.get("value");
+                BigInteger value;
+                if (!valueField.isNull()) {
+                    if (valueField.getAttribute() == FieldValue.Attribute.PRIMITIVE) {
+                        try {
+                            value = BigInteger.valueOf(valueField.getLongValue());
+                        } catch (Exception e) {
+                            value = new BigInteger(valueField.getStringValue());
+                        }
+                    } else {
+                        value = new BigInteger(valueField.getStringValue());
+                    }
+                } else {
+                    value = BigInteger.ZERO;
+                }
+                tt.setValue(value);
+
+                list.add(tt);
+            } catch (Exception e) {
+                log.error("映射代币转账失败", e);
+            }
+        }
+        return list;
+    }
+
+    // ============= 生成CSV文件并上传到MinIO =============
+
+    private List<String> generateAndUploadCsv(long startBlock, long endBlock,
+                                              List<ChainTx> nativeTxs,
+                                              List<ChainTokenTransfer> tokenTxs) throws IOException {
+        List<String> files = new ArrayList<>();
+
+        // 为代币转账准备交易索引映射
+        Map<String, Integer> txIndexMap = new HashMap<>();
+        for (ChainTx tx : nativeTxs) {
+            txIndexMap.put(tx.getTxHash(), tx.getTxIndex());
+        }
+
+        // 生成原生ETH CSV
+        String nativeFileName = String.format("native_%d_%d.csv", startBlock, endBlock);
+        try (CSVWriter writer = new CSVWriter(new FileWriter(nativeFileName))) {
+            writer.writeNext(new String[]{"block", "timestamp", "index", "hex_tx", "coin", "from_addr", "to_addr", "value"});
+            for (ChainTx tx : nativeTxs) {
+                String[] row = {
+                        String.valueOf(tx.getBlockHeight()),
+                        formatTimestamp(tx.getBlockTime()),
+                        String.valueOf(tx.getTxIndex() != null ? tx.getTxIndex() : 0),
+                        tx.getTxHash(),
+                        "0x0000000000000000000000000000000000000000",
+                        tx.getFromAddress(),
+                        tx.getToAddress() != null ? tx.getToAddress() : "0x0000000000000000000000000000000000000000",
+                        tx.getValueWei() != null ? tx.getValueWei().toString() : "0"
+                };
+                writer.writeNext(row);
+            }
+        }
+        files.add(nativeFileName);
+
+        // 生成代币转账 CSV
+        String tokenFileName = String.format("token_%d_%d.csv", startBlock, endBlock);
+        try (CSVWriter writer = new CSVWriter(new FileWriter(tokenFileName))) {
+            writer.writeNext(new String[]{"block", "timestamp", "index", "hex_tx", "coin", "from_addr", "to_addr", "value"});
+            for (ChainTokenTransfer tt : tokenTxs) {
+                Integer txIndex = txIndexMap.get(tt.getTransactionHash());
+                String[] row = {
+                        String.valueOf(tt.getBlockNumber()),
+                        formatTimestamp(tt.getBlockTimestamp()),
+                        String.valueOf(txIndex != null ? txIndex : 0),
+                        tt.getTransactionHash(),
+                        tt.getTokenAddress(),
+                        tt.getFromAddress(),
+                        tt.getToAddress(),
+                        tt.getValue().toString()
+                };
+                writer.writeNext(row);
+            }
+        }
+        files.add(tokenFileName);
+
+        // 上传到MinIO
+        for (String file : files) {
+            minIOService.uploadFile(file);
+        }
+
+        // 删除本地临时文件
+        for (String file : files) {
+            new File(file).delete();
+        }
+
+        return files;
+    }
+
+    /**
+     * 格式化时间为 CSV 要求的格式（yyyy-MM-dd HH:mm:ss）
+     */
+    private String formatTimestamp(LocalDateTime time) {
+        return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     // ============= 工具方法 =============
@@ -1226,9 +1699,10 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             if (limit > 1000) limit = 1000;
 
             Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "blockHeight", "txIndex"));
-            List<ChainTx> transactions = chainTxRepository.findByChainAndBlockTimeBetween(CHAIN_ETH, startTime, endTime, pageable);
 
-            return ApiResponse.success(transactions, (long) transactions.size());
+            Page<ChainTx> txPage = chainTxRepository.findByChainAndBlockTimeBetween(CHAIN_ETH, startTime, endTime, pageable);
+            List<ChainTx> txs = txPage.getContent();
+            return ApiResponse.success(txs, (long) txs.size());
 
         } catch (Exception e) {
             log.error("按时间获取交易失败", e);
@@ -1252,6 +1726,9 @@ public class EthereumDataServiceImpl implements EthereumDataService {
             return ApiResponse.error(500, "按时间获取区块失败: " + e.getMessage());
         }
     }
+
+
+
 
     // ============= 其他接口方法 =============
 

@@ -20,7 +20,7 @@ import java.net.Proxy;
 @Configuration
 public class BigQueryConfig {
 
-    @Value("${bigquery.project-id:dataprocessingamlsys}") // 请确保这是您的项目ID
+    @Value("dataprocessingamlsys") // 请确保这是您的项目ID
     private String projectId;
 
     @Value("${bigquery.credentials-path:classpath:service-account-key.json}")

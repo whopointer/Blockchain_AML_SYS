@@ -3,6 +3,7 @@ package com.seecoder.DataProcessing.service;
 
 import com.seecoder.DataProcessing.vo.ApiResponse;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -26,4 +27,7 @@ public interface MinIOService {
     // 清理管理
     ApiResponse<String> cleanupOldData(int daysToKeep);
     ApiResponse<Map<String, Object>> getStorageStats();
+
+
+    void uploadFile(String fileName) throws IOException;
 }

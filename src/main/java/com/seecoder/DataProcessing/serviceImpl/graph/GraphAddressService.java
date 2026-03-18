@@ -8,11 +8,8 @@ import org.neo4j.ogm.session.Session;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -993,7 +990,204 @@ public class GraphAddressService extends AbstractGraphService {
             return ApiResponse.error(500, "更新地址标签失败: " + e.getMessage());
         }
     }
-    
+
+
+
+
+    // ============ 新增 ============
+    /**
+     * 获取指定地址在时间范围内的直接交易对手地址
+     */
+    public Set<String> getNeighborAddresses(String address, LocalDateTime startTime, LocalDateTime endTime) {
+        String cypher = "MATCH (a:Address {address: $addr}) " +
+                "-[:TRANSFER]-(neighbor:Address) " +
+                "WHERE a <> neighbor " +
+                "AND EXISTS((a)-[:TRANSFER]->(t:Transaction)-[:TRANSFER]->(neighbor)) " +
+                "AND t.time >= $start AND t.time <= $end " +
+                "RETURN DISTINCT neighbor.address";
+        Map<String, Object> params = new HashMap<>();
+        params.put("addr", address);
+        params.put("start", startTime.toString());
+        params.put("end", endTime.toString());
+
+        Session session = getSession();
+        try {
+            Iterable<Map<String, Object>> result = session.query(cypher, params);
+            Set<String> neighbors = new HashSet<>();
+            for (Map<String, Object> row : result) {
+                neighbors.add((String) row.get("neighbor.address"));
+            }
+            return neighbors;
+        } finally {
+            closeSession(session);
+        }
+    }
+
+    /**
+     * 获取指定地址在时间范围内的交易哈希
+     */
+    public Set<String> getTransactionHashes(String address, LocalDateTime startTime, LocalDateTime endTime) {
+        String cypher = "MATCH (a:Address {address: $addr})-[r:TRANSFER]->(t:Transaction) " +
+                "WHERE t.time >= $start AND t.time <= $end " +
+                "RETURN DISTINCT t.txHash";
+        Map<String, Object> params = new HashMap<>();
+        params.put("addr", address);
+        params.put("start", startTime.toString());
+        params.put("end", endTime.toString());
+
+        Session session = getSession();
+        try {
+            Iterable<Map<String, Object>> result = session.query(cypher, params);
+            Set<String> txHashes = new HashSet<>();
+            for (Map<String, Object> row : result) {
+                txHashes.add((String) row.get("t.txHash"));
+            }
+            return txHashes;
+        } finally {
+            closeSession(session);
+        }
+    }
+
+    /**
+     * 判断是否存在从输出地址到输入地址的循环路径（至少2跳）
+     * @param inputAddrs  输入地址列表（发送方）
+     * @param outputAddrs 输出地址列表（接收方）
+     * @param maxHops     最大跳数，建议5-6，避免查询过重
+     * @return true 表示存在循环
+     */
+    @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
+    public boolean existsCycle(List<String> inputAddrs, List<String> outputAddrs, int maxHops) {
+        // 参数校验
+        if (inputAddrs == null || outputAddrs == null ||
+                inputAddrs.isEmpty() || outputAddrs.isEmpty()) {
+            return false;
+        }
+        // 去重
+        List<String> distinctInputs = new ArrayList<>(new HashSet<>(inputAddrs));
+        List<String> distinctOutputs = new ArrayList<>(new HashSet<>(outputAddrs));
+
+        Session session = getSession();
+        try {
+            // Cypher 查询：检查是否存在从 outputAddrs 中任一地址出发，
+            // 经过 2 到 maxHops 跳后到达 inputAddrs 中任一地址的路径
+            String cypher =
+                    "MATCH path = (out:Address)-[*2.." + maxHops + "]->(in:Address) " +
+                            "WHERE out.address IN $outputAddrs AND in.address IN $inputAddrs " +
+                            "RETURN count(path) > 0 AS exists";
+            Map<String, Object> params = new HashMap<>();
+            params.put("outputAddrs", distinctOutputs);
+            params.put("inputAddrs", distinctInputs);
+
+            Iterable<Map<String, Object>> result = session.query(cypher, params);
+            for (Map<String, Object> row : result) {
+                Boolean exists = (Boolean) row.get("exists");
+                return exists != null && exists;
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("检测交易循环失败", e);
+            return false; // 异常时保守返回 false
+        } finally {
+            closeSession(session);
+        }
+    }
+
+
+    /**
+     * 上游交易统计值内部类
+     */
+    public static class NeighborStats {
+        private Double avgAmount = 0.0;
+        private Double stdAmount = 0.0;
+        private Double avgFee = 0.0;
+        private Double avgInputs = 0.0;
+        private Double avgOutputs = 0.0;
+        private Double avgTimeSpan = 0.0;
+
+        // getters and setters
+        public Double getAvgAmount() { return avgAmount; }
+        public void setAvgAmount(Double avgAmount) { this.avgAmount = avgAmount; }
+        public Double getStdAmount() { return stdAmount; }
+        public void setStdAmount(Double stdAmount) { this.stdAmount = stdAmount; }
+        public Double getAvgFee() { return avgFee; }
+        public void setAvgFee(Double avgFee) { this.avgFee = avgFee; }
+        public Double getAvgInputs() { return avgInputs; }
+        public void setAvgInputs(Double avgInputs) { this.avgInputs = avgInputs; }
+        public Double getAvgOutputs() { return avgOutputs; }
+        public void setAvgOutputs(Double avgOutputs) { this.avgOutputs = avgOutputs; }
+        public Double getAvgTimeSpan() { return avgTimeSpan; }
+        public void setAvgTimeSpan(Double avgTimeSpan) { this.avgTimeSpan = avgTimeSpan; }
+    }
+    /**
+     * 批量获取多个地址的上游交易统计（作为接收方时的历史收入交易）
+     * @param addresses  地址集合
+     * @param currentTime 当前时间（用于计算时间间隔）
+     * @param startTime   查询时间范围开始
+     * @param endTime     查询时间范围结束
+     * @return 地址 -> NeighborStats 的映射
+     */
+    @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
+    public Map<String, NeighborStats> batchGetNeighborStats(Set<String> addresses,
+                                                            LocalDateTime currentTime,
+                                                            LocalDateTime startTime,
+                                                            LocalDateTime endTime) {
+        if (addresses == null || addresses.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Session session = getSession();
+        try {
+            // 使用 UNWIND 分别处理关系列表和交易列表，避免 avg([...]) 语法问题
+            String cypher = "UNWIND $addresses AS addr " +
+                    "MATCH (addrNode:Address {address: addr})<-[r:TRANSFER]-(tx:Transaction) " +
+                    "WHERE tx.time >= $startTime AND tx.time <= $endTime " +
+                    "WITH addr, COLLECT(r) AS rels, COLLECT(tx) AS txs " +
+                    // 计算关系金额的平均值和标准差
+                    "UNWIND rels AS rel " +
+                    "WITH addr, txs, AVG(toFloat(rel.amount)) AS avgAmount, STDEV(toFloat(rel.amount)) AS stdAmount " +
+                    // 计算交易相关特征
+                    "UNWIND txs AS tx " +
+                    "WITH addr, avgAmount, stdAmount, " +
+                    "     AVG(toFloat(tx.fee)) AS avgFee, " +
+                    "     AVG(COALESCE(tx.numInputs, 0)) AS avgInputs, " +      // 如果节点无此属性，默认为0
+                    "     AVG(COALESCE(tx.numOutputs, 0)) AS avgOutputs, " +
+                    "     AVG(duration.between(datetime(tx.time), datetime($currentTime)).seconds) AS avgTimeSpan " +
+                    "RETURN addr, avgAmount, stdAmount, avgFee, avgInputs, avgOutputs, avgTimeSpan";
+
+            Map<String, Object> params = new HashMap<>();
+            params.put("addresses", new ArrayList<>(addresses));
+            params.put("startTime", startTime.toString());
+            params.put("endTime", endTime.toString());
+            params.put("currentTime", currentTime.toString());
+
+            Iterable<Map<String, Object>> result = session.query(cypher, params);
+            Map<String, NeighborStats> statsMap = new HashMap<>();
+            for (Map<String, Object> row : result) {
+                String addr = (String) row.get("addr");
+                NeighborStats stats = new NeighborStats();
+                stats.setAvgAmount(safeGetDouble(row.get("avgAmount")));
+                stats.setStdAmount(safeGetDouble(row.get("stdAmount")));
+                stats.setAvgFee(safeGetDouble(row.get("avgFee")));
+                stats.setAvgInputs(safeGetDouble(row.get("avgInputs")));
+                stats.setAvgOutputs(safeGetDouble(row.get("avgOutputs")));
+                stats.setAvgTimeSpan(safeGetDouble(row.get("avgTimeSpan")));
+                statsMap.put(addr, stats);
+            }
+            return statsMap;
+        } finally {
+            closeSession(session);
+        }
+    }
+
+    private Double safeGetDouble(Object obj) {
+        if (obj == null) return 0.0;
+        if (obj instanceof Number) return ((Number) obj).doubleValue();
+        try {
+            return Double.parseDouble(obj.toString());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
 
 
 

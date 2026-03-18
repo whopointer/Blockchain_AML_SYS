@@ -45,7 +45,6 @@ public class Neo4jConfig {
     }
 
     @Bean
-    @Primary
     public Neo4jTransactionManager neo4jTransactionManager() {
         return new Neo4jTransactionManager(neo4jSessionFactory());
     }

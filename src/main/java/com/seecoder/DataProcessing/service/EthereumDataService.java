@@ -5,12 +5,14 @@ import com.seecoder.DataProcessing.po.ChainBlock;
 import com.seecoder.DataProcessing.po.ChainTx;
 import com.seecoder.DataProcessing.vo.ApiResponse;
 import org.springframework.data.domain.Page;
+import org.springframework.scheduling.annotation.Async;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public interface EthereumDataService {
     public ApiResponse<String> testGraphConnection();
@@ -116,6 +118,15 @@ public interface EthereumDataService {
      * 获取最新数据状态
      */
     ApiResponse<Map<String, Object>> getLatestData();
+
+
+    @Async
+    CompletableFuture<ApiResponse<List<String>>> exploreAndExport(String taskId,
+                                                                  List<String> sources,
+                                                                  List<String> allowed,
+                                                                  List<String> forbidden,
+                                                                  LocalDateTime startTime,
+                                                                  LocalDateTime endTime);
 
     // ============= 缓存清理方法 =============
 
