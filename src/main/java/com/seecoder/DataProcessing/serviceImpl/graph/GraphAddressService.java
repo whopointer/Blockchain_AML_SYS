@@ -30,9 +30,9 @@ public class GraphAddressService extends AbstractGraphService {
 
             Session session = getSession();
             try {
-                // 去除maxHops限制，使用默认的较小跳数限制避免查询时间过长
+                // 移除跳数限制，允许任意长度的路径
                 String pathQuery = "MATCH path = (a:Address {address: $fromAddress})" +
-                        "-[:TRANSFER*1..5]->(b:Address {address: $toAddress}) " +
+                        "-[:TRANSFER*]->(b:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BNB')} ] AS nodeData, " +
                         "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
@@ -544,8 +544,8 @@ public class GraphAddressService extends AbstractGraphService {
                     }
                 }
                 
-                // 计算节点层级，起始节点为0，收入侧为负值，支出侧为正值
-                Map<String, Integer> nodeLayers = GraphLayerCalculator.calculateNodeLayersWithDirection(allPaths, allPathDirections, address);
+                // 计算节点层级，中心节点为0，收入侧为负值，支出侧为正值
+                Map<String, Integer> nodeLayers = GraphLayerCalculator.calculateNodeLayersForNHops(allPaths, allPathDirections, address);
                 
                 Map<String, String> globalAddressToId = new HashMap<>();
                 

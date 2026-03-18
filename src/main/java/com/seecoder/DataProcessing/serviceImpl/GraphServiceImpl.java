@@ -1,8 +1,6 @@
 package com.seecoder.DataProcessing.serviceImpl;
 
 import com.seecoder.DataProcessing.po.ChainTx;
-import com.seecoder.DataProcessing.po.ChainTxInput;
-import com.seecoder.DataProcessing.po.ChainTxOutput;
 import com.seecoder.DataProcessing.service.GraphService;
 import com.seecoder.DataProcessing.serviceImpl.graph.GraphAddressService;
 import com.seecoder.DataProcessing.serviceImpl.graph.GraphStatsService;
@@ -16,7 +14,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Slf4j
 @Service
@@ -96,27 +93,4 @@ public class GraphServiceImpl implements GraphService {
     public void cleanGraphData(String chain) {
         statsService.cleanGraphData(chain);
     }
-
-
-    // ============ 新增 ============
-    @Override
-    public Set<String> getNeighborAddresses(String address, LocalDateTime startTime, LocalDateTime endTime) {
-        return addressService.getNeighborAddresses(address, startTime, endTime);
-    }
-
-    @Override
-    public Set<String> getTransactionHashes(String address, LocalDateTime startTime, LocalDateTime endTime) {
-        return addressService.getTransactionHashes(address, startTime, endTime);
-    }
-
-    @Override
-    public void saveBitcoinTransactionToGraph(ChainTx tx, List<ChainTxInput> inputs, List<ChainTxOutput> outputs) {
-        transactionService.saveBitcoinTransactionToGraph(tx,inputs,outputs);
-    }
-
-    @Override
-    public void saveBitcoinTransactionsToGraph(List<ChainTx> txs, Map<String, List<ChainTxInput>> inputsMap, Map<String, List<ChainTxOutput>> outputsMap) {
-        transactionService.saveBitcoinTransactionsToGraph(txs,inputsMap,outputsMap);
-    }
-
 }

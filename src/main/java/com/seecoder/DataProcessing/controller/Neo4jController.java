@@ -134,4 +134,56 @@ public class Neo4jController {
             return ApiResponse.error(500, "清理图数据失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 创建图谱快照接口
+     */
+    @PostMapping("/snapshot")
+    @ApiOperation("创建图谱快照")
+    public ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> createSnapshot(
+            @RequestBody com.seecoder.DataProcessing.po.GraphSnapshot snapshot) {
+        ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> resp = graphService.createGraphSnapshot(snapshot);
+        if (resp.getCode() != 200) {
+            return ApiResponse.error(resp.getCode(), resp.getMessage());
+        }
+        return resp;
+    }
+
+    /**
+     * 获取所有图谱快照接口
+     */
+    @GetMapping("/snapshots")
+    @ApiOperation("获取所有图谱快照")
+    public ApiResponse<List<com.seecoder.DataProcessing.po.GraphSnapshot>> getAllSnapshots() {
+        return graphService.getAllGraphSnapshots();
+    }
+
+    /**
+     * 修改图谱快照信息接口
+     */
+    @PutMapping("/snapshot/{id}")
+    @ApiOperation("修改图谱快照信息")
+    public ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> updateSnapshot(
+            @PathVariable Long id,
+            @RequestBody com.seecoder.DataProcessing.po.GraphSnapshot snapshot) {
+        ApiResponse<com.seecoder.DataProcessing.po.GraphSnapshot> resp = graphService.updateGraphSnapshot(id, snapshot);
+        if (resp.getCode() != 200) {
+            return ApiResponse.error(resp.getCode(), resp.getMessage());
+        }
+        return resp;
+    }
+
+    /**
+     * 删除图谱快照接口
+     */
+    @DeleteMapping("/snapshot/{id}")
+    @ApiOperation("删除图谱快照")
+    public ApiResponse<Void> deleteSnapshot(
+            @PathVariable Long id) {
+        ApiResponse<Void> resp = graphService.deleteGraphSnapshot(id);
+        if (resp.getCode() != 200) {
+            return ApiResponse.error(resp.getCode(), resp.getMessage());
+        }
+        return resp;
+    }
 }
