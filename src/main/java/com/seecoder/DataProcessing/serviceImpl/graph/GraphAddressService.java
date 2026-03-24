@@ -640,14 +640,29 @@ public class GraphAddressService extends AbstractGraphService {
                     List<Map<String, Object>> nodeData = allPaths.get(pathIdx);
                     List<Map<String, Object>> relData = allPathRels.get(pathIdx);
                     List<String> times = allPathTimes.get(pathIdx);
+                    String direction = allPathDirections.get(pathIdx);
                     
                     for (int i = 0; i < nodeData.size() - 1 && i < relData.size(); i++) {
                         if (i < nodeData.size() - 1) {
-                            Map<String, Object> fromNodeData = nodeData.get(i);
-                            Map<String, Object> toNodeData = nodeData.get(i + 1);
+                            Map<String, Object> fromNodeData;
+                            Map<String, Object> toNodeData;
+                            String fromAddr;
+                            String toAddr;
                             
-                            String fromAddr = fromNodeData != null ? fromNodeData.get("address").toString() : "";
-                            String toAddr = toNodeData != null ? toNodeData.get("address").toString() : "";
+                            // 根据路径方向调整from和to的顺序
+                            if ("income".equals(direction)) {
+                                // 收入侧路径，节点顺序与实际转账方向相反
+                                fromNodeData = nodeData.get(i + 1);
+                                toNodeData = nodeData.get(i);
+                                fromAddr = fromNodeData != null ? fromNodeData.get("address").toString() : "";
+                                toAddr = toNodeData != null ? toNodeData.get("address").toString() : "";
+                            } else {
+                                // 支出侧路径，节点顺序与实际转账方向一致
+                                fromNodeData = nodeData.get(i);
+                                toNodeData = nodeData.get(i + 1);
+                                fromAddr = fromNodeData != null ? fromNodeData.get("address").toString() : "";
+                                toAddr = toNodeData != null ? toNodeData.get("address").toString() : "";
+                            }
                             
                             // 检查边是否已存在
                             boolean edgeExists = allEdgeList.stream()
@@ -689,8 +704,9 @@ public class GraphAddressService extends AbstractGraphService {
                 graphDic.put("tx_count", totalTxCount);
                 graphDic.put("first_tx_time", firstTime != null ? firstTime : "");
                 graphDic.put("latest_tx_time", latestTime != null ? latestTime : "");
-                graphDic.put("address_first_tx_time", addressFirstTime != null ? addressFirstTime : "");
-                graphDic.put("address_latest_tx_time", addressLatestTime != null ? addressLatestTime : "");
+                graphDic.put("address_first_tx_time", addressFirstTime != null ? GraphFormatUtils.parseAndFormatTimestamp(addressFirstTime) : "");
+                graphDic.put("address_latest_tx_time", addressLatestTime != null ? GraphFormatUtils.parseAndFormatTimestamp(addressLatestTime) : "");
+
 
                 Object nodeListObj = graphDic.get("node_list");
                 long nodeListSize = 0;
