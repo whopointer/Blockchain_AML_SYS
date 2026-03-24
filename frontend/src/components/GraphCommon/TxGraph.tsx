@@ -174,7 +174,17 @@ const TxGraph: React.FC<TxGraphProps> = ({
         ? new Date(useFilter.endDate).getTime()
         : Number.MAX_VALUE;
       byTx = byTx.filter((l) => {
-        const txTimestamp = new Date(l.tx_time).getTime();
+        let txTimestamp: number;
+        if (typeof l.tx_time === "string") {
+          if (l.tx_time.includes("-")) {
+            txTimestamp = new Date(l.tx_time).getTime();
+          } else {
+            txTimestamp = new Date(parseInt(l.tx_time)).getTime();
+          }
+        } else {
+          const numTime = Number(l.tx_time);
+          txTimestamp = numTime > 1e10 ? numTime : numTime * 1000;
+        }
         return txTimestamp >= startTimestamp && txTimestamp <= endTimestamp;
       });
     }
@@ -217,6 +227,14 @@ const TxGraph: React.FC<TxGraphProps> = ({
     useFilter.startDate,
     useFilter.endDate,
   ]);
+
+  // 当 nodes 或 links 发生变化时，清除之前保存的位置和缩放信息
+  useEffect(() => {
+    // 清除保存的节点位置
+    nodesWithPositionRef.current.clear();
+    // 重置缩放和拖动信息
+    transformRef.current = { x: 0, y: 0, k: 1 };
+  }, [nodes, links]);
 
   // 当 props 中的 nodes/links 更新时执行绘图
   useEffect(() => {

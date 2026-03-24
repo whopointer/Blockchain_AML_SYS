@@ -11,6 +11,7 @@ import { GraphSnapshot } from "./types";
 import { transactionApi } from "../../services/transaction/api";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
+import { formatEthValue } from "../../utils/ethUtils";
 
 interface GraphDisplayProps {
   selectedSnapshot: GraphSnapshot;
@@ -43,6 +44,23 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState<boolean>(false);
+  const [filterConfig, setFilterConfig] = useState<{
+    txType: "all" | "inflow" | "outflow";
+    addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: any;
+    endDate?: any;
+  }>(
+    selectedSnapshot.filterConfig || {
+      txType: "all",
+      addrType: "all",
+      minAmount: undefined,
+      maxAmount: undefined,
+      startDate: null,
+      endDate: null,
+    },
+  );
 
   useEffect(() => {
     const fetchGraphData = async () => {
@@ -95,15 +113,37 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
             // 查找对应的节点ID
             const fromNode = convertedNodes.find((n) => n.addr === edge.from);
             const toNode = convertedNodes.find((n) => n.addr === edge.to);
+            const rawTime = edge.tx_time || edge.timestamp;
+            const parsedTime = parseDateSafely(rawTime);
+
+            // 处理交易值 - 如果是ETH则从wei转换为eth
+            let processedVal = edge.val || edge.value || 0;
+            let processedLabel = edge.label || "";
+
+            // 检查是否是ETH交易（根据地址格式或其他特征判断）
+            const isEthTransaction =
+              edge.from?.startsWith("0x") || edge.to?.startsWith("0x");
+
+            if (isEthTransaction) {
+              // 将wei转换为eth
+              processedVal = parseFloat(formatEthValue(processedVal));
+              processedLabel =
+                processedLabel ||
+                `${formatEthValue(edge.val || edge.value || 0)} ETH`;
+            } else {
+              // BTC或其他货币，保持原样
+              processedLabel = processedLabel || `${processedVal}`;
+            }
 
             return {
               from: fromNode?.id || edge.from,
               to: toNode?.id || edge.to,
-              label: edge.label || `${edge.value || edge.val}`,
-              val: edge.val || edge.value || 0,
-              tx_time: dayjs
-                .unix(parseInt(edge.tx_time || edge.timestamp))
-                .format("YYYY-MM-DD HH:mm"),
+              label: processedLabel,
+              val: processedVal,
+              tx_time:
+                parsedTime && parsedTime.isValid()
+                  ? parsedTime.format("YYYY-MM-DD HH:mm")
+                  : "",
               tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
             };
           });
@@ -123,6 +163,21 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
 
     if (selectedSnapshot) {
       fetchGraphData();
+    }
+  }, [selectedSnapshot]);
+
+  useEffect(() => {
+    if (selectedSnapshot) {
+      setFilterConfig(
+        selectedSnapshot.filterConfig || {
+          txType: "all",
+          addrType: "all",
+          minAmount: undefined,
+          maxAmount: undefined,
+          startDate: null,
+          endDate: null,
+        },
+      );
     }
   }, [selectedSnapshot]);
 
@@ -150,6 +205,34 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
       default:
         return "未知";
     }
+  };
+
+  const parseDateSafely = (dateValue: any) => {
+    if (!dateValue) {
+      return null;
+    }
+
+    if (typeof dateValue === "number") {
+      const strValue = Math.floor(dateValue).toString();
+      if (strValue.length === 10 || strValue.length === 13) {
+        return dayjs.unix(dateValue);
+      } else {
+        return dayjs(dateValue);
+      }
+    }
+
+    if (typeof dateValue === "string") {
+      const parsedDate = dayjs(dateValue);
+      if (parsedDate.isValid()) {
+        return parsedDate;
+      }
+    }
+
+    return dayjs(dateValue);
+  };
+
+  const handleFilterChange = (newFilter: any) => {
+    setFilterConfig(newFilter);
   };
 
   return (
@@ -350,20 +433,13 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
       <div style={{ marginTop: 20 }}>
         <h3 style={{ color: "#ffffff", marginBottom: 16 }}>图谱筛选信息</h3>
         <TxGraphFilter
-          value={
-            selectedSnapshot.filterConfig
-              ? {
-                  ...selectedSnapshot.filterConfig,
-                  startDate: selectedSnapshot.filterConfig.startDate
-                    ? dayjs(selectedSnapshot.filterConfig.startDate)
-                    : null,
-                  endDate: selectedSnapshot.filterConfig.endDate
-                    ? dayjs(selectedSnapshot.filterConfig.endDate)
-                    : null,
-                }
-              : undefined
-          }
-          onChange={() => {}} // 禁用更改功能，只用于展示
+          value={{
+            ...filterConfig,
+            startDate: parseDateSafely(filterConfig.startDate),
+            endDate: parseDateSafely(filterConfig.endDate),
+          }}
+          onChange={handleFilterChange}
+          links={graphData.links}
         />
 
         <h3
@@ -389,29 +465,14 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               links={graphData.links}
               width={740}
               height={500}
-              filter={
-                selectedSnapshot.filterConfig
-                  ? {
-                      ...selectedSnapshot.filterConfig,
-                      startDate: selectedSnapshot.filterConfig.startDate
-                        ? dayjs(
-                            selectedSnapshot.filterConfig.startDate,
-                          ).toDate()
-                        : null,
-                      endDate: selectedSnapshot.filterConfig.endDate
-                        ? dayjs(selectedSnapshot.filterConfig.endDate).toDate()
-                        : null,
-                    }
-                  : {
-                      txType: "all" as const,
-                      addrType: "all" as const,
-                      minAmount: undefined,
-                      maxAmount: undefined,
-                      startDate: null,
-                      endDate: null,
-                    }
-              }
-              onFilterChange={() => {}} // 禁用更改功能，只用于展示
+              filter={{
+                ...filterConfig,
+                startDate:
+                  parseDateSafely(filterConfig.startDate)?.toDate() || null,
+                endDate:
+                  parseDateSafely(filterConfig.endDate)?.toDate() || null,
+              }}
+              onFilterChange={handleFilterChange}
             />
           ) : (
             <div

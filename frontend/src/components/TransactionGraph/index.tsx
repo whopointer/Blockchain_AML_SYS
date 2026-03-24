@@ -65,7 +65,11 @@ const TransactionGraph: React.FC = () => {
   const [filter, setFilter] = useState<{
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
-  }>({ txType: "all", addrType: "all" });
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: any;
+    endDate?: any;
+  }>({ txType: "all", addrType: "all", startDate: null, endDate: null });
 
   const fetchGraphData = async () => {
     const targetAddress = routeAddress || "";
@@ -141,9 +145,13 @@ const TransactionGraph: React.FC = () => {
             to: toNode?.id || edge.to,
             label: processedLabel,
             val: processedVal,
-            tx_time: dayjs
-              .unix(parseInt(edge.tx_time || edge.timestamp))
-              .format("YYYY-MM-DD HH:mm"),
+            tx_time: (() => {
+              const timeValue = edge.tx_time || edge.timestamp;
+              const value = timeValue as unknown as string | number;
+              return typeof value === "string" && value.includes("-")
+                ? value.substring(0, 16)
+                : dayjs(Number(value)).format("YYYY-MM-DD HH:mm");
+            })(),
             tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
           };
         });
@@ -151,31 +159,37 @@ const TransactionGraph: React.FC = () => {
         setGraphData({ nodes: convertedNodes, links: convertedLinks });
 
         // 设置地址信息 - 根据实际API响应结构调整
-        const firstTimeValue =
-          response.data.first_tx_time ||
+        const firstTimeValue: any =
           response.data.address_first_tx_time ||
+          response.data.first_tx_time ||
           Math.min(...edges.map((e: any) => e.timestamp));
-        const latestTimeValue =
-          response.data.latest_tx_time ||
+        const latestTimeValue: any =
           response.data.address_latest_tx_time ||
+          response.data.latest_tx_time ||
           Math.max(...edges.map((e: any) => e.timestamp));
 
         setAddressInfo({
           txCount: response.data.tx_count || edges.length, // 使用API返回的交易计数
-          firstTxTime: dayjs
-            .unix(
-              typeof firstTimeValue === "string"
-                ? parseInt(firstTimeValue)
-                : firstTimeValue,
-            )
-            .format("YYYY-MM-DD HH:mm"),
-          latestTxTime: dayjs
-            .unix(
-              typeof latestTimeValue === "string"
-                ? parseInt(latestTimeValue)
-                : latestTimeValue,
-            )
-            .format("YYYY-MM-DD HH:mm"),
+          firstTxTime: (() => {
+            const value = firstTimeValue as unknown as string | number;
+            if (typeof value === "string" && value.includes("-")) {
+              return value.substring(0, 16);
+            } else {
+              const timestamp =
+                typeof value === "string" ? parseInt(value) : Number(value);
+              return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
+            }
+          })(),
+          latestTxTime: (() => {
+            const value = latestTimeValue as unknown as string | number;
+            if (typeof value === "string" && value.includes("-")) {
+              return value.substring(0, 16);
+            } else {
+              const timestamp =
+                typeof value === "string" ? parseInt(value) : Number(value);
+              return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
+            }
+          })(),
         });
 
         message.success("图谱数据加载成功");
@@ -279,6 +293,24 @@ const TransactionGraph: React.FC = () => {
             ? "MEDIUM"
             : "HIGH";
 
+      // 转换时间为UTC+8
+      const convertToUTC8 = (date: any) => {
+        if (!date) return null;
+        // 创建一个新的Date对象
+        const d = new Date(date);
+        // 转换为UTC+8时间（加上8小时）
+        const utc8Time = d.getTime() + 8 * 60 * 60 * 1000;
+        const utc8Date = new Date(utc8Time);
+        // 转换为ISO字符串
+        return utc8Date.toISOString();
+      };
+
+      const filterConfigWithUTC8 = {
+        ...filter,
+        startDate: convertToUTC8(filter.startDate),
+        endDate: convertToUTC8(filter.endDate),
+      };
+
       // 构建快照请求数据
       const snapshotRequest = {
         title: snapshotData.title,
@@ -289,7 +321,7 @@ const TransactionGraph: React.FC = () => {
         riskLevel: backendRiskLevel,
         centerAddress,
         hops: searchHops,
-        filterConfig: filter,
+        filterConfig: filterConfigWithUTC8,
       };
 
       // 调用后端API创建快照

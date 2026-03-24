@@ -18,7 +18,7 @@ interface FilterValue {
 interface Props {
   value?: FilterValue;
   onChange?: (v: FilterValue) => void;
-  links?: LinkItem[]; // transaction links used for computing time range
+  links?: LinkItem[];
 }
 
 const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
@@ -29,10 +29,42 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // derive earliest/latest times from provided link data; fall back to now when missing
+  const parseLinkTimeSafely = (timeValue: any) => {
+    if (!timeValue) {
+      return dayjs();
+    }
+
+    if (typeof timeValue === "number") {
+      const strValue = Math.floor(timeValue).toString();
+      if (strValue.length === 10 || strValue.length === 13) {
+        return dayjs.unix(timeValue);
+      } else {
+        return dayjs(timeValue);
+      }
+    }
+
+    if (typeof timeValue === "string") {
+      // 处理 ISO 8601 和其他标准格式
+      if (timeValue.includes(" ")) {
+        const parsedDate = dayjs(timeValue, "YYYY-MM-DD HH:mm");
+        if (parsedDate.isValid()) {
+          return parsedDate;
+        }
+      }
+      // 尝试直接解析
+      const parsedDate = dayjs(timeValue);
+      if (parsedDate.isValid() && parsedDate.year() > 1970) {
+        return parsedDate;
+      }
+      return dayjs(timeValue);
+    }
+
+    return dayjs(timeValue);
+  };
+
   const { firstTxTime, latestTxTime } = useMemo(() => {
     if (links && links.length > 0) {
-      const times = links.map((l) => dayjs(l.tx_time));
+      const times = links.map((l) => parseLinkTimeSafely(l.tx_time));
       const sorted = times.sort((a, b) => a.valueOf() - b.valueOf());
       return {
         firstTxTime: sorted[0],
@@ -146,9 +178,13 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
         debouncedOnChange({ ...currentFilterValue, startDate: null });
         return;
       }
-      const startOfDay = date.startOf("day");
       const currentFilterValue = value || defaultValue;
-      debouncedOnChange({ ...currentFilterValue, startDate: startOfDay });
+      // 保持原始时间，仅更新日期部分
+      const newDate = date
+        .hour(date.hour())
+        .minute(date.minute())
+        .second(date.second());
+      debouncedOnChange({ ...currentFilterValue, startDate: newDate });
     },
     [value, defaultValue, debouncedOnChange],
   );
@@ -160,9 +196,13 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
         debouncedOnChange({ ...currentFilterValue, endDate: null });
         return;
       }
-      const endOfDay = date.endOf("day");
       const currentFilterValue = value || defaultValue;
-      debouncedOnChange({ ...currentFilterValue, endDate: endOfDay });
+      // 保持原始时间，仅更新日期部分
+      const newDate = date
+        .hour(date.hour())
+        .minute(date.minute())
+        .second(date.second());
+      debouncedOnChange({ ...currentFilterValue, endDate: newDate });
     },
     [value, defaultValue, debouncedOnChange],
   );
@@ -277,7 +317,8 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
                     placeholder="起始日期"
                     value={value?.startDate || null}
                     onChange={handleStartDateChange}
-                    format="YYYY-MM-DD"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    showTime
                     style={{ width: "100%" }}
                   />
                 </Col>
@@ -286,7 +327,8 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
                     placeholder="结束日期"
                     value={value?.endDate || null}
                     onChange={handleEndDateChange}
-                    format="YYYY-MM-DD"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    showTime
                     style={{ width: "100%" }}
                   />
                 </Col>

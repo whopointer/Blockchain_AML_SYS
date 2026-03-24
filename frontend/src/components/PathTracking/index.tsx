@@ -46,7 +46,11 @@ const PathTracking: React.FC = () => {
   const [filter, setFilter] = useState<{
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
-  }>({ txType: "all", addrType: "all" });
+    minAmount?: number;
+    maxAmount?: number;
+    startDate?: any;
+    endDate?: any;
+  }>({ txType: "all", addrType: "all", startDate: null, endDate: null });
 
   const [showSearchBoxOnly, setShowSearchBoxOnly] = useState<boolean>(
     !urlFromAddress || !urlToAddress,
@@ -237,6 +241,24 @@ const PathTracking: React.FC = () => {
             ? "MEDIUM"
             : "HIGH";
 
+      // 转换时间为UTC+8
+      const convertToUTC8 = (date: any) => {
+        if (!date) return null;
+        // 创建一个新的Date对象
+        const d = new Date(date);
+        // 转换为UTC+8时间（加上8小时）
+        const utc8Time = d.getTime() + 8 * 60 * 60 * 1000;
+        const utc8Date = new Date(utc8Time);
+        // 转换为ISO字符串
+        return utc8Date.toISOString();
+      };
+
+      const filterConfigWithUTC8 = {
+        ...filter,
+        startDate: convertToUTC8(filter.startDate),
+        endDate: convertToUTC8(filter.endDate),
+      };
+
       const snapshotRequest = {
         title: snapshotData.title,
         description: snapshotData.description,
@@ -247,7 +269,7 @@ const PathTracking: React.FC = () => {
         riskLevel: backendRiskLevel,
         fromAddress: urlFromAddress || "",
         toAddress: urlToAddress || "",
-        filterConfig: filter,
+        filterConfig: filterConfigWithUTC8,
       };
 
       const response = await graphSnapshotApi.createSnapshot(snapshotRequest);
