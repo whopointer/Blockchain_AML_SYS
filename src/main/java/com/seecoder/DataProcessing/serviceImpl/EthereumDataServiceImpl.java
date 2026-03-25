@@ -665,7 +665,7 @@ public class EthereumDataServiceImpl implements EthereumDataService {
 
     // ============= 3. 定时同步 =============
 
-    @Scheduled(fixedDelay = 3000000) // 每5分钟执行一次
+    @Scheduled(cron = "0 0 4 * * ?") // 每5分钟执行一次
     @Transactional
     public void scheduledSyncLatestData() {
         try {

@@ -511,7 +511,7 @@ public class BitcoinDataServiceImpl implements BitcoinDataService {
 
     // ============= 3. 定时同步 =============
 
-    @Scheduled(fixedDelay = 300000)
+    @Scheduled(cron = "0 0 4 * * ?")
     @Transactional
     public void scheduledSyncLatestData() {
         try {

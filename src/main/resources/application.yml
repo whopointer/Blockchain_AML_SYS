@@ -83,3 +83,9 @@ server:
 proxy:
   host: 127.0.0.1
   port: 7897
+
+# application.yml 配置示例
+blacklist:
+  file: src/data/sdn.csv
+whitelist:
+  file: src/data/whitelist.csv
