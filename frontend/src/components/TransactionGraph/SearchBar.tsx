@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Select, Input, Button } from "antd";
+import { Select, Input, Button, message } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 
 interface SearchBarProps {
@@ -8,6 +8,55 @@ interface SearchBarProps {
   defaultAddress?: string;
   defaultHops?: number;
 }
+
+// 以太坊地址校验
+const isValidEthAddress = (address: string): boolean => {
+  // 以太坊地址：0x 开头，后跟 40 位十六进制字符
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
+
+// 比特币地址校验（支持 P2PKH, P2SH, Bech32）
+const isValidBtcAddress = (address: string): boolean => {
+  // P2PKH: 1 开头，26-35 位
+  // P2SH: 3 开头，26-35 位
+  // Bech32: bc1 开头
+  return (
+    /^1[a-zA-Z0-9]{25,34}$/.test(address) ||
+    /^3[a-zA-Z0-9]{25,34}$/.test(address) ||
+    /^bc1[a-zA-Z0-9]{6,87}$/i.test(address)
+  );
+};
+
+// ENS 域名校验
+const isValidEns = (address: string): boolean => {
+  // ENS: 以 .eth 结尾
+  return /^[a-zA-Z0-9-]+\.eth$/i.test(address);
+};
+
+// 综合地址校验
+const validateAddress = (crypto: string, address: string): string | null => {
+  if (!address || address.trim() === "") {
+    return "请输入钱包地址";
+  }
+
+  const trimmedAddress = address.trim();
+
+  if (crypto === "ETH") {
+    // ETH 支持地址和 ENS
+    if (isValidEns(trimmedAddress)) {
+      return null; // ENS 域名有效
+    }
+    if (!isValidEthAddress(trimmedAddress)) {
+      return "请输入有效的以太坊地址（0x 开头，40位十六进制）或 ENS 域名";
+    }
+  } else if (crypto === "BTC") {
+    if (!isValidBtcAddress(trimmedAddress)) {
+      return "请输入有效的比特币地址（以 1、3 或 bc1 开头）";
+    }
+  }
+
+  return null;
+};
 
 const SearchBar: React.FC<SearchBarProps> = ({
   defaultCrypto = "BTC",
@@ -18,11 +67,21 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [crypto, setCrypto] = React.useState<string>(defaultCrypto);
   const [address, setAddress] = React.useState<string>(defaultAddress);
   const [hops, setHops] = React.useState<number>(defaultHops);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleSearch = () => {
-    if (!address) return;
+    const trimmedAddress = address.trim();
+    const validationError = validateAddress(crypto, trimmedAddress);
+
+    if (validationError) {
+      setError(validationError);
+      message.error(validationError);
+      return;
+    }
+
+    setError(null);
     navigate(
-      `/transaction-graph/${crypto.toLowerCase()}/${address}?hops=${hops}`,
+      `/transaction-graph/${crypto.toLowerCase()}/${trimmedAddress}?hops=${hops}`,
     );
   };
 
@@ -44,7 +103,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
     >
       <Select
         value={crypto}
-        onChange={setCrypto}
+        onChange={(value) => {
+          setCrypto(value);
+          setError(null);
+        }}
         style={{
           width: 120,
           borderTopRightRadius: 0,
@@ -57,10 +119,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
         size="large"
       />
       <Input
-        placeholder="输入钱包地址 / ENS"
+        placeholder={
+          crypto === "ETH" ? "输入以太坊地址 / ENS" : "输入比特币地址"
+        }
         value={address}
-        onChange={(e) => setAddress(e.target.value)}
+        onChange={(e) => {
+          setAddress(e.target.value);
+          setError(null);
+        }}
         onKeyPress={handleKeyPress}
+        status={error ? "error" : undefined}
         style={{
           flex: 1,
           borderTopLeftRadius: 0,

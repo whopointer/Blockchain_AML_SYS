@@ -195,6 +195,17 @@ const PathTracking: React.FC = () => {
         });
 
         setGraphData({ nodes: convertedNodes, links: convertedLinks });
+
+        // 数据更新时重置筛选条件
+        setFilter({
+          txType: "all",
+          addrType: "all",
+          minAmount: undefined,
+          maxAmount: undefined,
+          startDate: null,
+          endDate: null,
+        });
+
         message.success("路径数据加载成功");
       } else {
         message.error(`路径数据加载失败: ${response.msg}`);

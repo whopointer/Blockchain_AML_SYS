@@ -158,6 +158,16 @@ const TransactionGraph: React.FC = () => {
 
         setGraphData({ nodes: convertedNodes, links: convertedLinks });
 
+        // 数据更新时重置筛选条件
+        setFilter({
+          txType: "all",
+          addrType: "all",
+          minAmount: undefined,
+          maxAmount: undefined,
+          startDate: null,
+          endDate: null,
+        });
+
         // 设置地址信息 - 根据实际API响应结构调整
         const firstTimeValue: any =
           response.data.address_first_tx_time ||
