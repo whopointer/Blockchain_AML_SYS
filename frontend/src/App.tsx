@@ -100,27 +100,106 @@ function App() {
       </Navbar>
 
       <Container fluid className="mt-5 pt-4">
-        <Row className="justify-content-center">
-          <Col xl={10} lg={11} md={12}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/prediction" element={<DashboardPage />} />
-              <Route path="/batch" element={<DashboardPage />} />
-              <Route path="/trace" element={<DashboardPage />} />
-              <Route path="/transaction-graph" element={<TransactionGraph />} />
-              <Route
-                path="/transaction-graph/:crypto/:address"
-                element={<TransactionGraph />}
-              />
-              <Route path="/case-details" element={<CaseDetails />} />
-              <Route path="/path-tracking" element={<PathTracking />} />
-              <Route path="/path-tracking/:crypto" element={<PathTracking />} />
-              {/* 处理无效路径 */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Col>
-        </Row>
+        <Routes>
+          {/* 仪表板相关页面保持原有宽度限制 */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/dashboard"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={11} md={12}>
+                  <DashboardPage />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/prediction"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={11} md={12}>
+                  <DashboardPage />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/batch"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={11} md={12}>
+                  <DashboardPage />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/trace"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={11} md={12}>
+                  <DashboardPage />
+                </Col>
+              </Row>
+            }
+          />
+
+          <Route
+            path="/transaction-graph"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={12} md={12}>
+                  <TransactionGraph />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/transaction-graph/:crypto/:address"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={12} lg={12} md={12}>
+                  <TransactionGraph />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/path-tracking"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={12} md={12}>
+                  <PathTracking />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/path-tracking/:crypto"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={12} lg={12} md={12}>
+                  <PathTracking />
+                </Col>
+              </Row>
+            }
+          />
+
+          {/* 案件详情页面使用全屏宽度 */}
+          <Route
+            path="/case-details"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={20} lg={18} md={14}>
+                  <CaseDetails />
+                </Col>
+              </Row>
+            }
+          />
+
+          {/* 处理无效路径 */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </Container>
     </div>
   );

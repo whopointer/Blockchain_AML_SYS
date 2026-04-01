@@ -1,5 +1,12 @@
 import { Dayjs } from "dayjs";
 
+export interface CaseComment {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface GraphSnapshot {
   id: string;
   title: string;
@@ -9,6 +16,8 @@ export interface GraphSnapshot {
   nodeCount: number;
   linkCount: number;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  archived?: boolean;
+  comments?: CaseComment[];
   centerAddress?: string;
   fromAddress?: string;
   toAddress?: string;
@@ -34,16 +43,93 @@ export interface FilterConfig {
   dateRange: [Dayjs | null, Dayjs | null];
 }
 
+export type CaseStatusFilter = "ALL" | "ACTIVE" | "ARCHIVED";
+
+// 案件管理相关类型
+export interface Case {
+  id: string;
+  title: string;
+  description: string;
+  status: "ACTIVE" | "ARCHIVED" | "CLOSED";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  tags: string[];
+  createTime: Dayjs | string;
+  updateTime: Dayjs | string;
+  assignedTo?: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  relatedSnapshots?: string[];
+  comments?: CaseComment[];
+}
+
+export interface CaseFilterConfig {
+  keyword: string;
+  status: "ALL" | "ACTIVE" | "ARCHIVED" | "CLOSED";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "";
+  tags: string[];
+  dateRange: [Dayjs | null, Dayjs | null];
+}
+
+// 订阅相关类型
+export interface SubscribedNode {
+  id: string;
+  address: string;
+  label?: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  tags: string[];
+  remark: string;
+  subscribedAt: Dayjs | string;
+  lastActivity?: Dayjs | string;
+  alertEnabled: boolean;
+  relatedCases?: string[];
+}
+
+export interface SubscribedTransaction {
+  id: string;
+  txHash: string;
+  fromAddress: string;
+  toAddress: string;
+  amount: string;
+  token: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  tags: string[];
+  remark: string;
+  subscribedAt: Dayjs | string;
+  txTime?: Dayjs | string;
+  alertEnabled: boolean;
+  relatedCases?: string[];
+}
+
+export interface SubscriptionFilter {
+  keyword: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "";
+  tags: string[];
+  alertOnly: boolean;
+}
+
+// 侧边栏菜单项
+export type MenuKey = "case-management" | "graph-snapshot" | "subscription";
+
+export interface SidebarProps {
+  activeKey: MenuKey;
+  onMenuSelect: (key: MenuKey) => void;
+  collapsed?: boolean;
+}
+
+// 图谱快照表格 Props
 export interface SnapshotTableProps {
-  snapshots: GraphSnapshot[];
   filteredSnapshots: GraphSnapshot[];
+  snapshots: GraphSnapshot[];
   loading: boolean;
   filterConfig: FilterConfig;
+  statusFilter: CaseStatusFilter;
   allTags: string[];
   onFilterChange: (config: FilterConfig) => void;
+  onStatusFilterChange?: (status: CaseStatusFilter) => void;
   onViewSnapshot: (snapshot: GraphSnapshot) => void;
+  onDownloadSnapshot?: (snapshot: GraphSnapshot) => void;
   onDeleteSnapshot: (snapshot: GraphSnapshot) => void;
-  onDownloadSnapshot: (snapshot: GraphSnapshot) => void;
+  onToggleArchive: (snapshot: GraphSnapshot) => void;
   onClearFilters: () => void;
   onExportPDF?: (snapshot: GraphSnapshot) => void;
   editingField?: string | null;

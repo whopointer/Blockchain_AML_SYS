@@ -395,8 +395,8 @@ const TransactionGraph: React.FC = () => {
             bodyStyle={{ padding: 16 }}
           >
             {/* 图表内容 */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ flex: 1, position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
+              <div style={{ flex: 1, minWidth: "500px", position: "relative" }}>
                 {dimensions && !isError ? (
                   <TxGraph
                     nodes={graphData.nodes}
@@ -452,8 +452,8 @@ const TransactionGraph: React.FC = () => {
               <div
                 style={{
                   width: "400px",
-                  minWidth: "400px",
-                  marginLeft: 20,
+                  minWidth: "300px",
+                  maxWidth: "500px",
                   position: "relative",
                 }}
               >

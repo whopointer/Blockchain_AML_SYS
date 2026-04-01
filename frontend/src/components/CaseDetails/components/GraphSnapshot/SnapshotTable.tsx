@@ -15,9 +15,10 @@ import {
   EyeOutlined,
   ClearOutlined,
   FilePdfOutlined,
+  InboxOutlined,
+  UndoOutlined,
 } from "@ant-design/icons";
-import { GraphSnapshot, SnapshotTableProps } from "./types";
-import LoadingOverlay from "./LoadingOverlay";
+import { GraphSnapshot, SnapshotTableProps } from "../../types";
 
 const { Search } = Input;
 
@@ -25,13 +26,14 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
   filteredSnapshots,
   loading,
   filterConfig,
+  statusFilter,
   allTags,
   onFilterChange,
+  onStatusFilterChange,
   onViewSnapshot,
   onDeleteSnapshot,
-  onDownloadSnapshot,
+  onToggleArchive,
   onClearFilters,
-  onExportPDF,
 }) => {
   const [searchValue, setSearchValue] = useState(filterConfig.title || "");
   const searchDebounceRef = useRef<number | null>(null);
@@ -53,6 +55,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
       }
     };
   }, [searchValue, filterConfig, onFilterChange]);
+
   const getRiskLevelColor = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
       case "HIGH":
@@ -97,8 +100,8 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
         const addressText = record.centerAddress
           ? record.centerAddress
           : record.fromAddress && record.toAddress
-            ? `${record.fromAddress} → ${record.toAddress}`
-            : "";
+          ? `${record.fromAddress} → ${record.toAddress}`
+          : "";
         return (
           <span style={{ fontSize: 12, fontFamily: "monospace" }}>
             {addressText}
@@ -123,7 +126,6 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
       key: "createTime",
       width: "15%",
       render: (date: any) => {
-        // 处理日期格式
         if (typeof date === "string") {
           return new Date(date).toLocaleString();
         }
@@ -147,9 +149,9 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
           <Button
             type="text"
             size="small"
-            icon={<FilePdfOutlined />}
-            onClick={() => onExportPDF && onExportPDF(record)}
-            title="导出PDF"
+            icon={record.archived ? <UndoOutlined /> : <InboxOutlined />}
+            onClick={() => onToggleArchive(record)}
+            title={record.archived ? "取消归档" : "归档案件"}
           />
           <Button
             type="text"
@@ -164,7 +166,6 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
     },
   ];
 
-  // 骨架屏渲染
   const renderSkeleton = () => (
     <div style={{ padding: "20px" }}>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -186,13 +187,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
   );
 
   return (
-    <div className="case-details-container" style={{ position: "relative" }}>
-      {/* 全屏 loading 遮罩 */}
-      <LoadingOverlay
-        loading={loading && filteredSnapshots.length === 0}
-        text="正在加载案件数据..."
-      />
-
+    <div style={{ position: "relative" }}>
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>
           <Search
@@ -202,7 +197,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
             enterButton
           />
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={5}>
           <Select
             style={{ width: "100%" }}
             placeholder="风险等级"
@@ -217,7 +212,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
             <Select.Option value="LOW">低风险</Select.Option>
           </Select>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={5}>
           <Select
             mode="multiple"
             style={{ width: "100%" }}
@@ -234,7 +229,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
             ))}
           </Select>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={5}>
           <Button
             type="default"
             icon={<ClearOutlined />}

@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, Button } from "antd";
-import { GraphSnapshot } from "./types";
+import { GraphSnapshot } from "../../types";
 
 interface DeleteModalProps {
   visible: boolean;

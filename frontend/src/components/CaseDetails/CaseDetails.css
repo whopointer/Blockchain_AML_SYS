@@ -1,227 +1,168 @@
-/* 案件详情页样式 */
+/* CaseDetails 主样式 */
 
-.case-details-container {
-  padding: 20px;
-  min-height: 100vh;
+.case-details-layout {
+  background: #f5f5f5;
+  min-height: calc(100vh - 120px);
 }
 
-.case-details-header {
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--primary-color);
-  padding-bottom: 16px;
+/* 侧边栏样式 */
+.case-sidebar {
+  background: #fff;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
 }
 
-.case-details-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-color);
+/* 内容区域 */
+.case-content {
+  padding: 24px;
+  overflow: auto;
 }
 
-.case-details-header p {
-  margin-top: 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-/* 过滤区域 */
-.filter-section {
-  padding: 16px;
-  border-radius: var(--border-radius);
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  margin-bottom: 20px;
-}
-
-.filter-section-title {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-
-.filter-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-row > * {
-  flex: 1;
-  min-width: 200px;
+/* 通用卡片样式 */
+.case-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 /* 统计卡片 */
-.stat-card {
+.case-stat-card {
   text-align: center;
-  padding: 16px;
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
-  background: var(--card-bg);
-  transition: all 0.3s ease;
+  border-radius: 8px;
 }
 
-.stat-card:hover {
-  box-shadow: var(--shadow-medium);
-}
-
-.stat-card-value {
-  font-size: 24px;
+.case-stat-value {
+  font-size: 32px;
   font-weight: 600;
+  color: #667eea;
   line-height: 1;
   margin-bottom: 8px;
 }
 
-.stat-card-label {
-  font-size: 12px;
-  color: var(--text-muted);
+.case-stat-label {
+  font-size: 14px;
+  color: #666;
 }
 
-.stat-card.high-risk .stat-card-value {
-  color: var(--danger-color);
+/* 高风险统计 */
+.case-stat-card.high-risk .case-stat-value {
+  color: #ff4d4f;
 }
 
-.stat-card.medium-risk .stat-card-value {
-  color: var(--warning-color);
+/* 中风险统计 */
+.case-stat-card.medium-risk .case-stat-value {
+  color: #faad14;
 }
 
-.stat-card.total .stat-card-value {
-  color: var(--primary-color);
+/* 筛选区域 */
+.case-filter-section {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
 /* 表格样式 */
-.case-details-table {
-  margin-top: 16px;
-  background: var(--card-bg);
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
-  overflow: hidden;
+.case-table {
+  background: #fff;
 }
 
-.case-details-table :global(.ant-table) {
-  font-size: 13px;
-  background: transparent;
-}
-
-.case-details-table :global(.ant-table-thead > tr > th) {
-  font-weight: 600;
-  background: #fafafa;
-  border-bottom: 2px solid var(--border-color);
-  color: var(--text-color);
-}
-
-.case-details-table :global(.ant-table-cell) {
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-color);
-}
-
-.case-details-table :global(.ant-table-row) {
-  transition: background 0.3s ease;
-}
-
-.case-details-table :global(.ant-table-row:hover > td) {
-  background-color: #f5f5f5;
-}
-
-/* 地址显示 */
-.address-text {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 12px;
-  color: var(--primary-color);
-  word-break: break-all;
-}
-
-/* 标签样式 */
-.snapshot-tag {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: var(--border-radius);
-}
-
-/* 抽屉样式 */
-.snapshot-drawer :global(.ant-drawer-body) {
-  padding: 24px;
-}
-
-.snapshot-details-section {
-  margin-bottom: 24px;
-}
-
-.snapshot-details-section h4 {
-  margin: 0 0 12px 0;
-  font-weight: 600;
+/* 状态标签 */
+.case-status-badge {
+  display: inline-flex;
+  align-items: center;
   font-size: 14px;
 }
 
-/* 空状态 */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-muted);
+.case-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  display: inline-block;
 }
 
-/* 操作按钮 */
-.action-buttons {
-  display: flex;
-  gap: 8px;
+.case-status-active {
+  color: #52c41a;
 }
 
-.action-buttons :global(.ant-btn) {
-  padding: 4px 8px;
-  font-size: 12px;
+.case-status-active .case-status-dot {
+  background: #52c41a;
 }
 
-/* 描述列表样式 */
-:global(.ant-descriptions-bordered) {
+.case-status-archived {
+  color: #8c8c8c;
+}
+
+.case-status-archived .case-status-dot {
+  background: #8c8c8c;
+}
+
+.case-status-closed {
+  color: #ff4d4f;
+}
+
+.case-status-closed .case-status-dot {
+  background: #ff4d4f;
+}
+
+/* 详情区域 */
+.case-detail-section {
+  margin-bottom: 24px;
+}
+
+.case-detail-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+/* 评论列表 */
+.case-comments-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.case-comment-item {
+  padding: 12px;
+  background: #f5f5f5;
   border-radius: 8px;
+  margin-bottom: 8px;
 }
 
-/* 主要卡片样式 */
-.case-details-card {
-  border-radius: var(--border-radius) !important;
-  box-shadow: var(--shadow-soft) !important;
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color) !important;
-  background: var(--card-bg) !important;
+.case-comment-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
-.case-details-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-medium) !important;
+.case-comment-author {
+  font-weight: 500;
+  margin-right: 8px;
 }
 
-/* 头部描述样式 */
-.case-details-header-description {
-  margin-top: 8px !important;
+.case-comment-time {
+  font-size: 12px;
+  color: #999;
 }
 
-/* 响应式设计 */
+.case-comment-content {
+  color: #333;
+  line-height: 1.5;
+}
+
+/* 抽屉样式 */
+.case-detail-drawer .ant-drawer-body {
+  padding: 24px;
+}
+
+/* 响应式 */
 @media (max-width: 768px) {
-  .filter-row {
-    flex-direction: column;
-  }
-
-  .filter-row > * {
-    min-width: auto;
-  }
-
-  .case-details-container {
+  .case-content {
     padding: 12px;
   }
-
-  .stat-card {
-    margin-bottom: 12px;
-  }
-
-  .case-details-table :global(.ant-table) {
-    font-size: 12px;
-  }
-
-  /* 添加移动端优化 */
-  .case-details-header h2 {
-    font-size: 20px;
-  }
-
-  .stat-card-value {
-    font-size: 20px;
+  
+  .case-stat-value {
+    font-size: 24px;
   }
 }
