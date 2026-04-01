@@ -21,6 +21,9 @@ const CaseDetails: React.FC = () => {
   const [selectedSnapshot, setSelectedSnapshot] =
     useState<GraphSnapshot | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [exportPendingSnapshotId, setExportPendingSnapshotId] = useState<
+    string | null
+  >(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [snapshotToDelete, setSnapshotToDelete] =
     useState<GraphSnapshot | null>(null);
@@ -33,20 +36,36 @@ const CaseDetails: React.FC = () => {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>(null);
 
+  const getSnapshotMainAddress = (snapshot: GraphSnapshot) => {
+    if (snapshot.centerAddress) {
+      return snapshot.centerAddress;
+    }
+    if (snapshot.fromAddress && snapshot.toAddress) {
+      return `${snapshot.fromAddress} → ${snapshot.toAddress}`;
+    }
+    return "";
+  };
+
   const filterSnapshots = useCallback(() => {
     let filtered = snapshots;
 
-    // 按标题过滤
+    // 按标题或主地址过滤
     if (filterConfig.title) {
-      filtered = filtered.filter((snapshot) =>
-        snapshot.title.toLowerCase().includes(filterConfig.title.toLowerCase()),
-      );
+      const keyword = filterConfig.title.toLowerCase();
+      filtered = filtered.filter((snapshot) => {
+        const mainAddress = getSnapshotMainAddress(snapshot).toLowerCase();
+        return (
+          snapshot.title.toLowerCase().includes(keyword) ||
+          mainAddress.includes(keyword)
+        );
+      });
     }
 
     // 按风险等级过滤
     if (filterConfig.riskLevel) {
+      const normalizedRisk = filterConfig.riskLevel.toUpperCase();
       filtered = filtered.filter(
-        (snapshot) => snapshot.riskLevel === filterConfig.riskLevel,
+        (snapshot) => snapshot.riskLevel === normalizedRisk,
       );
     }
 
@@ -86,48 +105,47 @@ const CaseDetails: React.FC = () => {
     filterSnapshots();
   }, [filterSnapshots]);
 
-  const loadSnapshots = () => {
+  const loadSnapshots = async () => {
     setLoading(true);
     try {
       // 调用API获取快照数据
-      graphSnapshotApi.getSnapshots().then((response) => {
-        if (response.success) {
-          // 转换日期字符串为 dayjs 对象
-          const parsedSnapshots = response.data.map((snapshot: any) => {
-            const convertedSnapshot = {
-              ...snapshot,
-              createTime:
-                typeof snapshot.createTime === "string"
-                  ? dayjs(snapshot.createTime)
-                  : snapshot.createTime,
+      const response = await graphSnapshotApi.getSnapshots();
+      if (response.success) {
+        // 转换日期字符串为 dayjs 对象
+        const parsedSnapshots = response.data.map((snapshot: any) => {
+          const convertedSnapshot = {
+            ...snapshot,
+            createTime:
+              typeof snapshot.createTime === "string"
+                ? dayjs(snapshot.createTime)
+                : snapshot.createTime,
+          };
+
+          // 如果存在filterConfig，则转换其中的日期
+          if (convertedSnapshot.filterConfig) {
+            convertedSnapshot.filterConfig = {
+              ...convertedSnapshot.filterConfig,
+              startDate: snapshot.filterConfig.startDate
+                ? typeof snapshot.filterConfig.startDate === "string"
+                  ? dayjs(snapshot.filterConfig.startDate)
+                  : snapshot.filterConfig.startDate
+                : null,
+              endDate: snapshot.filterConfig.endDate
+                ? typeof snapshot.filterConfig.endDate === "string"
+                  ? dayjs(snapshot.filterConfig.endDate)
+                  : snapshot.filterConfig.endDate
+                : null,
             };
+          }
 
-            // 如果存在filterConfig，则转换其中的日期
-            if (convertedSnapshot.filterConfig) {
-              convertedSnapshot.filterConfig = {
-                ...convertedSnapshot.filterConfig,
-                startDate: snapshot.filterConfig.startDate
-                  ? typeof snapshot.filterConfig.startDate === "string"
-                    ? dayjs(snapshot.filterConfig.startDate)
-                    : snapshot.filterConfig.startDate
-                  : null,
-                endDate: snapshot.filterConfig.endDate
-                  ? typeof snapshot.filterConfig.endDate === "string"
-                    ? dayjs(snapshot.filterConfig.endDate)
-                    : snapshot.filterConfig.endDate
-                  : null,
-              };
-            }
+          return convertedSnapshot;
+        });
 
-            return convertedSnapshot;
-          });
-
-          setSnapshots(parsedSnapshots);
-          setFilteredSnapshots(parsedSnapshots);
-        } else {
-          message.error(response.msg || "加载快照失败");
-        }
-      });
+        setSnapshots(parsedSnapshots);
+        setFilteredSnapshots(parsedSnapshots);
+      } else {
+        message.error(response.msg || "加载快照失败");
+      }
     } catch (error) {
       console.error("加载快照失败:", error);
       message.error("加载快照失败");
@@ -139,6 +157,16 @@ const CaseDetails: React.FC = () => {
   const handleViewSnapshot = (snapshot: GraphSnapshot) => {
     setSelectedSnapshot(snapshot);
     setDrawerVisible(true);
+  };
+
+  const handleExportPDF = (snapshot: GraphSnapshot) => {
+    setSelectedSnapshot(snapshot);
+    setDrawerVisible(true);
+    setExportPendingSnapshotId(snapshot.id);
+  };
+
+  const handleAutoExportComplete = () => {
+    setExportPendingSnapshotId(null);
   };
 
   const handleDeleteSnapshot = (snapshot: GraphSnapshot) => {
@@ -316,6 +344,7 @@ const CaseDetails: React.FC = () => {
             onDownloadSnapshot={handleDownloadSnapshot}
             onDeleteSnapshot={handleDeleteSnapshot}
             onClearFilters={handleClearFilters}
+            onExportPDF={handleExportPDF}
             editingField={editingField}
             tempValue={tempValue}
             startEditing={startEditing}
@@ -345,6 +374,8 @@ const CaseDetails: React.FC = () => {
               startEditing={startEditing}
               saveEdit={saveEdit}
               cancelEdit={cancelEdit}
+              exportPendingSnapshotId={exportPendingSnapshotId}
+              onAutoExportComplete={handleAutoExportComplete}
             />
           )}
         </Drawer>

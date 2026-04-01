@@ -1,9 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { Tag, Space, Button, Descriptions, Input, Select, Spin } from "antd";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
-  DownloadOutlined,
+  Tag,
+  Space,
+  Button,
+  Descriptions,
+  Input,
+  Select,
+  Spin,
+  message,
+} from "antd";
+import {
+  CopyOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
+  FilePdfOutlined,
+  FileExcelOutlined,
+  PictureOutlined,
 } from "@ant-design/icons";
 import TxGraph from "../GraphCommon/TxGraph";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
@@ -12,6 +25,14 @@ import { transactionApi } from "../../services/transaction/api";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
 import { formatEthValue } from "../../utils/ethUtils";
+import {
+  generatePDFReport,
+  exportFullGraphToPNG,
+  convertGraphToCSV,
+  downloadCSV,
+  exportCasePackage,
+} from "../../utils/exportUtils";
+import ErrorPlaceholder from "../GraphCommon/ErrorPlaceholder";
 
 interface GraphDisplayProps {
   selectedSnapshot: GraphSnapshot;
@@ -24,6 +45,8 @@ interface GraphDisplayProps {
   startEditing: (field: string, currentValue: any) => void;
   saveEdit: (snapshotId: string, field: string) => void;
   cancelEdit: () => void;
+  exportPendingSnapshotId?: string | null;
+  onAutoExportComplete?: () => void;
 }
 
 const GraphDisplay: React.FC<GraphDisplayProps> = ({
@@ -37,13 +60,22 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   startEditing,
   saveEdit,
   cancelEdit,
+  exportPendingSnapshotId,
+  onAutoExportComplete,
 }) => {
+  const [exportLoading, setExportLoading] = useState<{
+    pdf: boolean;
+    csv: boolean;
+    png: boolean;
+    package: boolean;
+  }>({ pdf: false, csv: false, png: false, package: false });
   const [graphData, setGraphData] = useState<{
     nodes?: NodeItem[];
     links?: LinkItem[];
   }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState<boolean>(false);
+  const autoExportTriggeredRef = useRef(false);
   const [filterConfig, setFilterConfig] = useState<{
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -231,23 +263,177 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
     return dayjs(dateValue);
   };
 
+  const copyCenterAddress = async () => {
+    if (!selectedSnapshot.centerAddress) {
+      message.warning("无中心地址可复制");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(selectedSnapshot.centerAddress);
+      message.success("已复制中心地址");
+    } catch (error) {
+      console.error("复制地址失败：", error);
+      message.error("复制地址失败");
+    }
+  };
+
   const handleFilterChange = (newFilter: any) => {
     setFilterConfig(newFilter);
+  };
+
+  // 导出PDF报告
+  const handleExportPDF = useCallback(async () => {
+    setExportLoading((prev) => ({ ...prev, pdf: true }));
+    try {
+      const success = await generatePDFReport(
+        selectedSnapshot,
+        graphData.nodes || [],
+        graphData.links || [],
+        "graph-container",
+      );
+      if (success) {
+        message.success("PDF报告导出成功");
+      } else {
+        message.error("PDF导出失败");
+      }
+    } catch (error) {
+      console.error("导出PDF失败:", error);
+      message.error("导出PDF失败");
+    } finally {
+      setExportLoading((prev) => ({ ...prev, pdf: false }));
+    }
+  }, [selectedSnapshot, graphData.nodes, graphData.links]);
+
+  useEffect(() => {
+    if (
+      exportPendingSnapshotId &&
+      selectedSnapshot.id === exportPendingSnapshotId &&
+      !loading &&
+      !isError &&
+      !autoExportTriggeredRef.current
+    ) {
+      autoExportTriggeredRef.current = true;
+      handleExportPDF().finally(() => {
+        onAutoExportComplete?.();
+      });
+    }
+  }, [
+    exportPendingSnapshotId,
+    selectedSnapshot.id,
+    loading,
+    isError,
+    onAutoExportComplete,
+    handleExportPDF,
+  ]);
+
+  useEffect(() => {
+    if (selectedSnapshot.id !== exportPendingSnapshotId) {
+      autoExportTriggeredRef.current = false;
+    }
+  }, [selectedSnapshot.id, exportPendingSnapshotId]);
+
+  // 导出CSV数据
+  const handleExportCSV = () => {
+    setExportLoading((prev) => ({ ...prev, csv: true }));
+    try {
+      const csvContent = convertGraphToCSV(
+        graphData.nodes || [],
+        graphData.links || [],
+        selectedSnapshot,
+      );
+      downloadCSV(csvContent, `${selectedSnapshot.title}-数据.csv`);
+      message.success("CSV数据导出成功");
+    } catch (error) {
+      console.error("导出CSV失败:", error);
+      message.error("导出CSV失败");
+    } finally {
+      setExportLoading((prev) => ({ ...prev, csv: false }));
+    }
+  };
+
+  // 导出PNG图片 - 导出完整 SVG 内容
+  const handleExportPNG = async () => {
+    setExportLoading((prev) => ({ ...prev, png: true }));
+    try {
+      // 获取 graph-container 中的 SVG 元素
+      const container = document.getElementById("graph-container");
+      const svgElement = container?.querySelector(
+        "svg",
+      ) as SVGSVGElement | null;
+
+      const success = await exportFullGraphToPNG(
+        svgElement,
+        `${selectedSnapshot.title}-图谱.png`,
+      );
+      if (success) {
+        message.success("PNG图片导出成功");
+      } else {
+        message.error("PNG导出失败");
+      }
+    } catch (error) {
+      console.error("导出PNG失败:", error);
+      message.error("导出PNG失败");
+    } finally {
+      setExportLoading((prev) => ({ ...prev, png: false }));
+    }
+  };
+
+  // 导出完整案件包
+  const handleExportPackage = async () => {
+    setExportLoading((prev) => ({ ...prev, package: true }));
+    try {
+      const result = await exportCasePackage(
+        selectedSnapshot,
+        graphData.nodes || [],
+        graphData.links || [],
+        "graph-container",
+      );
+      if (result.success) {
+        message.success(result.message);
+      } else {
+        message.error(result.message);
+      }
+    } catch (error) {
+      console.error("导出案件包失败:", error);
+      message.error("导出案件包失败");
+    } finally {
+      setExportLoading((prev) => ({ ...prev, package: false }));
+    }
   };
 
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <Space>
+        <Space wrap>
           <Button
             type="primary"
-            icon={<DownloadOutlined />}
-            onClick={() => {
-              handleDownloadSnapshot(selectedSnapshot);
-              setDrawerVisible(false);
-            }}
+            icon={<FilePdfOutlined />}
+            onClick={handleExportPDF}
+            loading={exportLoading.pdf}
           >
-            下载快照
+            导出PDF
+          </Button>
+          <Button
+            icon={<FileExcelOutlined />}
+            onClick={handleExportCSV}
+            loading={exportLoading.csv}
+          >
+            导出CSV
+          </Button>
+          <Button
+            icon={<PictureOutlined />}
+            onClick={handleExportPNG}
+            loading={exportLoading.png}
+          >
+            导出PNG
+          </Button>
+          <Button
+            type="dashed"
+            icon={<DownloadOutlined />}
+            onClick={handleExportPackage}
+            loading={exportLoading.package}
+          >
+            导出完整包
           </Button>
           <Button
             danger
@@ -365,9 +551,40 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           )}
         </Descriptions.Item>
 
-        <Descriptions.Item label="中心地址">
-          <span className="address-text">{selectedSnapshot.centerAddress}</span>
-        </Descriptions.Item>
+        {selectedSnapshot.centerAddress ? (
+          <Descriptions.Item label="中心地址">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <code className="address-text">
+                {selectedSnapshot.centerAddress}
+              </code>
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={copyCenterAddress}
+              />
+            </div>
+          </Descriptions.Item>
+        ) : (
+          <>
+            <Descriptions.Item label="起始地址">
+              <code className="address-text">
+                {selectedSnapshot.fromAddress || ""}
+              </code>
+            </Descriptions.Item>
+            <Descriptions.Item label="目标地址">
+              <code className="address-text">
+                {selectedSnapshot.toAddress || ""}
+              </code>
+            </Descriptions.Item>
+          </>
+        )}
         <Descriptions.Item label="创建时间">
           {dayjs(selectedSnapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}
         </Descriptions.Item>
@@ -431,7 +648,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
 
       {/* 图谱筛选信息和图谱快照 */}
       <div style={{ marginTop: 20 }}>
-        <h3 style={{ color: "#ffffff", marginBottom: 16 }}>图谱筛选信息</h3>
+        <h4>筛选条件</h4>
         <TxGraphFilter
           value={{
             ...filterConfig,
@@ -442,20 +659,13 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           links={graphData.links}
         />
 
-        <h3
-          style={{
-            color: "#ffffff",
-            marginBottom: 16,
-            marginTop: 20,
-          }}
-        >
-          图谱快照
-        </h3>
+        <h4>图谱快照</h4>
         <div
+          id="graph-container"
           style={{
             height: "500px",
-            // border: "1px solid #3a5f7f",
-            // borderRadius: 8,
+            backgroundColor: "#ffffff",
+            borderRadius: 8,
             position: "relative",
           }}
         >
@@ -475,18 +685,74 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               onFilterChange={handleFilterChange}
             />
           ) : (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "100%",
-                backgroundColor: "#f5f5f5",
-                borderRadius: "8px",
+            <ErrorPlaceholder
+              type="network"
+              title="图谱数据加载失败"
+              description="无法连接到数据服务器，请检查网络连接后重试"
+              onRetry={() => {
+                setIsError(false);
+                setLoading(true);
+                // 重新获取数据
+                const fetchGraphData = async () => {
+                  try {
+                    let response;
+                    if (
+                      selectedSnapshot.centerAddress &&
+                      selectedSnapshot.hops !== undefined
+                    ) {
+                      response = await transactionApi.getNhopGraph(
+                        selectedSnapshot.centerAddress,
+                        selectedSnapshot.hops,
+                      );
+                    } else if (
+                      selectedSnapshot.fromAddress &&
+                      selectedSnapshot.toAddress
+                    ) {
+                      response = await transactionApi.getAllPath(
+                        selectedSnapshot.fromAddress,
+                        selectedSnapshot.toAddress,
+                      );
+                    }
+
+                    if (response && response.success && response.data) {
+                      const { node_list, edge_list } = response.data;
+                      setGraphData({
+                        nodes: node_list.map((node: any, index: number) => ({
+                          id: node.id || node.address,
+                          label: node.label || node.address,
+                          title: node.title || node.label || node.address,
+                          addr: node.addr || node.address,
+                          layer: node.layer || 0,
+                          value: node.value || 0,
+                          malicious: node.malicious || undefined,
+                          shape: node.shape || undefined,
+                          image: node.image || undefined,
+                          expanded: index === 0,
+                          track: node.track || "one",
+                          pid: node.pid || undefined,
+                          color: node.color || undefined,
+                          exg: node.exg || undefined,
+                        })),
+                        links: edge_list.map((edge: any) => ({
+                          from: edge.from,
+                          to: edge.to,
+                          label: edge.label || `${edge.val || edge.value}`,
+                          val: edge.val || edge.value || 0,
+                          tx_time: edge.tx_time || "",
+                          tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
+                        })),
+                      });
+                    }
+                  } catch (error) {
+                    console.error("重新加载失败:", error);
+                    setIsError(true);
+                  } finally {
+                    setLoading(false);
+                  }
+                };
+                fetchGraphData();
               }}
-            >
-              <span style={{ color: "red" }}>数据加载失败，请刷新重试</span>
-            </div>
+            />
           )}
           {loading && (
             <div

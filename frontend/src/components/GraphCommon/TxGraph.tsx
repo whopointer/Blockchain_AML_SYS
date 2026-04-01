@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
 import * as d3 from "d3";
+import { Empty } from "antd";
 import { NodeItem, LinkItem } from "./types";
 import TxDetail from "./TxDetail";
 import { formatEthValue } from "../../utils/ethUtils";
@@ -440,7 +441,10 @@ const TxGraph: React.FC<TxGraphProps> = ({
         .each(function (ad: any) {
           const poly = d3.select(this);
           poly
-            .attr("fill", isLinkToMalicious(ad) ? "#E74C3C" : getEdgeColor(ad.val))
+            .attr(
+              "fill",
+              isLinkToMalicious(ad) ? "#E74C3C" : getEdgeColor(ad.val),
+            )
             .attr("data-scale", "1");
           const sNode = layout.nodes.find((n) => n.id === ad.from) as any;
           const tNode = layout.nodes.find((n) => n.id === ad.to) as any;
@@ -578,7 +582,10 @@ const TxGraph: React.FC<TxGraphProps> = ({
       .style("padding", "8px 12px")
       .style("border-radius", "6px")
       .style("font-size", "12px")
-      .style("font-family", 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace')
+      .style(
+        "font-family",
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      )
       .style("pointer-events", "none")
       .style("z-index", "1000")
       .style("box-shadow", "0 4px 12px rgba(0, 0, 0, 0.3)")
@@ -612,12 +619,10 @@ const TxGraph: React.FC<TxGraphProps> = ({
         if (isDragging) return;
         d3.select(this).style("cursor", "pointer");
         // 显示 tooltip
-        tooltip
-          .style("visibility", "visible")
-          .html(
-            `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
+        tooltip.style("visibility", "visible").html(
+          `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
              <div style="font-size: 11px; opacity: 0.8;">点击复制地址</div>`,
-          );
+        );
       })
       .on("mousemove", function (event) {
         tooltip
@@ -645,9 +650,7 @@ const TxGraph: React.FC<TxGraphProps> = ({
               }, 1000);
             })
             .catch(() => {
-              tooltip.html(
-                `<div style="color: #ff4d4f;">复制失败</div>`,
-              );
+              tooltip.html(`<div style="color: #ff4d4f;">复制失败</div>`);
             });
         }
         event.stopPropagation();
@@ -837,13 +840,42 @@ const TxGraph: React.FC<TxGraphProps> = ({
     setSelectedLink(null);
   };
 
+  // 空数据状态
+  const isEmpty = !filteredNodes || filteredNodes.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          width,
+          height,
+          border: "1px solid #e6e6e6",
+          backgroundColor: "#fafafa",
+          borderRadius: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="暂无交易数据"
+        />
+      </div>
+    );
+  }
+
   return (
     <>
       <svg
         ref={svgRef}
         width={width}
         height={height}
-        style={{ border: "1px solid #e6e6e6", backgroundColor: "white" }}
+        style={{
+          border: "1px solid #e6e6e6",
+          backgroundColor: "white",
+          borderRadius: 8,
+        }}
       >
         <g ref={gRef} />
       </svg>

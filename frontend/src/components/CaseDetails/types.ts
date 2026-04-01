@@ -45,6 +45,7 @@ export interface SnapshotTableProps {
   onDeleteSnapshot: (snapshot: GraphSnapshot) => void;
   onDownloadSnapshot: (snapshot: GraphSnapshot) => void;
   onClearFilters: () => void;
+  onExportPDF?: (snapshot: GraphSnapshot) => void;
   editingField?: string | null;
   tempValue?: any;
   startEditing?: (field: string, currentValue: any) => void;

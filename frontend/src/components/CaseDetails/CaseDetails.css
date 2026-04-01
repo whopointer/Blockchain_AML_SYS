@@ -126,6 +126,7 @@
 .address-text {
   font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 12px;
+  color: var(--primary-color);
   word-break: break-all;
 }
 

@@ -328,7 +328,7 @@ const TransactionGraph: React.FC = () => {
         tags: snapshotData.tags,
         nodeCount: graphData.nodes?.length || 0,
         linkCount: graphData.links?.length || 0,
-        riskLevel: backendRiskLevel,
+        riskLevel: snapshotData.riskLevel || backendRiskLevel,
         centerAddress,
         hops: searchHops,
         filterConfig: filterConfigWithUTC8,

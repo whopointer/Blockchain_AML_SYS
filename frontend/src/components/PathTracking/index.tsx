@@ -277,7 +277,7 @@ const PathTracking: React.FC = () => {
         mainAddress: centerAddress,
         nodeCount: graphData.nodes?.length || 0,
         linkCount: graphData.links?.length || 0,
-        riskLevel: backendRiskLevel,
+        riskLevel: snapshotData.riskLevel || backendRiskLevel,
         fromAddress: urlFromAddress || "",
         toAddress: urlToAddress || "",
         filterConfig: filterConfigWithUTC8,
