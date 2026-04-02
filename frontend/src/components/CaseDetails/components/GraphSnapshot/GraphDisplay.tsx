@@ -712,7 +712,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               <TxGraph
                 nodes={graphData.nodes}
                 links={graphData.links}
-                width={840}
+                width={740}
                 height={500}
                 filter={{
                   ...filterConfig,

@@ -5,7 +5,6 @@ import {
   Route,
   Navigate,
   useLocation,
-  useNavigate,
   Link,
 } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -193,6 +192,14 @@ function App() {
                 <Col xl={20} lg={18} md={14}>
                   <CaseDetails />
                 </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/case-details/*"
+            element={
+              <Row className="justify-content-center">
+                <CaseDetails />
               </Row>
             }
           />

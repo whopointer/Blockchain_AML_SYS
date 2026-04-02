@@ -3,7 +3,7 @@ import { LinkItem, NodeItem } from "../GraphCommon/types";
 import { Input, Table, Typography, Space, Card } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "../GraphCommon/TxDetail";
-import { formatEthValue } from "../../utils/ethUtils";
+import { formatEthValue } from "@/utils/ethUtils";
 
 const { Text } = Typography;
 

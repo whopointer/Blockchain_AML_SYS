@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Layout, ConfigProvider } from "antd";
+import { useLocation, useNavigate } from "react-router-dom";
 import zhCN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -14,8 +15,32 @@ dayjs.locale("zh-cn");
 
 const { Content } = Layout;
 
+const menuKeys: MenuKey[] = [
+  "case-management",
+  "graph-snapshot",
+  "subscription",
+];
+
+const getMenuKeyFromPath = (pathname: string): MenuKey => {
+  const segments = pathname.split("/").filter(Boolean);
+  const lastSegment = segments[segments.length - 1] as MenuKey;
+  return menuKeys.includes(lastSegment) ? lastSegment : "case-management";
+};
+
 const CaseDetails: React.FC = () => {
-  const [activeMenu, setActiveMenu] = useState<MenuKey>("case-management");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeMenu, setActiveMenu] = useState<MenuKey>(
+    getMenuKeyFromPath(location.pathname),
+  );
+
+  useEffect(() => {
+    setActiveMenu(getMenuKeyFromPath(location.pathname));
+  }, [location.pathname]);
+
+  const handleMenuSelect = (key: MenuKey) => {
+    navigate(`/case-details/${key}`);
+  };
 
   const renderContent = () => {
     switch (activeMenu) {
@@ -50,7 +75,7 @@ const CaseDetails: React.FC = () => {
       }}
     >
       <Layout style={{ minHeight: "100vh" }}>
-        <Sidebar activeKey={activeMenu} onMenuSelect={setActiveMenu} />
+        <Sidebar activeKey={activeMenu} onMenuSelect={handleMenuSelect} />
         <Content style={{ margin: 0, background: "#f5f7fa", flex: 1 }}>
           {renderContent()}
         </Content>

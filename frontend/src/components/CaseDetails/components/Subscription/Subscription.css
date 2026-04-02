@@ -3,7 +3,6 @@
   background: #f5f7fa;
   min-height: calc(100vh - 64px);
   width: 100%;
-
 }
 
 .subscription-header {
@@ -139,18 +138,20 @@
 }
 
 .subscription-stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
   margin-bottom: 24px;
 }
 
 .subscription-stat-card {
   background: #fff;
-  padding: 16px;
+  padding: 24px 16px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 120px;
 }
 
 .subscription-stat-value {

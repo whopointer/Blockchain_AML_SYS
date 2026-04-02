@@ -12,7 +12,7 @@ import {
 } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
-import { transactionApi } from "../../services/transaction/index";
+import { transactionApi } from "../../services/transaction";
 import { formatEthValue } from "../../utils/ethUtils";
 
 // 自定义函数用于在文本中间添加省略号

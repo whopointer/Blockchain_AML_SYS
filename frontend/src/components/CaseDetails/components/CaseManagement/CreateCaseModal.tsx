@@ -1,14 +1,5 @@
 import React, { useEffect } from "react";
-import {
-  Modal,
-  Form,
-  Input,
-  Select,
-  Button,
-  Space,
-  Row,
-  Col,
-} from "antd";
+import { Modal, Form, Input, Select, Button, Space, Row, Col } from "antd";
 import { Case } from "../../types";
 
 const { TextArea } = Input;
@@ -191,8 +182,8 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
                     initialValues.status === "ACTIVE"
                       ? "进行中"
                       : initialValues.status === "ARCHIVED"
-                      ? "已归档"
-                      : "已关闭"
+                        ? "已归档"
+                        : "已关闭"
                   }
                   disabled
                 />

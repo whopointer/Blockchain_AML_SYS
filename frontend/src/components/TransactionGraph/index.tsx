@@ -11,9 +11,9 @@ import { NodeItem, LinkItem } from "../GraphCommon/types";
 import { Row, Col, message, Card, Spin } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import { transactionApi } from "../../services/transaction/index";
-import { graphSnapshotApi } from "../../services/graph-snapshot/api";
-import { formatEthValue } from "../../utils/ethUtils";
+import { transactionApi } from "@/services/transaction";
+import { graphSnapshotApi } from "@/services/graph-snapshot/api";
+import { formatEthValue } from "@/utils/ethUtils";
 
 dayjs.locale("zh-cn");
 
