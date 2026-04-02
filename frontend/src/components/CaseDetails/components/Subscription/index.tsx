@@ -34,7 +34,7 @@ const convertBackendNodeToFrontend = (backendNode: any): SubscribedNode => {
     label: backendNode.label,
     riskLevel:
       backendNode.riskLevel === "CRITICAL"
-        ? "CRITICAL"
+        ? "HIGH"
         : backendNode.riskLevel === "HIGH"
           ? "HIGH"
           : backendNode.riskLevel === "MEDIUM"
@@ -62,7 +62,7 @@ const convertBackendTxToFrontend = (backendTx: any): SubscribedTransaction => {
     token: backendTx.token,
     riskLevel:
       backendTx.riskLevel === "CRITICAL"
-        ? "CRITICAL"
+        ? "HIGH"
         : backendTx.riskLevel === "HIGH"
           ? "HIGH"
           : backendTx.riskLevel === "MEDIUM"
@@ -181,14 +181,12 @@ const Subscription: React.FC = () => {
   // 统计数据
   const nodeStats = {
     total: nodes.length,
-    critical: nodes.filter((n) => n.riskLevel === "CRITICAL").length,
     high: nodes.filter((n) => n.riskLevel === "HIGH").length,
     alertEnabled: nodes.filter((n) => n.alertEnabled).length,
   };
 
   const txStats = {
     total: transactions.length,
-    critical: transactions.filter((t) => t.riskLevel === "CRITICAL").length,
     high: transactions.filter((t) => t.riskLevel === "HIGH").length,
     alertEnabled: transactions.filter((t) => t.alertEnabled).length,
   };
@@ -556,14 +554,14 @@ const Subscription: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card className="subscription-stat-card critical">
+          <Card className="subscription-stat-card high">
             <div
               className="subscription-stat-value"
-              style={{ color: "#ff4d4f" }}
+              style={{ color: "#faad14" }}
             >
-              {currentStats.critical}
+              {currentStats.high}
             </div>
-            <div className="subscription-stat-label">极高风险</div>
+            <div className="subscription-stat-label">高风险</div>
           </Card>
         </Col>
         <Col span={6}>

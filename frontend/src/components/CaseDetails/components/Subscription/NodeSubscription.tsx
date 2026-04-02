@@ -70,11 +70,10 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
   const getRiskLevelColor = (level: string) => {
     switch (level) {
       case "CRITICAL":
-        return "red";
       case "HIGH":
-        return "orange";
+        return "red";
       case "MEDIUM":
-        return "blue";
+        return "orange";
       case "LOW":
         return "green";
       default:
@@ -85,7 +84,6 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
   const getRiskLevelLabel = (level: string) => {
     switch (level) {
       case "CRITICAL":
-        return "高风险";
       case "HIGH":
         return "高风险";
       case "MEDIUM":
@@ -225,7 +223,6 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
                   }
                   allowClear
                 >
-                  <Select.Option value="CRITICAL">极高风险</Select.Option>
                   <Select.Option value="HIGH">高风险</Select.Option>
                   <Select.Option value="MEDIUM">中风险</Select.Option>
                   <Select.Option value="LOW">低风险</Select.Option>
