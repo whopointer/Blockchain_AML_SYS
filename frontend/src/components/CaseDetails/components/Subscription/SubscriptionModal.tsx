@@ -10,10 +10,7 @@ import {
   Col,
   Switch,
 } from "antd";
-import {
-  SubscribedNode,
-  SubscribedTransaction,
-} from "../../types";
+import { SubscribedNode, SubscribedTransaction } from "../../types";
 
 const { TextArea } = Input;
 
@@ -107,7 +104,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   ];
 
   const riskLevelOptions = [
-    { value: "CRITICAL", label: "极高风险", color: "red" },
+    { value: "CRITICAL", label: "高风险", color: "red" },
     { value: "HIGH", label: "高风险", color: "orange" },
     { value: "MEDIUM", label: "中风险", color: "blue" },
     { value: "LOW", label: "低风险", color: "green" },
@@ -259,7 +256,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <Select
                     mode="tags"
                     placeholder="选择或输入标签"
-                    options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
+                    options={tagOptions.map((tag) => ({
+                      label: tag,
+                      value: tag,
+                    }))}
                   />
                 </Form.Item>
               </Col>
@@ -275,7 +275,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 <Select
                   mode="tags"
                   placeholder="选择或输入标签"
-                  options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
+                  options={tagOptions.map((tag) => ({
+                    label: tag,
+                    value: tag,
+                  }))}
                 />
               </Form.Item>
             </Col>
@@ -286,10 +289,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               name="alertEnabled"
               valuePropName="checked"
             >
-              <Switch
-                checkedChildren="开启"
-                unCheckedChildren="关闭"
-              />
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
             </Form.Item>
           </Col>
         </Row>

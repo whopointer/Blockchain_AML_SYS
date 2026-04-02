@@ -1,5 +1,5 @@
 import React from "react";
-import { Table, Space, Button, Tag, Tooltip } from "antd";
+import { Table, Space, Button, Tag, Tooltip, Skeleton, Row, Col } from "antd";
 import {
   EyeOutlined,
   EditOutlined,
@@ -268,31 +268,65 @@ const CaseList: React.FC<CaseListProps> = ({
     },
   ];
 
+  const renderSkeleton = () => (
+    <div style={{ padding: "20px" }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+      </Row>
+      <Skeleton active paragraph={{ rows: 8 }} />
+    </div>
+  );
+
   return (
-    <Table
-      columns={columns}
-      dataSource={cases}
-      rowKey="id"
-      loading={loading}
-      pagination={{
-        pageSize: 10,
-        showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total) => `共 ${total} 条记录`,
-      }}
-      scroll={{ x: 1200 }}
-      locale={{
-        emptyText: (
-          <div style={{ padding: "40px 0", textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>📁</div>
-            <div style={{ color: "#999", fontSize: "14px" }}>暂无案件数据</div>
-            <div style={{ color: "#bbb", fontSize: "12px", marginTop: "8px" }}>
-              点击右上角按钮创建新案件
-            </div>
-          </div>
-        ),
-      }}
-    />
+    <div style={{ position: "relative" }}>
+      {loading && cases.length === 0 ? (
+        renderSkeleton()
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={cases}
+          rowKey="id"
+          loading={{
+            spinning: loading && cases.length > 0,
+            tip: "案件数据加载中...",
+            size: "large",
+          }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 条记录`,
+          }}
+          scroll={{ x: 1200 }}
+          locale={{
+            emptyText: (
+              <div style={{ padding: "40px 0", textAlign: "center" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>📁</div>
+                <div style={{ color: "#999", fontSize: "14px" }}>
+                  暂无案件数据
+                </div>
+                <div
+                  style={{ color: "#bbb", fontSize: "12px", marginTop: "8px" }}
+                >
+                  点击右上角按钮创建新案件
+                </div>
+              </div>
+            ),
+          }}
+        />
+      )}
+    </div>
   );
 };
 

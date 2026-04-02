@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Card,
   Row,
@@ -14,6 +14,8 @@ import {
   List,
   Input,
   Divider,
+  Skeleton,
+  Modal,
 } from "antd";
 import {
   PlusOutlined,
@@ -29,67 +31,144 @@ import CaseFilter from "./CaseFilter";
 import CaseList from "./CaseList";
 import CreateCaseModal from "./CreateCaseModal";
 import "./CaseManagement.css";
+import { caseApi } from "../../../../services/case/api";
 
-// 模拟案件数据
-const mockCases: Case[] = [
-  {
-    id: "CASE-2024-001",
-    title: "可疑交易调查 - 0x1234...5678",
-    description: "发现多笔大额异常交易，涉及多个可疑地址",
-    status: "ACTIVE",
-    riskLevel: "HIGH",
-    priority: "URGENT",
-    tags: ["可疑交易", "大额转账", "多地址关联"],
-    createTime: dayjs().subtract(3, "day"),
-    updateTime: dayjs().subtract(1, "day"),
-    assignedTo: "张三",
-    relatedSnapshots: ["snapshot-1", "snapshot-2"],
-    comments: [
-      {
-        id: "1",
-        author: "张三",
-        content: "已初步分析交易路径，发现3层关联地址",
-        createdAt: dayjs().subtract(2, "day").format("YYYY-MM-DD HH:mm:ss"),
-      },
-    ],
-  },
-  {
-    id: "CASE-2024-002",
-    title: "地址风险监控 - 0xabcd...efgh",
-    description: "该地址被标记为高风险，需要持续监控",
-    status: "ACTIVE",
-    riskLevel: "MEDIUM",
-    priority: "HIGH",
-    tags: ["地址监控", "风险标记"],
-    createTime: dayjs().subtract(7, "day"),
-    updateTime: dayjs().subtract(2, "day"),
-    assignedTo: "李四",
-    relatedSnapshots: ["snapshot-3"],
-  },
-  {
-    id: "CASE-2024-003",
-    title: "常规审查 - 交易所钱包",
-    description: "对交易所热钱包进行常规风险审查",
-    status: "CLOSED",
-    riskLevel: "LOW",
-    priority: "LOW",
-    tags: ["常规审查", "交易所"],
-    createTime: dayjs().subtract(30, "day"),
-    updateTime: dayjs().subtract(25, "day"),
-    assignedTo: "王五",
+const parseBackendTags = (tags: any): string[] => {
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => String(tag).trim()).filter((t) => t);
+  }
+  if (typeof tags === "string") {
+    return tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((t) => t);
+  }
+  return [];
+};
+
+// 后端数据转换为前端Case类型
+const convertBackendCaseToFrontend = (backendCase: any): Case => {
+  return {
+    id: backendCase.id.toString(), // 确保id是字符串
+    title: backendCase.title || backendCase.caseName || "未命名案件",
+    description: backendCase.description || "",
+    status: mapBackendStatusToStatus(backendCase.status),
+    riskLevel: mapBackendRiskLevelToRiskLevel(backendCase.riskLevel),
+    tags: Array.isArray(backendCase.tags)
+      ? backendCase.tags
+      : parseBackendTags(backendCase.tags),
+    createTime: dayjs(backendCase.createTime),
+    updateTime: dayjs(backendCase.updateTime),
+    assignedTo: backendCase.assignedTo,
+    priority: mapBackendPriorityToPriority(backendCase.priority),
     relatedSnapshots: [],
-  },
-];
+    comments: [],
+  };
+};
+
+// 将后端状态映射到前端状态
+const mapBackendStatusToStatus = (
+  backendStatus: string,
+): "ACTIVE" | "ARCHIVED" | "CLOSED" => {
+  switch (backendStatus) {
+    case "NEW":
+      return "ACTIVE";
+    case "IN_PROGRESS":
+      return "ACTIVE";
+    case "ARCHIVED":
+      return "ARCHIVED";
+    case "CLOSED":
+      return "CLOSED";
+    default:
+      return "ACTIVE"; // 默认为ACTIVE
+  }
+};
+
+// 将后端风险等级映射到前端风险等级
+const mapBackendRiskLevelToRiskLevel = (
+  backendRiskLevel: string,
+): "LOW" | "MEDIUM" | "HIGH" => {
+  switch (backendRiskLevel) {
+    case "HIGH":
+      return "HIGH";
+    case "MEDIUM":
+      return "MEDIUM";
+    case "LOW":
+      return "LOW";
+    default:
+      return "LOW"; // 默认为LOW
+  }
+};
+
+// 将后端优先级映射到前端优先级
+const mapBackendPriorityToPriority = (
+  backendPriority: string,
+): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
+  switch (backendPriority) {
+    case "URGENT":
+      return "URGENT";
+    case "HIGH":
+      return "HIGH";
+    case "MEDIUM":
+      return "MEDIUM";
+    case "LOW":
+      return "LOW";
+    default:
+      return "MEDIUM"; // 默认为MEDIUM
+  }
+};
+
+// 前端Case转换为后端数据格式
+const convertFrontendCaseToBackend = (frontendCase: Partial<Case>): any => {
+  return {
+    caseName: frontendCase.title,
+    description: frontendCase.description,
+    status: frontendCase.status,
+    riskLevel: frontendCase.riskLevel,
+    tags: frontendCase.tags?.join(","),
+    assignedTo: frontendCase.assignedTo,
+    priority: frontendCase.priority,
+  };
+};
 
 const CaseManagement: React.FC = () => {
-  const [cases, setCases] = useState<Case[]>(mockCases);
-  const [filteredCases, setFilteredCases] = useState<Case[]>(mockCases);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [filteredCases, setFilteredCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editingCase, setEditingCase] = useState<Case | null>(null);
   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [commentInput, setCommentInput] = useState("");
+
+  // 加载案件数据
+  const loadCases = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await caseApi.getAllCases();
+      if (response.success) {
+        const convertedCases = response.data.map(convertBackendCaseToFrontend);
+        setCases(convertedCases);
+        setFilteredCases(convertedCases);
+      } else {
+        message.error(response.msg || "加载案件失败");
+        setCases([]);
+        setFilteredCases([]);
+      }
+    } catch (error) {
+      console.error("加载案件失败:", error);
+      message.error("加载案件失败");
+      setCases([]);
+      setFilteredCases([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 初始化加载
+  useEffect(() => {
+    loadCases();
+  }, [loadCases]);
 
   // 统计数据
   const stats = {
@@ -147,66 +226,119 @@ const CaseManagement: React.FC = () => {
   );
 
   // 创建案件
-  const handleCreateCase = (values: any) => {
-    const newCase: Case = {
-      id: `CASE-${dayjs().format("YYYY")}-${String(cases.length + 1).padStart(3, "0")}`,
-      title: values.title,
-      description: values.description,
-      status: "ACTIVE",
-      riskLevel: values.riskLevel,
-      priority: values.priority,
-      tags: values.tags || [],
-      createTime: dayjs(),
-      updateTime: dayjs(),
-      assignedTo: values.assignedTo,
-      relatedSnapshots: values.relatedSnapshots || [],
-    };
-    setCases([newCase, ...cases]);
-    setFilteredCases([newCase, ...filteredCases]);
-    setCreateModalVisible(false);
-    message.success("案件创建成功");
+  const handleCreateCase = async (values: any) => {
+    try {
+      const backendData = convertFrontendCaseToBackend({
+        title: values.title,
+        description: values.description,
+        status: "ACTIVE",
+        riskLevel: values.riskLevel,
+        priority: values.priority,
+        tags: values.tags || [],
+        assignedTo: values.assignedTo,
+      });
+      const response = await caseApi.createCase(backendData);
+      if (response.success) {
+        const newCase = convertBackendCaseToFrontend(response.data);
+        setCases([newCase, ...cases]);
+        setFilteredCases([newCase, ...filteredCases]);
+        setCreateModalVisible(false);
+        message.success("案件创建成功");
+      } else {
+        message.error(response.msg || "创建案件失败");
+      }
+    } catch (error) {
+      console.error("创建案件失败:", error);
+      message.error("创建案件失败");
+    }
   };
 
   // 编辑案件
-  const handleEditCase = (values: any) => {
+  const handleEditCase = async (values: any) => {
     if (!editingCase) return;
-    const updated = cases.map((c) =>
-      c.id === editingCase.id ? { ...c, ...values, updateTime: dayjs() } : c,
-    );
-    setCases(updated);
-    setFilteredCases(updated);
-    setEditingCase(null);
-    setCreateModalVisible(false);
-    message.success("案件更新成功");
+    try {
+      const backendData = convertFrontendCaseToBackend({
+        title: values.title,
+        description: values.description,
+        riskLevel: values.riskLevel,
+        priority: values.priority,
+        tags: values.tags || [],
+        assignedTo: values.assignedTo,
+      });
+      const response = await caseApi.updateCase(editingCase.id, backendData);
+      if (response.success) {
+        const updatedCase = convertBackendCaseToFrontend(response.data);
+        const updated = cases.map((c) =>
+          c.id === editingCase.id ? updatedCase : c,
+        );
+        setCases(updated);
+        setFilteredCases(updated);
+        setEditingCase(null);
+        setCreateModalVisible(false);
+        message.success("案件更新成功");
+      } else {
+        message.error(response.msg || "更新案件失败");
+      }
+    } catch (error) {
+      console.error("更新案件失败:", error);
+      message.error("更新案件失败");
+    }
   };
 
   // 删除案件
-  const handleDeleteCase = (caseId: string) => {
-    const updated = cases.filter((c) => c.id !== caseId);
-    setCases(updated);
-    setFilteredCases(updated);
-    if (selectedCase?.id === caseId) {
-      setDetailDrawerVisible(false);
-      setSelectedCase(null);
-    }
-    message.success("案件已删除");
+  const handleDeleteCase = async (caseId: string) => {
+    Modal.confirm({
+      title: "确认删除",
+      content: "您确定要删除这个案件吗？此操作无法撤销。",
+      okText: "删除",
+      okType: "danger",
+      cancelText: "取消",
+      onOk: async () => {
+        try {
+          const response = await caseApi.deleteCase(caseId);
+          if (response.success) {
+            const updated = cases.filter((c) => c.id !== caseId);
+            setCases(updated);
+            setFilteredCases(updated);
+            if (selectedCase?.id === caseId) {
+              setDetailDrawerVisible(false);
+              setSelectedCase(null);
+            }
+            message.success("案件已删除");
+          } else {
+            message.error(response.msg || "删除案件失败");
+          }
+        } catch (error) {
+          console.error("删除案件失败:", error);
+          message.error("删除案件失败");
+        }
+      },
+    });
   };
 
   // 归档/取消归档
-  const handleToggleArchive = (caseItem: Case) => {
-    const newStatus: "ACTIVE" | "ARCHIVED" =
-      caseItem.status === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
-    const updated = cases.map((c) =>
-      c.id === caseItem.id
-        ? { ...c, status: newStatus, updateTime: dayjs() }
-        : c,
-    );
-    setCases(updated);
-    setFilteredCases(updated);
-    if (selectedCase?.id === caseItem.id) {
-      setSelectedCase({ ...selectedCase, status: newStatus });
+  const handleToggleArchive = async (caseItem: Case) => {
+    const newStatus = caseItem.status === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
+    try {
+      const response = await caseApi.updateCaseStatus(caseItem.id, newStatus);
+      if (response.success) {
+        const updatedCase = convertBackendCaseToFrontend(response.data);
+        const updated = cases.map((c) =>
+          c.id === caseItem.id ? updatedCase : c,
+        );
+        setCases(updated);
+        setFilteredCases(updated);
+        if (selectedCase?.id === caseItem.id) {
+          setSelectedCase(updatedCase);
+        }
+        message.success(newStatus === "ARCHIVED" ? "案件已归档" : "已取消归档");
+      } else {
+        message.error(response.msg || "更新案件状态失败");
+      }
+    } catch (error) {
+      console.error("更新案件状态失败:", error);
+      message.error("更新案件状态失败");
     }
-    message.success(newStatus === "ARCHIVED" ? "案件已归档" : "已取消归档");
   };
 
   // 查看详情
@@ -252,32 +384,61 @@ const CaseManagement: React.FC = () => {
     <div className="case-management-container">
       {/* 统计卡片 */}
       <Row gutter={16} className="case-stats-row">
-        <Col span={6}>
-          <Card className="case-stat-card">
-            <div className="case-stat-value">{stats.total}</div>
-            <div className="case-stat-label">总案件数</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="case-stat-card">
-            <div className="case-stat-value" style={{ color: "#1890ff" }}>
-              {stats.active}
-            </div>
-            <div className="case-stat-label">进行中</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="case-stat-card high-risk">
-            <div className="case-stat-value">{stats.highRisk}</div>
-            <div className="case-stat-label">高风险</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="case-stat-card medium-risk">
-            <div className="case-stat-value">{stats.urgent}</div>
-            <div className="case-stat-label">紧急案件</div>
-          </Card>
-        </Col>
+        {loading ? (
+          // 骨架屏
+          <>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <Skeleton active paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <Skeleton active paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <Skeleton active paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <Skeleton active paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+          </>
+        ) : (
+          // 实际数据
+          <>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <div className="case-stat-value">{stats.total}</div>
+                <div className="case-stat-label">总案件数</div>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card">
+                <div className="case-stat-value" style={{ color: "#1890ff" }}>
+                  {stats.active}
+                </div>
+                <div className="case-stat-label">进行中</div>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card high-risk">
+                <div className="case-stat-value">{stats.highRisk}</div>
+                <div className="case-stat-label">高风险</div>
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card className="case-stat-card medium-risk">
+                <div className="case-stat-value">{stats.urgent}</div>
+                <div className="case-stat-label">紧急案件</div>
+              </Card>
+            </Col>
+          </>
+        )}
       </Row>
 
       {/* 筛选栏 */}
@@ -376,7 +537,7 @@ const CaseManagement: React.FC = () => {
             </Space>
 
             <Divider />
-            
+
             <Descriptions
               bordered
               column={1}

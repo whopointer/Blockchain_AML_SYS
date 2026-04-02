@@ -59,6 +59,8 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
   };
 
   const tagOptions = [
+    "诈骗",
+    "洗钱",
     "可疑交易",
     "大额转账",
     "多地址关联",
@@ -69,6 +71,14 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
     "混币器",
     "暗网",
     "钓鱼",
+    "勒索软件",
+    "恶意合约",
+    "非法集资",
+    "恐怖主义融资",
+    "网络犯罪",
+    "身份盗用",
+    "虚假平台",
+    "庞氏骗局",
   ];
 
   return (

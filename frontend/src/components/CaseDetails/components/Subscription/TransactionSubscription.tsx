@@ -10,6 +10,7 @@ import {
   Card,
   Tag,
   Tooltip,
+  Skeleton,
 } from "antd";
 import dayjs from "dayjs";
 import {
@@ -25,6 +26,7 @@ import { SubscribedTransaction, SubscriptionFilter } from "../../types";
 interface TransactionSubscriptionProps {
   transactions: SubscribedTransaction[];
   allTags: string[];
+  loading?: boolean;
   onFilter: (filters: SubscriptionFilter) => void;
   onDelete: (id: string) => void;
   onToggleAlert: (id: string) => void;
@@ -34,6 +36,7 @@ interface TransactionSubscriptionProps {
 const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
   transactions,
   allTags,
+  loading = false,
   onFilter,
   onDelete,
   onToggleAlert,
@@ -104,6 +107,120 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
     if (address.length <= 16) return address;
     return `${address.slice(0, 6)}...${address.slice(-6)}`;
   };
+
+  const renderSkeleton = () => (
+    <div style={{ padding: "20px" }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+        <Col span={6}>
+          <Skeleton.Input active style={{ width: "100%" }} />
+        </Col>
+      </Row>
+      <Row gutter={[16, 16]}>
+        {[1, 2].map((item) => (
+          <Col xs={24} lg={12} key={item}>
+            <Card className="subscription-card" bodyStyle={{ padding: 0 }}>
+              <div style={{ padding: 16 }}>
+                <div className="subscription-card-header">
+                  <div>
+                    <div className="subscription-card-title">
+                      <Skeleton.Input
+                        active
+                        style={{ width: 120, height: 20 }}
+                      />
+                    </div>
+                    <div
+                      className="subscription-card-subtitle"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      <Skeleton.Input
+                        active
+                        style={{ width: 80, height: 16 }}
+                      />
+                      <Skeleton.Button active size="small" shape="circle" />
+                      <Skeleton.Input
+                        active
+                        style={{ width: 80, height: 16 }}
+                      />
+                    </div>
+                  </div>
+                  <div className="subscription-card-actions">
+                    <Skeleton.Button active size="small" shape="circle" />
+                    <Skeleton.Button active size="small" shape="circle" />
+                    <Skeleton.Button active size="small" shape="circle" />
+                  </div>
+                </div>
+
+                <div className="subscription-card-content">
+                  <div className="subscription-card-item">
+                    <span className="subscription-card-label">金额:</span>
+                    <Skeleton.Input
+                      active
+                      style={{ width: 80, height: 16, marginLeft: 8 }}
+                    />
+                  </div>
+                  <div className="subscription-card-item">
+                    <span className="subscription-card-label">风险等级:</span>
+                    <Skeleton.Input
+                      active
+                      style={{ width: 60, height: 24, marginLeft: 8 }}
+                    />
+                  </div>
+                  <div className="subscription-card-item">
+                    <span className="subscription-card-label">交易时间:</span>
+                    <Skeleton.Input
+                      active
+                      style={{ width: 100, height: 16, marginLeft: 8 }}
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: "#f5f7fa",
+                    padding: 12,
+                    borderRadius: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Skeleton.Input
+                    active
+                    style={{ width: "100%", height: 40 }}
+                  />
+                </div>
+
+                <div className="subscription-card-footer">
+                  <div className="subscription-card-tags">
+                    <Skeleton.Input
+                      active
+                      style={{ width: 50, height: 24, marginRight: 8 }}
+                    />
+                    <Skeleton.Input active style={{ width: 50, height: 24 }} />
+                  </div>
+                  <div className="subscription-card-time">
+                    <Skeleton.Input active style={{ width: 80, height: 16 }} />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </div>
+  );
 
   return (
     <div>
@@ -186,151 +303,163 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
 
       {/* 交易列表 */}
       <div className="subscription-list-section">
-        <Row gutter={[16, 16]}>
-          {transactions.length === 0 ? (
-            <Col span={24}>
-              <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔔</div>
-                <div style={{ color: "#999", fontSize: "14px" }}>
-                  暂无交易订阅
+        {loading && transactions.length === 0 ? (
+          renderSkeleton()
+        ) : (
+          <Row gutter={[16, 16]}>
+            {transactions.length === 0 ? (
+              <Col span={24}>
+                <div style={{ textAlign: "center", padding: "60px 0" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                    🔔
+                  </div>
+                  <div style={{ color: "#999", fontSize: "14px" }}>
+                    暂无交易订阅
+                  </div>
+                  <div
+                    style={{
+                      color: "#bbb",
+                      fontSize: "12px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    点击右上角按钮添加新的交易订阅
+                  </div>
                 </div>
-                <div
-                  style={{ color: "#bbb", fontSize: "12px", marginTop: "8px" }}
-                >
-                  点击右上角按钮添加新的交易订阅
-                </div>
-              </div>
-            </Col>
-          ) : (
-            transactions.map((tx) => (
-              <Col xs={24} lg={12} key={tx.id}>
-                <Card className="subscription-card" bodyStyle={{ padding: 0 }}>
-                  <div style={{ padding: 16 }}>
-                    <div className="subscription-card-header">
-                      <div>
-                        <div className="subscription-card-title">
-                          <Tooltip title={tx.txHash}>
-                            <span className="subscription-address-text">
-                              {truncateHash(tx.txHash)}
-                            </span>
+              </Col>
+            ) : (
+              transactions.map((tx) => (
+                <Col xs={24} lg={12} key={tx.id}>
+                  <Card
+                    className="subscription-card"
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <div style={{ padding: 16 }}>
+                      <div className="subscription-card-header">
+                        <div>
+                          <div className="subscription-card-title">
+                            <Tooltip title={tx.txHash}>
+                              <span className="subscription-address-text">
+                                {truncateHash(tx.txHash)}
+                              </span>
+                            </Tooltip>
+                          </div>
+                          <div
+                            className="subscription-card-subtitle"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              marginTop: 8,
+                            }}
+                          >
+                            <Tooltip title={tx.fromAddress}>
+                              <span>{truncateAddress(tx.fromAddress)}</span>
+                            </Tooltip>
+                            <ArrowRightOutlined style={{ color: "#8c8c8c" }} />
+                            <Tooltip title={tx.toAddress}>
+                              <span>{truncateAddress(tx.toAddress)}</span>
+                            </Tooltip>
+                          </div>
+                        </div>
+                        <div className="subscription-card-actions">
+                          <Tooltip
+                            title={tx.alertEnabled ? "关闭告警" : "开启告警"}
+                          >
+                            <Button
+                              type={tx.alertEnabled ? "primary" : "default"}
+                              size="small"
+                              icon={<BellOutlined />}
+                              onClick={() => onToggleAlert(tx.id)}
+                              danger={tx.alertEnabled}
+                            />
+                          </Tooltip>
+                          <Tooltip title="编辑">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => onEdit(tx)}
+                            />
+                          </Tooltip>
+                          <Tooltip title="删除">
+                            <Button
+                              type="text"
+                              danger
+                              size="small"
+                              icon={<DeleteOutlined />}
+                              onClick={() => onDelete(tx.id)}
+                            />
                           </Tooltip>
                         </div>
-                        <div
-                          className="subscription-card-subtitle"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            marginTop: 8,
-                          }}
-                        >
-                          <Tooltip title={tx.fromAddress}>
-                            <span>{truncateAddress(tx.fromAddress)}</span>
-                          </Tooltip>
-                          <ArrowRightOutlined style={{ color: "#8c8c8c" }} />
-                          <Tooltip title={tx.toAddress}>
-                            <span>{truncateAddress(tx.toAddress)}</span>
-                          </Tooltip>
+                      </div>
+                      <div className="subscription-card-content">
+                        <div className="subscription-card-item">
+                          <span className="subscription-card-label">金额:</span>
+                          <span
+                            className="subscription-card-value"
+                            style={{ color: "#667eea", fontWeight: 600 }}
+                          >
+                            {tx.amount} {tx.token}
+                          </span>
                         </div>
-                      </div>
-                      <div className="subscription-card-actions">
-                        <Tooltip
-                          title={tx.alertEnabled ? "关闭告警" : "开启告警"}
-                        >
-                          <Button
-                            type={tx.alertEnabled ? "primary" : "default"}
-                            size="small"
-                            icon={<BellOutlined />}
-                            onClick={() => onToggleAlert(tx.id)}
-                            danger={tx.alertEnabled}
-                          />
-                        </Tooltip>
-                        <Tooltip title="编辑">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => onEdit(tx)}
-                          />
-                        </Tooltip>
-                        <Tooltip title="删除">
-                          <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            onClick={() => onDelete(tx.id)}
-                          />
-                        </Tooltip>
-                      </div>
-                    </div>
-
-                    <div className="subscription-card-content">
-                      <div className="subscription-card-item">
-                        <span className="subscription-card-label">金额:</span>
-                        <span
-                          className="subscription-card-value"
-                          style={{ color: "#667eea", fontWeight: 600 }}
-                        >
-                          {tx.amount} {tx.token}
-                        </span>
-                      </div>
-                      <div className="subscription-card-item">
-                        <span className="subscription-card-label">
-                          风险等级:
-                        </span>
-                        <Tag color={getRiskLevelColor(tx.riskLevel)}>
-                          {getRiskLevelLabel(tx.riskLevel)}
-                        </Tag>
-                      </div>
-                      {tx.txTime && (
                         <div className="subscription-card-item">
                           <span className="subscription-card-label">
-                            交易时间:
+                            风险等级:
                           </span>
-                          <span className="subscription-card-value">
-                            {typeof tx.txTime === "string"
-                              ? dayjs(tx.txTime).format("YYYY-MM-DD HH:mm")
-                              : tx.txTime.format("YYYY-MM-DD HH:mm")}
-                          </span>
+                          <Tag color={getRiskLevelColor(tx.riskLevel)}>
+                            {getRiskLevelLabel(tx.riskLevel)}
+                          </Tag>
+                        </div>
+                        {tx.txTime && (
+                          <div className="subscription-card-item">
+                            <span className="subscription-card-label">
+                              交易时间:
+                            </span>
+                            <span className="subscription-card-value">
+                              {typeof tx.txTime === "string"
+                                ? dayjs(tx.txTime).format("YYYY-MM-DD HH:mm")
+                                : tx.txTime.format("YYYY-MM-DD HH:mm")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {tx.remark && (
+                        <div
+                          style={{
+                            background: "#f5f7fa",
+                            padding: 12,
+                            borderRadius: 6,
+                            marginBottom: 12,
+                            fontSize: 13,
+                            color: "#4b5563",
+                          }}
+                        >
+                          {tx.remark}
                         </div>
                       )}
-                    </div>
-
-                    <div
-                      style={{
-                        background: "#f5f7fa",
-                        padding: 12,
-                        borderRadius: 6,
-                        marginBottom: 12,
-                        fontSize: 13,
-                        color: "#4b5563",
-                      }}
-                    >
-                      {tx.remark}
-                    </div>
-
-                    <div className="subscription-card-footer">
-                      <div className="subscription-card-tags">
-                        {tx.tags.map((tag) => (
-                          <Tag key={tag} color="blue">
-                            {tag}
-                          </Tag>
-                        ))}
-                      </div>
-                      <div className="subscription-card-time">
-                        订阅于{" "}
-                        {typeof tx.subscribedAt === "string"
-                          ? dayjs(tx.subscribedAt).format("YYYY-MM-DD")
-                          : tx.subscribedAt.format("YYYY-MM-DD")}
+                      <div className="subscription-card-footer">
+                        <div className="subscription-card-tags">
+                          {tx.tags.map((tag) => (
+                            <Tag key={tag} color="blue">
+                              {tag}
+                            </Tag>
+                          ))}
+                        </div>
+                        <div className="subscription-card-time">
+                          订阅于{" "}
+                          {typeof tx.subscribedAt === "string"
+                            ? dayjs(tx.subscribedAt).format("YYYY-MM-DD")
+                            : tx.subscribedAt.format("YYYY-MM-DD")}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              </Col>
-            ))
-          )}
-        </Row>
+                  </Card>
+                </Col>
+              ))
+            )}
+          </Row>
+        )}
       </div>
     </div>
   );
