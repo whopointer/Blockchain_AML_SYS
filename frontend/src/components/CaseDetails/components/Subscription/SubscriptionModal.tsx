@@ -104,8 +104,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   ];
 
   const riskLevelOptions = [
-    { value: "CRITICAL", label: "高风险", color: "red" },
-    { value: "HIGH", label: "高风险", color: "orange" },
+    { value: "HIGH", label: "高风险", color: "red" },
     { value: "MEDIUM", label: "中风险", color: "blue" },
     { value: "LOW", label: "低风险", color: "green" },
   ];

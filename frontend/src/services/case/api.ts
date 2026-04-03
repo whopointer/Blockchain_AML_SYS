@@ -43,6 +43,16 @@ export const caseApi = {
   getCasesByRiskLevel: (riskLevel: string) =>
     apiClient.get(`/cases/risk/${riskLevel}`).then((res) => res.data),
 
+  // 按优先级查询
+  getCasesByPriority: (priority: string) =>
+    apiClient.get(`/cases/priority/${priority}`).then((res) => res.data),
+
+  // 按优先级和状态查询
+  getCasesByPriorityAndStatus: (priority: string, status: string) =>
+    apiClient
+      .get(`/cases/priority/${priority}/status/${status}`)
+      .then((res) => res.data),
+
   // 搜索案件
   searchCases: (keyword: string) =>
     apiClient.get(`/cases/search?keyword=${keyword}`).then((res) => res.data),
@@ -50,13 +60,13 @@ export const caseApi = {
   // 更新案件状态
   updateCaseStatus: (id: string, status: string) =>
     apiClient
-      .put(`/cases/${id}/status?status=${status}`)
+      .put(`/cases/${id}/status`, null, { params: { status } })
       .then((res) => res.data),
 
   // 指派案件
   assignCase: (id: string, assignedTo: string) =>
     apiClient
-      .put(`/cases/${id}/assign?assignedTo=${assignedTo}`)
+      .put(`/cases/${id}/assign`, null, { params: { assignedTo } })
       .then((res) => res.data),
 };
 

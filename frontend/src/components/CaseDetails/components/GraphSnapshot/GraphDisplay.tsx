@@ -622,7 +622,14 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
                   onChange={(value) => setTempValue(value)}
                   style={{ width: "100%", marginBottom: 8 }}
                   placeholder="输入标签"
-                ></Select>
+                >
+                  <Select.Option value="洗钱">洗钱</Select.Option>
+                  <Select.Option value="欺诈">欺诈</Select.Option>
+                  <Select.Option value="可疑交易">可疑交易</Select.Option>
+                  <Select.Option value="高风险">高风险</Select.Option>
+                  <Select.Option value="调查中">调查中</Select.Option>
+                  <Select.Option value="已确认">已确认</Select.Option>
+                </Select>
                 <div>
                   <Button
                     size="small"

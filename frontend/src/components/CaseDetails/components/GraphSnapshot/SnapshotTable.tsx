@@ -100,8 +100,8 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
         const addressText = record.centerAddress
           ? record.centerAddress
           : record.fromAddress && record.toAddress
-          ? `${record.fromAddress} → ${record.toAddress}`
-          : "";
+            ? `${record.fromAddress} → ${record.toAddress}`
+            : "";
         return (
           <span style={{ fontSize: 12, fontFamily: "monospace" }}>
             {addressText}
@@ -126,6 +126,9 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
       key: "createTime",
       width: "15%",
       render: (date: any) => {
+        if (!date) {
+          return "";
+        }
         if (typeof date === "string") {
           return new Date(date).toLocaleString();
         }

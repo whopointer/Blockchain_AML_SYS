@@ -69,7 +69,6 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
 
   const getRiskLevelColor = (level: string) => {
     switch (level) {
-      case "CRITICAL":
       case "HIGH":
         return "red";
       case "MEDIUM":
@@ -83,7 +82,6 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
 
   const getRiskLevelLabel = (level: string) => {
     switch (level) {
-      case "CRITICAL":
       case "HIGH":
         return "高风险";
       case "MEDIUM":

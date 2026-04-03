@@ -26,32 +26,23 @@ const parseBackendStringArray = (value: any): string[] => {
   return [];
 };
 
-// 后端节点数据转换为前端类型
 const convertBackendNodeToFrontend = (backendNode: any): SubscribedNode => {
   return {
     id: backendNode.id,
     address: backendNode.address,
     label: backendNode.label,
-    riskLevel:
-      backendNode.riskLevel === "CRITICAL"
-        ? "HIGH"
-        : backendNode.riskLevel === "HIGH"
-          ? "HIGH"
-          : backendNode.riskLevel === "MEDIUM"
-            ? "MEDIUM"
-            : "LOW",
+    riskLevel: backendNode.riskLevel,
     tags: parseBackendStringArray(backendNode.tags),
-    remark: backendNode.remark || "",
-    subscribedAt: dayjs(backendNode.subscribedAt),
+    remark: backendNode.notes || backendNode.remark || "",
+    subscribedAt: dayjs(backendNode.createTime || backendNode.subscribedAt),
     lastActivity: backendNode.lastActivity
       ? dayjs(backendNode.lastActivity)
       : undefined,
-    alertEnabled: backendNode.alertEnabled,
+    alertEnabled: backendNode.isActive,
     relatedCases: parseBackendStringArray(backendNode.relatedCases),
   };
 };
 
-// 后端交易数据转换为前端类型
 const convertBackendTxToFrontend = (backendTx: any): SubscribedTransaction => {
   return {
     id: backendTx.id,
@@ -60,19 +51,12 @@ const convertBackendTxToFrontend = (backendTx: any): SubscribedTransaction => {
     toAddress: backendTx.toAddress,
     amount: backendTx.amount,
     token: backendTx.token,
-    riskLevel:
-      backendTx.riskLevel === "CRITICAL"
-        ? "HIGH"
-        : backendTx.riskLevel === "HIGH"
-          ? "HIGH"
-          : backendTx.riskLevel === "MEDIUM"
-            ? "MEDIUM"
-            : "LOW",
+    riskLevel: backendTx.riskLevel,
     tags: parseBackendStringArray(backendTx.tags),
-    remark: backendTx.remark || "",
-    subscribedAt: dayjs(backendTx.subscribedAt),
+    remark: backendTx.notes || backendTx.remark || "",
+    subscribedAt: dayjs(backendTx.createTime || backendTx.subscribedAt),
     txTime: backendTx.txTime ? dayjs(backendTx.txTime) : undefined,
-    alertEnabled: backendTx.alertEnabled,
+    alertEnabled: backendTx.isActive,
     relatedCases: parseBackendStringArray(backendTx.relatedCases),
   };
 };

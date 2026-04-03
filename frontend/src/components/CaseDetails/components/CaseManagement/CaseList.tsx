@@ -9,6 +9,12 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { Case } from "../../types";
+import {
+  getStatusLabel,
+  getStatusDotColor,
+  getPriorityLabel,
+  getPriorityColor,
+} from "../../utils";
 
 interface CaseListProps {
   cases: Case[];
@@ -53,89 +59,22 @@ const CaseList: React.FC<CaseListProps> = ({
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "URGENT":
-        return "red";
-      case "HIGH":
-        return "orange";
-      case "MEDIUM":
-        return "blue";
-      case "LOW":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case "URGENT":
-        return "紧急";
-      case "HIGH":
-        return "高";
-      case "MEDIUM":
-        return "中";
-      case "LOW":
-        return "低";
-      default:
-        return "未知";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return (
-          <span style={{ color: "#52c41a" }}>
-            <span
-              style={{
-                display: "inline-block",
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#52c41a",
-                marginRight: 6,
-              }}
-            />
-            进行中
-          </span>
-        );
-      case "ARCHIVED":
-        return (
-          <span style={{ color: "#8c8c8c" }}>
-            <span
-              style={{
-                display: "inline-block",
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#8c8c8c",
-                marginRight: 6,
-              }}
-            />
-            已归档
-          </span>
-        );
-      case "CLOSED":
-        return (
-          <span style={{ color: "#ff4d4f" }}>
-            <span
-              style={{
-                display: "inline-block",
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#ff4d4f",
-                marginRight: 6,
-              }}
-            />
-            已关闭
-          </span>
-        );
-      default:
-        return status;
-    }
+  const getStatusWithDot = (status: string) => {
+    return (
+      <span style={{ color: getStatusDotColor(status) }}>
+        <span
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: getStatusDotColor(status),
+            marginRight: 6,
+          }}
+        />
+        {getStatusLabel(status)}
+      </span>
+    );
   };
 
   const columns = [
@@ -184,7 +123,7 @@ const CaseList: React.FC<CaseListProps> = ({
       dataIndex: "status",
       key: "status",
       width: 100,
-      render: (status: string) => getStatusLabel(status),
+      render: (status: string) => getStatusWithDot(status),
     },
     {
       title: "负责人",

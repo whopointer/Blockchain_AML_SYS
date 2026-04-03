@@ -50,7 +50,7 @@ export interface Case {
   id: string;
   title: string;
   description: string;
-  status: "ACTIVE" | "ARCHIVED" | "CLOSED";
+  status: "NEW" | "IN_PROGRESS" | "ARCHIVED" | "CLOSED";
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tags: string[];
   createTime: Dayjs | string;
@@ -63,7 +63,7 @@ export interface Case {
 
 export interface CaseFilterConfig {
   keyword: string;
-  status: "ALL" | "ACTIVE" | "ARCHIVED" | "CLOSED";
+  status: "ALL" | "NEW" | "IN_PROGRESS" | "ARCHIVED" | "CLOSED";
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "";
   tags: string[];
@@ -75,7 +75,7 @@ export interface SubscribedNode {
   id: string;
   address: string;
   label?: string;
-  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tags: string[];
   remark: string;
   subscribedAt: Dayjs | string;
@@ -91,7 +91,7 @@ export interface SubscribedTransaction {
   toAddress: string;
   amount: string;
   token: string;
-  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tags: string[];
   remark: string;
   subscribedAt: Dayjs | string;
@@ -102,7 +102,7 @@ export interface SubscribedTransaction {
 
 export interface SubscriptionFilter {
   keyword: string;
-  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "";
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
   tags: string[];
   alertOnly: boolean;
 }

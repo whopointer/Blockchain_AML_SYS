@@ -27,6 +27,12 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { Case, CaseComment } from "../../types";
+import {
+  getPriorityColor,
+  getPriorityLabel,
+  getStatusLabel,
+  getStatusDotColor,
+} from "../../utils";
 import CaseFilter from "./CaseFilter";
 import CaseList from "./CaseList";
 import CreateCaseModal from "./CreateCaseModal";
@@ -46,86 +52,32 @@ const parseBackendTags = (tags: any): string[] => {
   return [];
 };
 
-// 后端数据转换为前端Case类型
 const convertBackendCaseToFrontend = (backendCase: any): Case => {
   return {
     id: backendCase.id.toString(), // 确保id是字符串
     title: backendCase.title || backendCase.caseName || "未命名案件",
     description: backendCase.description || "",
-    status: mapBackendStatusToStatus(backendCase.status),
-    riskLevel: mapBackendRiskLevelToRiskLevel(backendCase.riskLevel),
+    status: backendCase.status,
+    riskLevel: backendCase.riskLevel,
     tags: Array.isArray(backendCase.tags)
       ? backendCase.tags
       : parseBackendTags(backendCase.tags),
     createTime: dayjs(backendCase.createTime),
     updateTime: dayjs(backendCase.updateTime),
     assignedTo: backendCase.assignedTo,
-    priority: mapBackendPriorityToPriority(backendCase.priority),
+    priority: backendCase.priority,
     relatedSnapshots: [],
     comments: [],
   };
 };
 
-// 将后端状态映射到前端状态
-const mapBackendStatusToStatus = (
-  backendStatus: string,
-): "ACTIVE" | "ARCHIVED" | "CLOSED" => {
-  switch (backendStatus) {
-    case "NEW":
-      return "ACTIVE";
-    case "IN_PROGRESS":
-      return "ACTIVE";
-    case "ARCHIVED":
-      return "ARCHIVED";
-    case "CLOSED":
-      return "CLOSED";
-    default:
-      return "ACTIVE"; // 默认为ACTIVE
-  }
-};
-
-// 将后端风险等级映射到前端风险等级
-const mapBackendRiskLevelToRiskLevel = (
-  backendRiskLevel: string,
-): "LOW" | "MEDIUM" | "HIGH" => {
-  switch (backendRiskLevel) {
-    case "HIGH":
-      return "HIGH";
-    case "MEDIUM":
-      return "MEDIUM";
-    case "LOW":
-      return "LOW";
-    default:
-      return "LOW"; // 默认为LOW
-  }
-};
-
-// 将后端优先级映射到前端优先级
-const mapBackendPriorityToPriority = (
-  backendPriority: string,
-): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
-  switch (backendPriority) {
-    case "URGENT":
-      return "URGENT";
-    case "HIGH":
-      return "HIGH";
-    case "MEDIUM":
-      return "MEDIUM";
-    case "LOW":
-      return "LOW";
-    default:
-      return "MEDIUM"; // 默认为MEDIUM
-  }
-};
-
-// 前端Case转换为后端数据格式
 const convertFrontendCaseToBackend = (frontendCase: Partial<Case>): any => {
   return {
-    caseName: frontendCase.title,
+    title: frontendCase.title,
     description: frontendCase.description,
     status: frontendCase.status,
     riskLevel: frontendCase.riskLevel,
-    tags: frontendCase.tags?.join(","),
+    tags: frontendCase.tags || [],
     assignedTo: frontendCase.assignedTo,
     priority: frontendCase.priority,
   };
@@ -173,7 +125,9 @@ const CaseManagement: React.FC = () => {
   // 统计数据
   const stats = {
     total: cases.length,
-    active: cases.filter((c) => c.status === "ACTIVE").length,
+    active: cases.filter(
+      (c) => c.status === "IN_PROGRESS" || c.status === "NEW",
+    ).length,
     highRisk: cases.filter((c) => c.riskLevel === "HIGH").length,
     urgent: cases.filter((c) => c.priority === "URGENT").length,
   };
@@ -231,7 +185,7 @@ const CaseManagement: React.FC = () => {
       const backendData = convertFrontendCaseToBackend({
         title: values.title,
         description: values.description,
-        status: "ACTIVE",
+        status: "NEW",
         riskLevel: values.riskLevel,
         priority: values.priority,
         tags: values.tags || [],
@@ -318,9 +272,13 @@ const CaseManagement: React.FC = () => {
 
   // 归档/取消归档
   const handleToggleArchive = async (caseItem: Case) => {
-    const newStatus = caseItem.status === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
+    const backendStatus =
+      caseItem.status === "ARCHIVED" ? "IN_PROGRESS" : "ARCHIVED";
     try {
-      const response = await caseApi.updateCaseStatus(caseItem.id, newStatus);
+      const response = await caseApi.updateCaseStatus(
+        caseItem.id,
+        backendStatus,
+      );
       if (response.success) {
         const updatedCase = convertBackendCaseToFrontend(response.data);
         const updated = cases.map((c) =>
@@ -331,7 +289,9 @@ const CaseManagement: React.FC = () => {
         if (selectedCase?.id === caseItem.id) {
           setSelectedCase(updatedCase);
         }
-        message.success(newStatus === "ARCHIVED" ? "案件已归档" : "已取消归档");
+        message.success(
+          backendStatus === "ARCHIVED" ? "案件已归档" : "已取消归档",
+        );
       } else {
         message.error(response.msg || "更新案件状态失败");
       }
@@ -571,36 +531,23 @@ const CaseManagement: React.FC = () => {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="优先级">
-                <Tag
-                  color={
-                    selectedCase.priority === "URGENT"
-                      ? "red"
-                      : selectedCase.priority === "HIGH"
-                        ? "orange"
-                        : selectedCase.priority === "MEDIUM"
-                          ? "blue"
-                          : "default"
-                  }
-                >
-                  {selectedCase.priority === "URGENT"
-                    ? "紧急"
-                    : selectedCase.priority === "HIGH"
-                      ? "高"
-                      : selectedCase.priority === "MEDIUM"
-                        ? "中"
-                        : "低"}
+                <Tag color={getPriorityColor(selectedCase.priority)}>
+                  {getPriorityLabel(selectedCase.priority)}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="状态">
-                <span
-                  className={`case-status-badge case-status-${selectedCase.status.toLowerCase()}`}
-                >
-                  <span className="case-status-dot" />
-                  {selectedCase.status === "ACTIVE"
-                    ? "进行中"
-                    : selectedCase.status === "ARCHIVED"
-                      ? "已归档"
-                      : "已关闭"}
+                <span style={{ color: getStatusDotColor(selectedCase.status) }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: getStatusDotColor(selectedCase.status),
+                      marginRight: 6,
+                    }}
+                  />
+                  {getStatusLabel(selectedCase.status)}
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label="负责人">

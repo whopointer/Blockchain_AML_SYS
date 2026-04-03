@@ -70,7 +70,6 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
 
   const getRiskLevelColor = (level: string) => {
     switch (level) {
-      case "CRITICAL":
       case "HIGH":
         return "red";
       case "MEDIUM":
@@ -84,7 +83,6 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
 
   const getRiskLevelLabel = (level: string) => {
     switch (level) {
-      case "CRITICAL":
       case "HIGH":
         return "高风险";
       case "MEDIUM":

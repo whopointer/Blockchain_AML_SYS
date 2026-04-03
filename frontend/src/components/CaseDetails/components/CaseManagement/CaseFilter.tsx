@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  Input,
-  Select,
-  DatePicker,
-  Row,
-  Col,
-  Button,
-  Form,
-} from "antd";
+import { Input, Select, DatePicker, Row, Col, Button, Form } from "antd";
 import { SearchOutlined, ClearOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -54,7 +46,11 @@ const CaseFilter: React.FC<CaseFilterProps> = ({ onFilter, allTags }) => {
     <Form form={form} layout="vertical" className="case-filter-section">
       <Row gutter={[16, 16]} align="bottom">
         <Col xs={24} sm={12} md={6} lg={5}>
-          <Form.Item label="关键词搜索" name="keyword" style={{ marginBottom: 0 }}>
+          <Form.Item
+            label="关键词搜索"
+            name="keyword"
+            style={{ marginBottom: 0 }}
+          >
             <Input
               placeholder="搜索案件标题/编号/描述"
               prefix={<SearchOutlined />}
@@ -75,20 +71,23 @@ const CaseFilter: React.FC<CaseFilterProps> = ({ onFilter, allTags }) => {
               allowClear
             >
               <Select.Option value="ALL">全部</Select.Option>
-              <Select.Option value="ACTIVE">进行中</Select.Option>
+              <Select.Option value="NEW">新建</Select.Option>
+              <Select.Option value="IN_PROGRESS">进行中</Select.Option>
               <Select.Option value="ARCHIVED">已归档</Select.Option>
               <Select.Option value="CLOSED">已关闭</Select.Option>
             </Select>
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6} lg={4}>
-          <Form.Item label="风险等级" name="riskLevel" style={{ marginBottom: 0 }}>
+          <Form.Item
+            label="风险等级"
+            name="riskLevel"
+            style={{ marginBottom: 0 }}
+          >
             <Select
               placeholder="全部等级"
               value={filters.riskLevel || undefined}
-              onChange={(value) =>
-                setFilters({ ...filters, riskLevel: value })
-              }
+              onChange={(value) => setFilters({ ...filters, riskLevel: value })}
               allowClear
             >
               <Select.Option value="HIGH">高风险</Select.Option>
@@ -102,9 +101,7 @@ const CaseFilter: React.FC<CaseFilterProps> = ({ onFilter, allTags }) => {
             <Select
               placeholder="全部优先级"
               value={filters.priority || undefined}
-              onChange={(value) =>
-                setFilters({ ...filters, priority: value })
-              }
+              onChange={(value) => setFilters({ ...filters, priority: value })}
               allowClear
             >
               <Select.Option value="URGENT">紧急</Select.Option>

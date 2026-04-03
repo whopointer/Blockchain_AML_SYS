@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Modal, Form, Input, Select, Button, Space, Row, Col } from "antd";
 import { Case } from "../../types";
+import { getStatusLabel } from "../../utils";
 
 const { TextArea } = Input;
 
@@ -188,13 +189,7 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
             <Col span={12}>
               <Form.Item label="当前状态">
                 <Input
-                  value={
-                    initialValues.status === "ACTIVE"
-                      ? "进行中"
-                      : initialValues.status === "ARCHIVED"
-                        ? "已归档"
-                        : "已关闭"
-                  }
+                  value={getStatusLabel(initialValues?.status || "")}
                   disabled
                 />
               </Form.Item>
