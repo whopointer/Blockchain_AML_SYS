@@ -15,6 +15,8 @@ export interface NodeItem {
   exg?: number;
   x?: number;
   y?: number;
+  fx?: number | null;
+  fy?: number | null;
 }
 
 export interface LinkItem {

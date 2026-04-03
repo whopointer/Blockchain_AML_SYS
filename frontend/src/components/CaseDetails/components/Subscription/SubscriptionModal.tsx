@@ -19,6 +19,7 @@ interface SubscriptionModalProps {
   type: "node" | "transaction";
   isEdit?: boolean;
   initialValues?: SubscribedNode | SubscribedTransaction | null;
+  address?: string;
   onCancel: () => void;
   onSubmit: (values: any) => void;
 }
@@ -28,6 +29,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   type,
   isEdit = false,
   initialValues,
+  address,
   onCancel,
   onSubmit,
 }) => {
@@ -41,9 +43,8 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           const node = initialValues as SubscribedNode;
           form.setFieldsValue({
             address: node.address,
-            label: node.label,
-            riskLevel: node.riskLevel,
             tags: node.tags,
+            riskLevel: node.riskLevel,
             remark: node.remark,
             alertEnabled: node.alertEnabled,
           });
@@ -68,10 +69,11 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           tags: [],
           alertEnabled: true,
           token: "ETH",
+          ...(isNode && address ? { address } : {}),
         });
       }
     }
-  }, [visible, initialValues, isNode, form]);
+  }, [visible, initialValues, isNode, form, address]);
 
   const handleSubmit = async () => {
     try {
@@ -149,8 +151,15 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </Row>
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item label="标签" name="label">
-                  <Input placeholder="给地址添加一个标签" />
+                <Form.Item label="标签" name="tags">
+                  <Select
+                    mode="tags"
+                    placeholder="选择或输入标签"
+                    options={tagOptions.map((tag) => ({
+                      label: tag,
+                      value: tag,
+                    }))}
+                  />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -248,18 +257,6 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                       </Select.Option>
                     ))}
                   </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="标签" name="tags">
-                  <Select
-                    mode="tags"
-                    placeholder="选择或输入标签"
-                    options={tagOptions.map((tag) => ({
-                      label: tag,
-                      value: tag,
-                    }))}
-                  />
                 </Form.Item>
               </Col>
             </Row>

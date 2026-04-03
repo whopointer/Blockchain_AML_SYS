@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Input, Select, DatePicker, Row, Col, Button, Form } from "antd";
+import { Input, Select, Row, Col, Button, Form } from "antd";
 import { SearchOutlined, ClearOutlined } from "@ant-design/icons";
-import dayjs from "dayjs";
-
-const { RangePicker } = DatePicker;
 
 interface CaseFilterProps {
   onFilter: (filters: any) => void;

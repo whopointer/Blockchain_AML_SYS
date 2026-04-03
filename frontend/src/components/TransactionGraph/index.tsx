@@ -406,6 +406,18 @@ const TransactionGraph: React.FC = () => {
                     currencySymbol={currencySymbol}
                     filter={filter}
                     onFilterChange={setFilter}
+                    onGraphUpdate={(
+                      updatedNodes: NodeItem[],
+                      updatedLinks: LinkItem[],
+                    ) => {
+                      console.log("Updated nodes:", updatedNodes);
+                      console.log("Updated links:", updatedLinks);
+                      setGraphData((prev) => ({
+                        ...prev,
+                        nodes: updatedNodes,
+                        links: updatedLinks,
+                      }));
+                    }}
                   />
                 ) : (
                   <div

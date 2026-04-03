@@ -92,7 +92,7 @@ function App() {
               <CustomNavLink to="/batch">批量分析</CustomNavLink>
               <CustomNavLink to="/transaction-graph">交易图谱</CustomNavLink>
               <CustomNavLink to="/path-tracking">路径追踪</CustomNavLink>
-              <CustomNavLink to="/case-details">案件详情</CustomNavLink>
+              <CustomNavLink to="/case-details">案件中心</CustomNavLink>
             </Nav>
           </Navbar.Collapse>
         </Container>
@@ -184,7 +184,6 @@ function App() {
             }
           />
 
-          {/* 案件详情页面使用全屏宽度 */}
           <Route
             path="/case-details"
             element={

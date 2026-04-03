@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Tag,
   Space,
@@ -81,6 +81,13 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState<boolean>(false);
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dimensionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [filterConfig, setFilterConfig] = useState<{
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -207,6 +214,37 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
       );
     }
   }, [selectedSnapshot]);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const { offsetWidth, offsetHeight } = containerRef.current;
+        if (offsetWidth > 0 && offsetHeight > 0) {
+          setDimensions({ width: offsetWidth, height: offsetHeight });
+        }
+      }
+    };
+
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (dimensionsTimeoutRef.current) {
+        clearTimeout(dimensionsTimeoutRef.current);
+      }
+      dimensionsTimeoutRef.current = setTimeout(updateDimensions, 100);
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+      if (dimensionsTimeoutRef.current) {
+        clearTimeout(dimensionsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const getRiskLevelColor = (riskLevel: "LOW" | "MEDIUM" | "HIGH"): string => {
     switch (riskLevel) {
@@ -708,6 +746,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           <h4>图谱快照</h4>
           <div
             id="graph-container"
+            ref={containerRef}
             style={{
               height: "500px",
               backgroundColor: "#ffffff",
@@ -715,12 +754,12 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               position: "relative",
             }}
           >
-            {!isError ? (
+            {dimensions && !isError ? (
               <TxGraph
                 nodes={graphData.nodes}
                 links={graphData.links}
-                width={740}
-                height={500}
+                width={dimensions.width}
+                height={dimensions.height}
                 filter={{
                   ...filterConfig,
                   startDate:
@@ -729,20 +768,45 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
                     parseDateSafely(filterConfig.endDate)?.toDate() || null,
                 }}
                 onFilterChange={handleFilterChange}
-              />
-            ) : (
-              <ErrorPlaceholder
-                type="network"
-                title="图谱数据加载失败"
-                description="无法连接到数据服务器，请检查网络连接后重试"
-                onRetry={() => {
-                  setIsError(false);
-                  setLoading(true);
-                  window.location.reload();
+                onGraphUpdate={(
+                  updatedNodes: NodeItem[],
+                  updatedLinks: LinkItem[],
+                ) => {
+                  setGraphData((prev) => ({
+                    ...prev,
+                    nodes: updatedNodes,
+                    links: updatedLinks,
+                  }));
                 }}
               />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: "500px",
+                  backgroundColor: "#f5f5f5",
+                  borderRadius: "8px",
+                }}
+              >
+                {isError ? (
+                  <ErrorPlaceholder
+                    type="network"
+                    title="图谱数据加载失败"
+                    description="无法连接到数据服务器，请检查网络连接后重试"
+                    onRetry={() => {
+                      setIsError(false);
+                      setLoading(true);
+                      window.location.reload();
+                    }}
+                  />
+                ) : (
+                  <span>暂无数据</span>
+                )}
+              </div>
             )}
-            {loading && (
+            {loading && dimensions && (
               <div
                 style={{
                   position: "absolute",

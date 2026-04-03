@@ -1,5 +1,6 @@
 import React from "react";
 import { Table, Space, Button, Tag, Tooltip, Skeleton, Row, Col } from "antd";
+import type { SortOrder } from "antd/es/table/interface";
 import {
   EyeOutlined,
   EditOutlined,
@@ -154,6 +155,13 @@ const CaseList: React.FC<CaseListProps> = ({
       dataIndex: "createTime",
       key: "createTime",
       width: 160,
+      sorter: (a: Case, b: Case) => {
+        const timeA = dayjs(a.createTime).valueOf();
+        const timeB = dayjs(b.createTime).valueOf();
+        return timeA - timeB;
+      },
+      sortDirections: ["descend", "ascend"] as SortOrder[],
+      showSorterTooltip: false,
       render: (time: any) => dayjs(time).format("YYYY-MM-DD HH:mm"),
     },
     {

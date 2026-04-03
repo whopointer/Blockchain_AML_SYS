@@ -67,12 +67,11 @@ const convertFrontendNodeToBackend = (
 ): any => {
   return {
     address: frontendNode.address,
-    label: frontendNode.label,
+    tags: frontendNode.tags || [],
     riskLevel: frontendNode.riskLevel,
-    tags: frontendNode.tags?.join(","),
-    remark: frontendNode.remark,
+    notes: frontendNode.remark,
     alertEnabled: frontendNode.alertEnabled,
-    relatedCases: frontendNode.relatedCases?.join(","),
+    relatedCases: frontendNode.relatedCases || [],
   };
 };
 
@@ -87,10 +86,10 @@ const convertFrontendTxToBackend = (
     amount: frontendTx.amount,
     token: frontendTx.token,
     riskLevel: frontendTx.riskLevel,
-    tags: frontendTx.tags?.join(","),
-    remark: frontendTx.remark,
+    tags: frontendTx.tags || [],
+    notes: frontendTx.remark,
     alertEnabled: frontendTx.alertEnabled,
-    relatedCases: frontendTx.relatedCases?.join(","),
+    relatedCases: frontendTx.relatedCases || [],
   };
 };
 
