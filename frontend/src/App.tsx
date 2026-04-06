@@ -1,12 +1,7 @@
 import React, { useState } from "react";
 import { Container, Nav, Navbar, Tab, Tabs, Row, Col } from "react-bootstrap";
-import {
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  Link,
-} from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 
@@ -51,6 +46,9 @@ const DashboardPage = () => {
 
   return (
     <Tab.Container defaultActiveKey="dashboard">
+      <Helmet>
+        <title>系统仪表板 - 区块链AML反洗钱系统</title>
+      </Helmet>
       <Tabs id="main-tabs" className="mb-4" fill justify>
         <Tab eventKey="dashboard" title="🎯 系统仪表板">
           <Dashboard />
@@ -79,6 +77,9 @@ const DashboardPage = () => {
 function App() {
   return (
     <div className="App">
+      <Helmet>
+        <title>区块链AML反洗钱系统</title>
+      </Helmet>
       <Navbar expand="lg" className="fixed-top">
         <Container>
           <Navbar.Brand as={Link} to="/dashboard">

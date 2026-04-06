@@ -59,6 +59,86 @@ export function computePositions(
 }
 
 /**
+ * 只计算缺失位置的节点，保留已有位置的节点
+ * 用于双击展开新节点时，只计算新节点的位置而不影响旧节点
+ */
+export function computeMissingPositions(
+  nodes: NodeItem[],
+  links: LinkItem[],
+  width: number,
+  height: number,
+): { nodes: NodeItem[]; links: LinkItem[] } {
+  // 分离有位置和无位置的节点
+  const nodesWithPosition = nodes.filter(
+    (n) => n.x !== undefined && n.y !== undefined,
+  );
+  const nodesWithoutPosition = nodes.filter(
+    (n) => n.x === undefined || n.y === undefined,
+  );
+
+  // 如果所有节点都有位置，直接返回
+  if (nodesWithoutPosition.length === 0) {
+    return { nodes, links };
+  }
+
+  // 如果所有节点都没有位置，使用完整布局计算
+  if (nodesWithPosition.length === 0) {
+    return computePositions(nodes, links, width, height);
+  }
+
+  // 有部分节点有位置，部分没有
+  // 以有位置的节点为基础，为没有位置的节点计算位置
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const layerSpacing = 200;
+
+  // 为没有位置的节点设置 layer（如果没有）
+  nodesWithoutPosition.forEach((n) => {
+    if (n.layer === undefined || n.layer === null) n.layer = 1;
+  });
+
+  // 按 layer 分组
+  const layers: { [key: number]: NodeItem[] } = {};
+  nodesWithoutPosition.forEach((n) => {
+    const l = n.layer as number;
+    if (!layers[l]) layers[l] = [];
+    layers[l].push(n);
+  });
+
+  // 计算每个新节点的层中应该有多少个已有位置的节点
+  const existingLayers: { [key: number]: number } = {};
+  nodesWithPosition.forEach((n) => {
+    const l = n.layer as number;
+    existingLayers[l] = (existingLayers[l] || 0) + 1;
+  });
+
+  Object.keys(layers)
+    .map((k) => Number(k))
+    .forEach((layer) => {
+      const group = layers[layer];
+      const x = centerX + layer * layerSpacing;
+
+      // 已有位置节点的数量作为偏移
+      const existingCount = existingLayers[layer] || 0;
+      const count = group.length;
+      const maxSpacing = 100;
+      const minSpacing = 40;
+      const spacing = Math.min(
+        maxSpacing,
+        Math.max(minSpacing, height / (count + existingCount + 1)),
+      );
+      const startY = centerY - (spacing * (count - 1)) / 2;
+
+      group.forEach((node, i) => {
+        node.x = x;
+        node.y = startY + i * spacing;
+      });
+    });
+
+  return { nodes, links };
+}
+
+/**
  * 合并节点数据，去重
  */
 export const mergeNodes = (

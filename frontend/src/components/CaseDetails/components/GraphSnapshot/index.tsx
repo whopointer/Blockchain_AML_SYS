@@ -13,7 +13,7 @@ import type {
   CaseComment,
   CaseStatusFilter,
 } from "../../types";
-import { graphSnapshotApi } from "../../../../services/graph-snapshot/api";
+import { graphSnapshotApi } from "@/services/graph-snapshot/api";
 
 dayjs.locale("zh-cn");
 
@@ -37,6 +37,7 @@ const GraphSnapshotPage: React.FC = () => {
     dateRange: [null, null],
   });
   const [statusFilter, setStatusFilter] = useState<CaseStatusFilter>("ALL");
+  const [graphDataLoading, setGraphDataLoading] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>(null);
 
@@ -47,6 +48,11 @@ const GraphSnapshotPage: React.FC = () => {
     {
       archived: boolean;
       comments: CaseComment[];
+      transformConfig?: {
+        x: number;
+        y: number;
+        k: number;
+      };
     }
   > => {
     try {
@@ -59,6 +65,11 @@ const GraphSnapshotPage: React.FC = () => {
         {
           archived: boolean;
           comments: CaseComment[];
+          transformConfig?: {
+            x: number;
+            y: number;
+            k: number;
+          };
         }
       >;
     } catch (error) {
@@ -68,7 +79,14 @@ const GraphSnapshotPage: React.FC = () => {
   };
 
   const saveSnapshotMetaMap = (
-    metaMap: Record<string, { archived: boolean; comments: CaseComment[] }>,
+    metaMap: Record<
+      string,
+      {
+        archived: boolean;
+        comments: CaseComment[];
+        transformConfig?: { x: number; y: number; k: number };
+      }
+    >,
   ) => {
     localStorage.setItem(SNAPSHOT_META_STORAGE_KEY, JSON.stringify(metaMap));
   };
@@ -81,6 +99,7 @@ const GraphSnapshotPage: React.FC = () => {
         ...snapshot,
         archived: meta.archived,
         comments: meta.comments || [],
+        transformConfig: meta.transformConfig,
       };
     },
     [],
@@ -95,6 +114,35 @@ const GraphSnapshotPage: React.FC = () => {
     }
     return "";
   };
+
+  const updateSnapshotTransform = useCallback(
+    (snapshotId: string, transform: { x: number; y: number; k: number }) => {
+      const metaMap = loadSnapshotMetaMap();
+      if (!metaMap[snapshotId]) {
+        metaMap[snapshotId] = { archived: false, comments: [] };
+      }
+      metaMap[snapshotId].transformConfig = transform;
+      saveSnapshotMetaMap(metaMap);
+
+      setSnapshots((prev) =>
+        prev.map((s) =>
+          s.id === snapshotId ? { ...s, transformConfig: transform } : s,
+        ),
+      );
+      setFilteredSnapshots((prev) =>
+        prev.map((s) =>
+          s.id === snapshotId ? { ...s, transformConfig: transform } : s,
+        ),
+      );
+      if (selectedSnapshot && selectedSnapshot.id === snapshotId) {
+        setSelectedSnapshot({
+          ...selectedSnapshot,
+          transformConfig: transform,
+        });
+      }
+    },
+    [selectedSnapshot],
+  );
 
   const filterSnapshots = useCallback(() => {
     let filtered = snapshots;
@@ -209,9 +257,25 @@ const GraphSnapshotPage: React.FC = () => {
     filterSnapshots();
   }, [filterSnapshots]);
 
-  const handleViewSnapshot = (snapshot: GraphSnapshot) => {
-    setSelectedSnapshot(snapshot);
+  const handleViewSnapshot = async (snapshot: GraphSnapshot) => {
     setDrawerVisible(true);
+    setGraphDataLoading(true);
+
+    try {
+      const response = await graphSnapshotApi.getSnapshotDetail(snapshot.id);
+      if (response.success && response.data) {
+        setSelectedSnapshot(response.data);
+      } else {
+        message.error(response.msg || "获取快照详情失败");
+        setSelectedSnapshot(snapshot);
+      }
+    } catch (error) {
+      console.error("获取快照详情失败:", error);
+      message.error("获取快照详情失败");
+      setSelectedSnapshot(snapshot);
+    } finally {
+      setGraphDataLoading(false);
+    }
   };
 
   const handleExportPDF = (snapshot: GraphSnapshot) => {
@@ -480,11 +544,13 @@ const GraphSnapshotPage: React.FC = () => {
           {selectedSnapshot && (
             <GraphDisplay
               selectedSnapshot={selectedSnapshot}
+              loading={graphDataLoading}
               onClose={() => setDrawerVisible(false)}
               onDownloadSnapshot={handleDownloadSnapshot}
               onDeleteSnapshot={handleDeleteSnapshot}
               onToggleArchiveSnapshot={toggleArchiveSnapshot}
               onAddComment={addCommentToSnapshot}
+              onTransformChange={updateSnapshotTransform}
               editingField={editingField}
               tempValue={tempValue}
               setTempValue={setTempValue}

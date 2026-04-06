@@ -37,7 +37,7 @@ import CaseFilter from "./CaseFilter";
 import CaseList from "./CaseList";
 import CreateCaseModal from "./CreateCaseModal";
 import "./CaseManagement.css";
-import { caseApi } from "../../../../services/case/api";
+import { caseApi } from "@/services/case/api";
 
 const parseBackendTags = (tags: any): string[] => {
   if (Array.isArray(tags)) {

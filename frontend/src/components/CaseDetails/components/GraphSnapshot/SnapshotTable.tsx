@@ -276,9 +276,9 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
     () => (
       <div style={{ padding: "40px 0", textAlign: "center" }}>
         <div style={{ fontSize: "48px", marginBottom: "16px" }}>📋</div>
-        <div style={{ color: "#999", fontSize: "14px" }}>暂无案件数据</div>
+        <div style={{ color: "#999", fontSize: "14px" }}>暂无图谱快照</div>
         <div style={{ color: "#bbb", fontSize: "12px", marginTop: "8px" }}>
-          您可以在交易图谱页面保存快照来创建案件
+          您可以在交易图谱页面创建图谱快照
         </div>
       </div>
     ),

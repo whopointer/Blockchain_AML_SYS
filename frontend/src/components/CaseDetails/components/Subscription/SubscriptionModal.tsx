@@ -47,6 +47,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             riskLevel: node.riskLevel,
             remark: node.remark,
             alertEnabled: node.alertEnabled,
+            cryptoType: node.cryptoType || "ETH",
           });
         } else {
           const tx = initialValues as SubscribedTransaction;
@@ -60,6 +61,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             tags: tx.tags,
             remark: tx.remark,
             alertEnabled: tx.alertEnabled,
+            cryptoType: tx.cryptoType || "ETH",
           });
         }
       } else {
@@ -69,6 +71,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           tags: [],
           alertEnabled: true,
           token: "ETH",
+          cryptoType: "ETH",
           ...(isNode && address ? { address } : {}),
         });
       }
@@ -151,6 +154,20 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </Row>
             <Row gutter={16}>
               <Col span={12}>
+                <Form.Item 
+                  label="加密货币类型" 
+                  name="cryptoType" 
+                  rules={[{ required: true, message: "请选择加密货币类型" }]}
+                  initialValue="ETH"
+                >
+                  <Select placeholder="选择加密货币类型">
+                    <Select.Option value="ETH">以太坊 (ETH)</Select.Option>
+                    <Select.Option value="BTC">比特币 (BTC)</Select.Option>
+                    <Select.Option value="OTHER">其他</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
                 <Form.Item label="标签" name="tags">
                   <Select
                     mode="tags"
@@ -162,6 +179,8 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   />
                 </Form.Item>
               </Col>
+            </Row>
+            <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
                   label="风险等级"
@@ -244,6 +263,20 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               </Col>
             </Row>
             <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item 
+                  label="区块链类型" 
+                  name="cryptoType" 
+                  rules={[{ required: true, message: "请选择区块链类型" }]}
+                  initialValue="ETH"
+                >
+                  <Select placeholder="选择区块链类型">
+                    <Select.Option value="ETH">以太坊</Select.Option>
+                    <Select.Option value="BTC">比特币</Select.Option>
+                    <Select.Option value="OTHER">其他</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
               <Col span={12}>
                 <Form.Item
                   label="风险等级"

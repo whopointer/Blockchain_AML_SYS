@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Row, Col, Form, Card, message, Spin } from "antd";
 import {
   transactionApi,
   GraphAnalysisResponse,
-} from "../../services/transaction/index";
+} from "@/services/transaction/index";
 import TxGraph from "../GraphCommon/TxGraph";
 import PathTxAnalysis from "./PathTxAnalysis";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
@@ -14,7 +15,7 @@ import PathTrackingSearch from "./PathTrackingSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import { graphSnapshotApi } from "../../services/graph-snapshot/api";
+import { graphSnapshotApi } from "@/services/graph-snapshot/api";
 import ResultSearchBar from "./ResultSearchBar";
 
 dayjs.locale("zh-cn");
@@ -270,17 +271,51 @@ const PathTracking: React.FC = () => {
         endDate: convertToUTC8(filter.endDate),
       };
 
+      const graphDataPayload = {
+        nodes:
+          graphData.nodes?.map((node) => ({
+            id: node.id,
+            addr: node.addr,
+            label: node.label,
+            title: node.title,
+            layer: node.layer,
+            value: node.value,
+            pid: node.pid,
+            color: node.color,
+            shape: node.shape,
+            image: node.image,
+            track: node.track,
+            expanded: node.expanded,
+            malicious: node.malicious,
+            exg: node.exg,
+            x: node.x,
+            y: node.y,
+            fx: node.fx,
+            fy: node.fy,
+          })) || [],
+        links:
+          graphData.links?.map((link) => ({
+            from: link.from,
+            to: link.to,
+            label: link.label,
+            val: link.val,
+            tx_time: link.tx_time,
+            tx_hash_list: link.tx_hash_list,
+          })) || [],
+      };
+
       const snapshotRequest = {
         title: snapshotData.title,
         description: snapshotData.description,
         tags: snapshotData.tags,
-        mainAddress: centerAddress,
         nodeCount: graphData.nodes?.length || 0,
         linkCount: graphData.links?.length || 0,
         riskLevel: snapshotData.riskLevel || backendRiskLevel,
         fromAddress: urlFromAddress || "",
         toAddress: urlToAddress || "",
         filterConfig: filterConfigWithUTC8,
+        graphData: graphDataPayload,
+        dataSource: "snapshot",
       };
 
       const response = await graphSnapshotApi.createSnapshot(snapshotRequest);
@@ -300,6 +335,9 @@ const PathTracking: React.FC = () => {
 
   return (
     <div ref={containerRef}>
+      <Helmet>
+        <title>路径追踪 - 区块链AML反洗钱系统</title>
+      </Helmet>
       {/* 搜索框部分 - 当没有查询字符串时显示完整界面，否则只显示搜索框 */}
       {showSearchBoxOnly ? (
         <PathTrackingSearch
@@ -364,6 +402,16 @@ const PathTracking: React.FC = () => {
                     currencySymbol={currency.toUpperCase()}
                     filter={filter}
                     onFilterChange={setFilter}
+                    onGraphUpdate={(
+                      updatedNodes: NodeItem[],
+                      updatedLinks: LinkItem[],
+                    ) => {
+                      setGraphData((prev) => ({
+                        ...prev,
+                        nodes: updatedNodes,
+                        links: updatedLinks,
+                      }));
+                    }}
                   />
                 ) : (
                   <div

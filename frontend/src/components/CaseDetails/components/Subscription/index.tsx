@@ -40,7 +40,8 @@ const convertBackendNodeToFrontend = (backendNode: any): SubscribedNode => {
       : undefined,
     alertEnabled: backendNode.isActive,
     relatedCases: parseBackendStringArray(backendNode.relatedCases),
-  };
+    cryptoType: backendNode.cryptoType, // 添加加密货币类型
+  } as SubscribedNode & { cryptoType?: string };
 };
 
 const convertBackendTxToFrontend = (backendTx: any): SubscribedTransaction => {
@@ -58,19 +59,35 @@ const convertBackendTxToFrontend = (backendTx: any): SubscribedTransaction => {
     txTime: backendTx.txTime ? dayjs(backendTx.txTime) : undefined,
     alertEnabled: backendTx.isActive,
     relatedCases: parseBackendStringArray(backendTx.relatedCases),
-  };
+    cryptoType: backendTx.cryptoType, // 添加加密货币类型
+  } as SubscribedTransaction & { cryptoType?: string };
 };
 
 // 前端节点转换为后端格式
 const convertFrontendNodeToBackend = (
   frontendNode: Partial<SubscribedNode>,
 ): any => {
+  // 优先使用表单中的cryptoType，如果没有则根据地址推断
+  const address = frontendNode.address || '';
+  let cryptoType = frontendNode.cryptoType || "ETH"; // 默认值
+  
+  // 如果没有提供cryptoType，根据地址前缀推断
+  if (!frontendNode.cryptoType) {
+    if (address.startsWith("1") || address.startsWith("3") || address.startsWith("bc1")) {
+      cryptoType = "BTC";
+    } else if (address.startsWith("0x")) {
+      cryptoType = "ETH";
+    }
+  }
+  
   return {
     address: frontendNode.address,
+    cryptoType: cryptoType,
+    label: frontendNode.label || "",
     tags: frontendNode.tags || [],
     riskLevel: frontendNode.riskLevel,
     notes: frontendNode.remark,
-    alertEnabled: frontendNode.alertEnabled,
+    isActive: frontendNode.alertEnabled,
     relatedCases: frontendNode.relatedCases || [],
   };
 };
@@ -79,8 +96,23 @@ const convertFrontendNodeToBackend = (
 const convertFrontendTxToBackend = (
   frontendTx: Partial<SubscribedTransaction>,
 ): any => {
+  // 优先使用表单中的cryptoType，如果没有则根据代币推断
+  const token = frontendTx.token || "ETH";
+  let cryptoType = frontendTx.cryptoType || "ETH"; // 默认值
+  
+  // 如果没有提供cryptoType，根据代币类型推断
+  if (!frontendTx.cryptoType) {
+    if (token === "BTC") {
+      cryptoType = "BTC";
+    } else {
+      // 默认以太坊链（ETH、USDT、USDC、BNB等）
+      cryptoType = "ETH";
+    }
+  }
+  
   return {
     txHash: frontendTx.txHash,
+    cryptoType: cryptoType,
     fromAddress: frontendTx.fromAddress,
     toAddress: frontendTx.toAddress,
     amount: frontendTx.amount,
@@ -88,7 +120,7 @@ const convertFrontendTxToBackend = (
     riskLevel: frontendTx.riskLevel,
     tags: frontendTx.tags || [],
     notes: frontendTx.remark,
-    alertEnabled: frontendTx.alertEnabled,
+    isActive: frontendTx.alertEnabled,
     relatedCases: frontendTx.relatedCases || [],
   };
 };

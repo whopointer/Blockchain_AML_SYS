@@ -9,6 +9,7 @@ import {
   StarOutlined,
 } from "@ant-design/icons";
 import SubscriptionModal from "../CaseDetails/components/Subscription/SubscriptionModal";
+import { subscriptionApi } from "@/services/case/api";
 
 interface AddressInfoProps {
   address?: string;
@@ -16,6 +17,7 @@ interface AddressInfoProps {
   firstTxTime?: string;
   latestTxTime?: string;
   isMalicious?: boolean;
+  cryptoType?: string;
 }
 
 // 格式化地址显示：前8位 + ... + 后8位
@@ -42,6 +44,7 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
   firstTxTime,
   latestTxTime,
   isMalicious = false,
+  cryptoType,
 }) => {
   const [subscriptionModalVisible, setSubscriptionModalVisible] =
     useState(false);
@@ -54,10 +57,32 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
     setSubscriptionModalVisible(false);
   };
 
-  const handleSubmitSubscription = (values: any) => {
-    console.log("Subscription submitted:", values);
-    message.success("订阅成功");
-    setSubscriptionModalVisible(false);
+  const handleSubmitSubscription = async (values: any) => {
+    try {
+      const backendData = {
+        address: values.address || address,
+        cryptoType: cryptoType || "ETH", // 添加必填字段
+        label: "",
+        tags: values.tags || [],
+        riskLevel: values.riskLevel || "MEDIUM",
+        notes: values.remark || "",
+        isActive:
+          values.alertEnabled !== undefined ? values.alertEnabled : true,
+        relatedCases: values.relatedCases || [],
+      };
+
+      const response =
+        await subscriptionApi.createNodeSubscription(backendData);
+      if (response.success) {
+        message.success("节点订阅添加成功");
+        setSubscriptionModalVisible(false);
+      } else {
+        message.error(response.msg || "添加节点订阅失败");
+      }
+    } catch (error) {
+      console.error("添加订阅失败:", error);
+      message.error("添加订阅失败");
+    }
   };
 
   return (

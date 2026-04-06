@@ -30,10 +30,16 @@ export interface GraphSnapshot {
     startDate?: Dayjs | null;
     endDate?: Dayjs | null;
   };
+  transformConfig?: {
+    x: number;
+    y: number;
+    k: number;
+  };
   graphData?: {
     nodes: import("../GraphCommon/types").NodeItem[];
     links: import("../GraphCommon/types").LinkItem[];
   };
+  dataSource?: "api" | "snapshot";
 }
 
 export interface FilterConfig {

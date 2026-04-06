@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Layout, ConfigProvider } from "antd";
+import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate } from "react-router-dom";
 import zhCN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
@@ -56,31 +57,36 @@ const CaseDetails: React.FC = () => {
   };
 
   return (
-    <ConfigProvider
-      locale={zhCN}
-      theme={{
-        token: {
-          colorPrimary: "#667eea",
-          colorSuccess: "#13b497",
-          colorWarning: "#faad14",
-          colorError: "#ff4d4f",
-          colorInfo: "#1890ff",
-        },
-        components: {
-          Table: {
-            cellPaddingBlock: 12,
-            cellPaddingInline: 16,
+    <>
+      <Helmet>
+        <title>案件中心 - 区块链AML反洗钱系统</title>
+      </Helmet>
+      <ConfigProvider
+        locale={zhCN}
+        theme={{
+          token: {
+            colorPrimary: "#667eea",
+            colorSuccess: "#13b497",
+            colorWarning: "#faad14",
+            colorError: "#ff4d4f",
+            colorInfo: "#1890ff",
           },
-        },
-      }}
-    >
-      <Layout style={{ minHeight: "100vh" }}>
-        <Sidebar activeKey={activeMenu} onMenuSelect={handleMenuSelect} />
-        <Content style={{ margin: 0, background: "#f5f7fa", flex: 1 }}>
-          {renderContent()}
-        </Content>
-      </Layout>
-    </ConfigProvider>
+          components: {
+            Table: {
+              cellPaddingBlock: 12,
+              cellPaddingInline: 16,
+            },
+          },
+        }}
+      >
+        <Layout style={{ minHeight: "100vh" }}>
+          <Sidebar activeKey={activeMenu} onMenuSelect={handleMenuSelect} />
+          <Content style={{ margin: 0, background: "#f5f7fa", flex: 1 }}>
+            {renderContent()}
+          </Content>
+        </Layout>
+      </ConfigProvider>
+    </>
   );
 };
 

@@ -23,24 +23,25 @@ import {
   InboxOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
-import TxGraph from "../../../GraphCommon/TxGraph";
-import TxGraphFilter from "../../../GraphCommon/TxGraphFilter";
+import TxGraph from "@/components/GraphCommon/TxGraph";
+import TxGraphFilter from "@/components/GraphCommon/TxGraphFilter";
 import { GraphSnapshot } from "../../types";
-import { transactionApi } from "../../../../services/transaction/api";
-import { NodeItem, LinkItem } from "../../../GraphCommon/types";
+import { transactionApi } from "@/services/transaction/api";
+import { NodeItem, LinkItem } from "@/components/GraphCommon/types";
 import dayjs from "dayjs";
-import { formatEthValue } from "../../../../utils/ethUtils";
+
 import {
   generatePDFReport,
   exportFullGraphToPNG,
   convertGraphToCSV,
   downloadCSV,
   exportCasePackage,
-} from "../../../../utils/exportUtils";
-import ErrorPlaceholder from "../../../GraphCommon/ErrorPlaceholder";
+} from "@/utils/exportUtils";
+import ErrorPlaceholder from "@/components/GraphCommon/ErrorPlaceholder";
 
 interface GraphDisplayProps {
   selectedSnapshot: GraphSnapshot;
+  loading: boolean;
   onClose: () => void;
   onDownloadSnapshot: (snapshot: GraphSnapshot) => void;
   onDeleteSnapshot: (snapshot: GraphSnapshot) => void;
@@ -88,6 +89,18 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dimensionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 为每个图谱快照单独存储拖拽位移和缩放大小
+  const [graphTransform, setGraphTransform] = useState<{
+    x: number;
+    y: number;
+    k: number;
+  }>({ x: 0, y: 0, k: 1 });
+
+  // 使用 useRef 来存储所有快照的变换状态，避免每次切换都重置
+  const snapshotTransformsRef = useRef<
+    Record<string, { x: number; y: number; k: number }>
+  >({});
+
   const [filterConfig, setFilterConfig] = useState<{
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -106,11 +119,155 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
     },
   );
 
+  // 当切换快照时，恢复或初始化对应的变换状态
+  useEffect(() => {
+    if (selectedSnapshot?.id) {
+      const snapshotId = selectedSnapshot.id;
+
+      // 如果之前保存过这个快照的变换状态，就恢复它
+      if (snapshotTransformsRef.current[snapshotId]) {
+        const cachedTransform = snapshotTransformsRef.current[snapshotId];
+        // 只在变换实际变化时更新状态
+        if (
+          graphTransform.x !== cachedTransform.x ||
+          graphTransform.y !== cachedTransform.y ||
+          graphTransform.k !== cachedTransform.k
+        ) {
+          setGraphTransform(cachedTransform);
+        }
+      } else {
+        // 否则初始化为默认状态（不在缓存中存储，表示从未交互过）
+        // 只在变换实际变化时更新状态
+        if (
+          graphTransform.x !== 0 ||
+          graphTransform.y !== 0 ||
+          graphTransform.k !== 1
+        ) {
+          setGraphTransform({ x: 0, y: 0, k: 1 });
+        }
+        // 注意：这里不保存到缓存，只有用户实际交互后才保存
+      }
+    }
+  }, [selectedSnapshot?.id, graphTransform.x, graphTransform.y, graphTransform.k]);
+
+  // 使用防抖来减少变换更新的频率
+  const transformChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingTransformRef = useRef<{ x: number; y: number; k: number } | null>(null);
+
+  // 处理变换状态变化，保存到对应的快照（防抖处理）
+  const handleTransformChange = useCallback(
+    (transform: { x: number; y: number; k: number }) => {
+      if (selectedSnapshot?.id) {
+        const snapshotId = selectedSnapshot.id;
+        
+        // 保存待处理的变换
+        pendingTransformRef.current = transform;
+        
+        // 清除之前的定时器
+        if (transformChangeTimeoutRef.current) {
+          clearTimeout(transformChangeTimeoutRef.current);
+        }
+        
+        // 设置新的定时器（防抖：延迟50ms后执行，因为现在只在交互结束时触发）
+        transformChangeTimeoutRef.current = setTimeout(() => {
+          if (pendingTransformRef.current && selectedSnapshot?.id === snapshotId) {
+            const finalTransform = pendingTransformRef.current;
+            // 检查变换是否实际发生变化，避免不必要的更新
+            const currentTransform = snapshotTransformsRef.current[snapshotId];
+            if (
+              !currentTransform ||
+              currentTransform.x !== finalTransform.x ||
+              currentTransform.y !== finalTransform.y ||
+              currentTransform.k !== finalTransform.k
+            ) {
+              // 更新当前状态
+              setGraphTransform(finalTransform);
+              // 保存到缓存（只有用户实际交互后才保存）
+              snapshotTransformsRef.current[snapshotId] = finalTransform;
+            }
+            pendingTransformRef.current = null;
+          }
+        }, 50); // 50ms防抖延迟，因为现在只在交互结束时触发
+      }
+    },
+    [selectedSnapshot?.id],
+  );
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (transformChangeTimeoutRef.current) {
+        clearTimeout(transformChangeTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // 快照切换时取消未完成的定时器
+  useEffect(() => {
+    // 取消未完成的定时器
+    if (transformChangeTimeoutRef.current) {
+      clearTimeout(transformChangeTimeoutRef.current);
+      transformChangeTimeoutRef.current = null;
+    }
+    // 清空待处理的变换
+    pendingTransformRef.current = null;
+  }, [selectedSnapshot?.id]);
+
   useEffect(() => {
     const fetchGraphData = async () => {
       setLoading(true);
       setIsError(false);
       try {
+        if (
+          selectedSnapshot.graphData &&
+          selectedSnapshot.dataSource === "snapshot"
+        ) {
+          const { nodes, links } = selectedSnapshot.graphData;
+
+          const convertedNodes: NodeItem[] = nodes.map((node: any) => ({
+            id: node.id || node.addr,
+            label: node.label || node.addr,
+            title: node.title || node.label || node.addr,
+            addr: node.addr,
+            layer: node.layer || 0,
+            value: node.value || 0,
+            malicious: node.malicious || undefined,
+            shape: node.shape || undefined,
+            image: node.image || undefined,
+            expanded: node.expanded || false,
+            track: node.track || "one",
+            pid: node.pid || undefined,
+            color: node.color || undefined,
+            exg: node.exg || undefined,
+            x: node.x,
+            y: node.y,
+            fx: node.fx,
+            fy: node.fy,
+          }));
+
+          const convertedLinks: LinkItem[] = links.map((edge: any) => {
+            const fromNode = convertedNodes.find(
+              (n) => n.id === edge.from || n.addr === edge.from,
+            );
+            const toNode = convertedNodes.find(
+              (n) => n.id === edge.to || n.addr === edge.to,
+            );
+
+            return {
+              from: fromNode?.id || edge.from,
+              to: toNode?.id || edge.to,
+              label: edge.label || "",
+              val: edge.val || 0,
+              tx_time: edge.tx_time || "",
+              tx_hash_list: edge.tx_hash_list || [],
+            };
+          });
+
+          setGraphData({ nodes: convertedNodes, links: convertedLinks });
+          setLoading(false);
+          return;
+        }
+
         let response;
 
         if (
@@ -121,98 +278,72 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
             selectedSnapshot.centerAddress,
             selectedSnapshot.hops,
           );
-        } else if (selectedSnapshot.fromAddress && selectedSnapshot.toAddress) {
-          response = await transactionApi.getAllPath(
-            selectedSnapshot.fromAddress,
-            selectedSnapshot.toAddress,
-          );
-        }
 
-        if (response && response.success && response.data) {
-          const { node_list: nodes, edge_list: edges } = response.data;
+          const { node_list: nodes, edge_list: links } = response.data;
 
-          const convertedNodes: NodeItem[] = nodes.map((node: any, index) => ({
-            id: node.id || node.address,
-            label: node.label || node.address,
-            title: node.title || node.label || node.address,
-            addr: node.addr || node.address,
+          const convertedNodes: NodeItem[] = nodes.map((node: any) => ({
+            id: node.id || node.addr,
+            label: node.label || node.addr,
+            title: node.title || node.label || node.addr,
+            addr: node.addr,
             layer: node.layer || 0,
             value: node.value || 0,
             malicious: node.malicious || undefined,
             shape: node.shape || undefined,
             image: node.image || undefined,
-            expanded: index === 0,
+            expanded: node.expanded || false,
             track: node.track || "one",
             pid: node.pid || undefined,
             color: node.color || undefined,
             exg: node.exg || undefined,
+            x: node.x,
+            y: node.y,
+            fx: node.fx,
+            fy: node.fy,
           }));
 
-          const convertedLinks: LinkItem[] = edges.map((edge: any) => {
-            const fromNode = convertedNodes.find((n) => n.addr === edge.from);
-            const toNode = convertedNodes.find((n) => n.addr === edge.to);
-            const rawTime = edge.tx_time || edge.timestamp;
-            const parsedTime = parseDateSafely(rawTime);
-
-            let processedVal = edge.val || edge.value || 0;
-            let processedLabel = edge.label || "";
-
-            const isEthTransaction =
-              edge.from?.startsWith("0x") || edge.to?.startsWith("0x");
-
-            if (isEthTransaction) {
-              processedVal = parseFloat(formatEthValue(processedVal));
-              processedLabel =
-                processedLabel ||
-                `${formatEthValue(edge.val || edge.value || 0)} ETH`;
-            } else {
-              processedLabel = processedLabel || `${processedVal}`;
-            }
+          const convertedLinks: LinkItem[] = links.map((edge: any) => {
+            const fromNode = convertedNodes.find(
+              (n) => n.id === edge.from || n.addr === edge.from,
+            );
+            const toNode = convertedNodes.find(
+              (n) => n.id === edge.to || n.addr === edge.to,
+            );
 
             return {
               from: fromNode?.id || edge.from,
               to: toNode?.id || edge.to,
-              label: processedLabel,
-              val: processedVal,
-              tx_time:
-                parsedTime && parsedTime.isValid()
-                  ? parsedTime.format("YYYY-MM-DD HH:mm")
-                  : "",
-              tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
+              label: edge.label || "",
+              val: edge.val || 0,
+              tx_time: edge.tx_time || "",
+              tx_hash_list: edge.tx_hash_list || [],
             };
           });
 
           setGraphData({ nodes: convertedNodes, links: convertedLinks });
-        } else {
-          setGraphData({ nodes: [], links: [] });
         }
       } catch (error) {
-        console.error("Failed to fetch graph data:", error);
         setIsError(true);
-        setGraphData({ nodes: [], links: [] });
+        console.error("Failed to fetch graph data:", error);
       } finally {
         setLoading(false);
       }
+
+      if (selectedSnapshot) {
+        setFilterConfig(
+          selectedSnapshot.filterConfig || {
+            txType: "all",
+            addrType: "all",
+            minAmount: undefined,
+            maxAmount: undefined,
+            startDate: null,
+            endDate: null,
+          },
+        );
+      }
     };
 
-    if (selectedSnapshot) {
-      fetchGraphData();
-    }
-  }, [selectedSnapshot]);
-
-  useEffect(() => {
-    if (selectedSnapshot) {
-      setFilterConfig(
-        selectedSnapshot.filterConfig || {
-          txType: "all",
-          addrType: "all",
-          minAmount: undefined,
-          maxAmount: undefined,
-          startDate: null,
-          endDate: null,
-        },
-      );
-    }
+    fetchGraphData();
   }, [selectedSnapshot]);
 
   useEffect(() => {
@@ -314,6 +445,17 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
     setFilterConfig(newFilter);
   };
 
+  const handleGraphUpdate = useCallback(
+    (updatedNodes: NodeItem[], updatedLinks: LinkItem[]) => {
+      setGraphData((prev) => ({
+        ...prev,
+        nodes: updatedNodes,
+        links: updatedLinks,
+      }));
+    },
+    [],
+  );
+
   const handleExportPDF = useCallback(async () => {
     setExportLoading((prev) => ({ ...prev, pdf: true }));
     try {
@@ -404,6 +546,31 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   return (
     <div>
       <div>
+        {(exportLoading.pdf ||
+          exportLoading.csv ||
+          exportLoading.png ||
+          exportLoading.package) && (
+          <div
+            style={{
+              padding: "10px 16px",
+              marginBottom: "16px",
+              borderRadius: "4px",
+              backgroundColor: "#e6f7ff",
+              border: "1px solid #91d5ff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Spin size="small" style={{ marginRight: "8px" }} />
+            <span>
+              {exportLoading.pdf && "正在导出PDF"}
+              {exportLoading.csv && "正在导出CSV"}
+              {exportLoading.png && "正在导出PNG"}
+              {exportLoading.package && "正在导出完整包"}
+            </span>
+          </div>
+        )}
         <div style={{ marginBottom: 20 }}>
           <Space wrap>
             <Button
@@ -756,6 +923,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           >
             {dimensions && !isError ? (
               <TxGraph
+                key={selectedSnapshot.id} // 添加key确保快照切换时重新渲染
                 nodes={graphData.nodes}
                 links={graphData.links}
                 width={dimensions.width}
@@ -768,16 +936,9 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
                     parseDateSafely(filterConfig.endDate)?.toDate() || null,
                 }}
                 onFilterChange={handleFilterChange}
-                onGraphUpdate={(
-                  updatedNodes: NodeItem[],
-                  updatedLinks: LinkItem[],
-                ) => {
-                  setGraphData((prev) => ({
-                    ...prev,
-                    nodes: updatedNodes,
-                    links: updatedLinks,
-                  }));
-                }}
+                onGraphUpdate={handleGraphUpdate}
+                initialTransform={graphTransform}
+                onTransformChange={handleTransformChange}
               />
             ) : (
               <div

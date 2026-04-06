@@ -27,6 +27,8 @@ interface TxGraphCoreProps {
     endDate?: Date | null;
   }) => void;
   onGraphUpdate?: (nodes: NodeItem[], links: LinkItem[]) => void;
+  initialTransform?: { x: number; y: number; k: number };
+  onTransformChange?: (transform: { x: number; y: number; k: number }) => void;
 }
 
 const TxGraphCore: React.FC<TxGraphCoreProps> = ({
@@ -38,6 +40,8 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
   filter,
   onFilterChange,
   onGraphUpdate,
+  initialTransform,
+  onTransformChange,
 }) => {
   const [selectedLink, setSelectedLink] = useState<LinkItem | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -220,10 +224,7 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
       currentCenterNodeId !== newCenterNodeId
     ) {
       // 中心节点发生变化，需要重新计算视图位置
-      // Note: In the new architecture, we don't store positions in this component anymore
-      // Positions will be handled in the D3Renderer component
     } else if (isInitialLoad) {
-      // Initial load setup
       setIsInitialLoad(false);
     }
 
@@ -275,7 +276,6 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
     };
 
     // 计算每个节点的最大单笔交易金额（用于节点颜色深浅）
-    // 使用最大单笔金额而不是总金额，避免大额节点垄断深色
     const nodeAmtMap = new Map<string, number>();
     filteredLinks.forEach((link) => {
       // 取该节点相关边的最大金额
@@ -349,6 +349,8 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
         colorForNode={colorForNode}
         isLinkToMalicious={isLinkToMalicious}
         getEdgeColor={getEdgeColor}
+        initialTransform={initialTransform}
+        onTransformChange={onTransformChange}
       />
 
       {/* 边详情弹窗 */}

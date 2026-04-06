@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { NodeItem, LinkItem } from "../types";
-import { formatEthValue } from "../../../utils/ethUtils";
+import { formatEthValue } from "@/utils/ethUtils";
 import { message } from "antd";
-import { transactionApi } from "../../../services/transaction";
-import { computePositions, mergeNodes, mergeLinks } from "./layoutUtils";
+import { transactionApi } from "@/services/transaction";
+import { computeMissingPositions, mergeNodes, mergeLinks } from "./layoutUtils";
 
 interface D3RendererProps {
   nodes: NodeItem[];
@@ -25,6 +25,8 @@ interface D3RendererProps {
   isLinkToMalicious: (link: LinkItem) => boolean;
   getEdgeColor: (val: number) => string;
   currencySymbol?: string;
+  initialTransform?: { x: number; y: number; k: number };
+  onTransformChange?: (transform: { x: number; y: number; k: number }) => void;
 }
 
 const D3Renderer: React.FC<D3RendererProps> = ({
@@ -42,6 +44,8 @@ const D3Renderer: React.FC<D3RendererProps> = ({
   isLinkToMalicious,
   getEdgeColor,
   currencySymbol,
+  initialTransform,
+  onTransformChange,
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
@@ -52,7 +56,13 @@ const D3Renderer: React.FC<D3RendererProps> = ({
     x: number;
     y: number;
     k: number;
-  }>({ x: 0, y: 0, k: 1 });
+  }>(initialTransform || { x: 0, y: 0, k: 1 });
+
+  // 标记是否跳过 onTransformChange 回调（避免程序设置变换时触发循环）
+  const skipTransformChangeRef = useRef(false);
+
+  // 存储上一次的 initialTransform 用于比较
+  const prevInitialTransformRef = useRef(initialTransform);
 
   // 拖拽状态标记
   let isDragging = false;
@@ -62,26 +72,69 @@ const D3Renderer: React.FC<D3RendererProps> = ({
 
     // 计算布局
     let layout: { nodes: NodeItem[]; links: LinkItem[] };
-    const hasExistingPositions = nodes.every((n) =>
-      nodesWithPositionRef.current.has(n.id),
-    );
 
-    if (hasExistingPositions) {
+    // 逐节点判断：优先使用节点自带的 x,y，没有则从 ref 读取，都没有才需要计算
+    const needsLayout = nodes.some((n) => {
+      // 节点自带坐标
+      if (n.x !== undefined && n.y !== undefined) {
+        // 保存到 ref 供后续使用
+        nodesWithPositionRef.current.set(n.id, { x: n.x, y: n.y });
+        return false; // 有坐标，不需要计算
+      }
+      // ref 中有坐标
+      if (nodesWithPositionRef.current.has(n.id)) {
+        return false; // ref 有坐标，不需要计算
+      }
+      return true; // 没有坐标，需要计算布局
+    });
+
+    if (!needsLayout) {
+      // 所有节点都有位置（要么自带，要么在 ref 中）
       const layoutNodes = nodes.map((n) => {
+        // 优先使用节点自带的坐标
+        if (n.x !== undefined && n.y !== undefined) {
+          return n;
+        }
+        // 否则使用 ref 中保存的坐标
         const saved = nodesWithPositionRef.current.get(n.id);
         return saved ? { ...n, x: saved.x, y: saved.y } : n;
       });
       layout = { nodes: layoutNodes, links };
     } else {
-      // 使用 layoutUtils.ts 中的布局计算方法
-      layout = computePositions([...nodes], [...links], width, height);
+      // 有节点没有位置，需要计算布局
+      // 使用 computeMissingPositions 只计算缺失位置的节点，保留已有位置
+      layout = computeMissingPositions([...nodes], [...links], width, height);
+      // 保存计算后的位置到 ref
       layout.nodes.forEach((n) => {
-        nodesWithPositionRef.current.set(n.id, { x: n.x!, y: n.y! });
+        if (n.x !== undefined && n.y !== undefined) {
+          nodesWithPositionRef.current.set(n.id, { x: n.x, y: n.y });
+        }
       });
     }
 
     const svg = d3.select(svgRef.current as unknown as SVGSVGElement);
     const g = d3.select(gRef.current as unknown as SVGGElement);
+
+    // 检查 initialTransform 是否变化，如果变化则更新 transformRef
+    if (
+      initialTransform &&
+      (prevInitialTransformRef.current?.x !== initialTransform.x ||
+        prevInitialTransformRef.current?.y !== initialTransform.y ||
+        prevInitialTransformRef.current?.k !== initialTransform.k)
+    ) {
+      // 更新 transformRef
+      transformRef.current = {
+        x: initialTransform.x,
+        y: initialTransform.y,
+        k: initialTransform.k,
+      };
+      // 标记为跳过下一次 onTransformChange 回调
+      skipTransformChangeRef.current = true;
+    } else if (!initialTransform && prevInitialTransformRef.current) {
+      // 如果 initialTransform 变为 undefined/null，重置为默认值
+      transformRef.current = { x: 0, y: 0, k: 1 };
+      skipTransformChangeRef.current = true;
+    }
 
     // 添加箭头定义（始终指向右侧）
     svg.select("defs").remove();
@@ -433,7 +486,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
               .style("left", mouseX + 10 + "px")
               .html(
                 `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
-                 <div style="font-size: 11px; opacity: 0.8;">点击复制地址</div>`,
+                 <div style="font-size: 11px; opacity: 0.8;">点击复制地址, 双击展开节点</div>`,
               );
           }
         }
@@ -503,7 +556,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
         d3.select(this).style("cursor", "pointer");
         tooltip.style("visibility", "visible").html(
           `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
-             <div style="font-size: 11px; opacity: 0.8;">点击复制地址</div>`,
+             <div style="font-size: 11px; opacity: 0.8;">点击复制地址, 双击展开节点</div>`,
         );
       })
       .on("mousemove", function (event) {
@@ -569,10 +622,9 @@ const D3Renderer: React.FC<D3RendererProps> = ({
       // 阻止事件冒泡
       event.stopPropagation();
 
-      try {
-        // 显示加载状态
-        message.loading(`正在查询 ${d.addr} 的交易数据...`);
+      const loadingMsg = message.loading(`正在查询 ${d.addr} 的交易数据...`);
 
+      try {
         // 调用 API 查询该节点的交易数据（使用 1 跳查询）
         const response = await transactionApi.getNhopGraph(d.addr, 1);
 
@@ -670,12 +722,15 @@ const D3Renderer: React.FC<D3RendererProps> = ({
           }
 
           message.success(`成功查询到 ${d.addr} 的交易数据`);
+          loadingMsg();
         } else {
           message.error(`查询交易数据失败: ${response.msg}`);
+          loadingMsg();
         }
       } catch (error) {
         console.error("查询交易数据失败:", error);
         message.error("查询交易数据失败，请稍后重试");
+        loadingMsg();
       }
     });
 
@@ -692,25 +747,44 @@ const D3Renderer: React.FC<D3RendererProps> = ({
           k: event.transform.k,
         };
         g.attr("transform", event.transform as any);
+        // 注意：这里不再调用 onTransformChange，只在交互结束时调用
+      })
+      .on("end", (event) => {
+        // 交互结束时（拖拽或缩放结束）保存变换状态
+        if (
+          onTransformChange &&
+          !skipTransformChangeRef.current &&
+          event.sourceEvent
+        ) {
+          // event.sourceEvent 存在表示是用户交互，而不是程序设置
+          onTransformChange({
+            x: event.transform.x,
+            y: event.transform.y,
+            k: event.transform.k,
+          });
+        }
       });
 
     // 应用缩放行为到SVG
     svg.call(zoomBehavior as any);
 
-    // 恢复之前保存的缩放和拖动位置
+    // 应用初始变换（总是应用，确保视图状态正确重置）
     const savedTransform = transformRef.current;
-    if (
-      savedTransform.k !== 1 ||
-      savedTransform.x !== 0 ||
-      savedTransform.y !== 0
-    ) {
-      // 使用 zoom 的 transform 方法来设置变换，这样 zoom 的内部状态会同步，后续交互不会重置位置
+    // 使用 zoom 的 transform 方法来设置变换，这样 zoom 的内部状态会同步
+    // 设置跳过标志，避免程序设置变换时触发 onTransformChange 回调
+    skipTransformChangeRef.current = true;
+    try {
       svg.call(
         (zoomBehavior as any).transform,
         d3.zoomIdentity
           .translate(savedTransform.x, savedTransform.y)
           .scale(savedTransform.k),
       );
+    } finally {
+      // 确保在下一事件循环中重置跳过标志，让用户交互能正常触发回调
+      setTimeout(() => {
+        skipTransformChangeRef.current = false;
+      }, 0);
     }
 
     svg.on("click", function (event) {
@@ -718,6 +792,9 @@ const D3Renderer: React.FC<D3RendererProps> = ({
         // 点击空白处，不做任何操作
       }
     });
+
+    // 更新 prevInitialTransformRef
+    prevInitialTransformRef.current = initialTransform;
 
     // 清理 tooltip
     return () => {
@@ -738,6 +815,8 @@ const D3Renderer: React.FC<D3RendererProps> = ({
     isLinkToMalicious,
     getEdgeColor,
     currencySymbol,
+    initialTransform,
+    onTransformChange,
   ]);
 
   return (
