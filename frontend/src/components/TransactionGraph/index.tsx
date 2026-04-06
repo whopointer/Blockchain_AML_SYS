@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import TxGraph from "../GraphCommon/TxGraph";
 import TxAnalysis from "./TxAnalysis";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
@@ -11,9 +12,9 @@ import { NodeItem, LinkItem } from "../GraphCommon/types";
 import { Row, Col, message, Card, Spin } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import { transactionApi } from "../../services/transaction/index";
-import { graphSnapshotApi } from "../../services/graph-snapshot/api";
-import { formatEthValue } from "../../utils/ethUtils";
+import { transactionApi } from "@/services/transaction";
+import { graphSnapshotApi } from "@/services/graph-snapshot/api";
+import { formatEthValue } from "@/utils/ethUtils";
 
 dayjs.locale("zh-cn");
 
@@ -71,157 +72,159 @@ const TransactionGraph: React.FC = () => {
     endDate?: any;
   }>({ txType: "all", addrType: "all", startDate: null, endDate: null });
 
-  const fetchGraphData = async () => {
-    const targetAddress = routeAddress || "";
-    if (!targetAddress) return;
+  const fetchGraphData = useCallback(
+    async (effectiveHops: number) => {
+      const targetAddress = routeAddress || "";
+      if (!targetAddress) return;
 
+      try {
+        setLoading(true);
+        setIsError(false); // 重置错误状态
+
+        // no hardcoded addresses anymore – data will come from API
+        const response = await transactionApi.getNhopGraph(
+          targetAddress,
+          effectiveHops,
+        );
+
+        if (response.success) {
+          console.log(response.data);
+          // 转换API返回的数据为组件需要的格式
+          const { node_list: nodes, edge_list: edges } = response.data;
+
+          // 转换节点数据 - 根据实际API响应结构调整
+          const convertedNodes: NodeItem[] = nodes.map((node: any, index) => ({
+            id: node.id,
+            label: node.label || "",
+            title: node.title,
+            addr: node.addr,
+            layer: node.layer,
+            value: node.value || 0,
+            malicious: node.malicious || undefined,
+            shape: node.shape || undefined,
+            image: node.image || undefined,
+            expanded: index === 0, // 只展开主节点
+            track: node.track || "one",
+            pid: node.pid || undefined,
+            color: node.color || undefined,
+            exg: node.exg || undefined,
+          }));
+
+          // 转换边数据 - 根据实际API响应结构调整
+          const convertedLinks: LinkItem[] = edges.map((edge: any) => {
+            // 查找对应的节点ID
+            const fromNode = convertedNodes.find((n) => n.addr === edge.from);
+            const toNode = convertedNodes.find((n) => n.addr === edge.to);
+
+            // 处理交易值 - 如果是ETH则从wei转换为eth，如果是BTC则保持原样
+            let processedVal = edge.val || edge.value || 0;
+            let processedLabel = edge.label || "";
+
+            if (currencySymbol === "ETH") {
+              // 将wei转换为eth
+              processedVal =
+                typeof processedVal === "string" ||
+                typeof processedVal === "number"
+                  ? parseFloat(formatEthValue(processedVal))
+                  : processedVal;
+              processedLabel =
+                processedLabel ||
+                `${formatEthValue(edge.val || edge.value || 0)} ${currencySymbol}`;
+            } else {
+              // BTC或其他货币，保持原样
+              processedLabel =
+                processedLabel || `${processedVal} ${currencySymbol}`;
+            }
+
+            return {
+              from: fromNode?.id || edge.from,
+              to: toNode?.id || edge.to,
+              label: processedLabel,
+              val: processedVal,
+              tx_time: (() => {
+                const timeValue = edge.tx_time || edge.timestamp;
+                const value = timeValue as unknown as string | number;
+                return typeof value === "string" && value.includes("-")
+                  ? value.substring(0, 16)
+                  : dayjs(Number(value)).format("YYYY-MM-DD HH:mm");
+              })(),
+              tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
+            };
+          });
+
+          setGraphData({ nodes: convertedNodes, links: convertedLinks });
+
+          // 数据更新时重置筛选条件
+          setFilter({
+            txType: "all",
+            addrType: "all",
+            minAmount: undefined,
+            maxAmount: undefined,
+            startDate: null,
+            endDate: null,
+          });
+
+          // 设置地址信息 - 根据实际API响应结构调整
+          const firstTimeValue: any =
+            response.data.address_first_tx_time ||
+            response.data.first_tx_time ||
+            Math.min(...edges.map((e: any) => e.timestamp));
+          const latestTimeValue: any =
+            response.data.address_latest_tx_time ||
+            response.data.latest_tx_time ||
+            Math.max(...edges.map((e: any) => e.timestamp));
+
+          setAddressInfo({
+            txCount: response.data.tx_count || edges.length, // 使用API返回的交易计数
+            firstTxTime: (() => {
+              const value = firstTimeValue as unknown as string | number;
+              if (typeof value === "string" && value.includes("-")) {
+                return value.substring(0, 16);
+              } else {
+                const timestamp =
+                  typeof value === "string" ? parseInt(value) : Number(value);
+                return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
+              }
+            })(),
+            latestTxTime: (() => {
+              const value = latestTimeValue as unknown as string | number;
+              if (typeof value === "string" && value.includes("-")) {
+                return value.substring(0, 16);
+              } else {
+                const timestamp =
+                  typeof value === "string" ? parseInt(value) : Number(value);
+                return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
+              }
+            })(),
+          });
+
+          message.success("图谱数据加载成功");
+          setLoading(false);
+        } else {
+          message.error(`图谱数据加载失败: ${response.msg}`);
+          setIsError(true);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("获取图谱数据失败:", error);
+        message.error("获取图谱数据失败，请稍后重试");
+        setIsError(true);
+        setLoading(false);
+      } finally {
+        //
+      }
+    },
+    [routeAddress, crypto, currencySymbol],
+  );
+
+  useEffect(() => {
     // 从查询参数获取hops，默认为1
     const hopsParam = searchParams.get("hops");
     const hops = hopsParam ? parseInt(hopsParam, 10) : 1;
     // 确保hops为有效数字，最小值为1
     const effectiveHops = isNaN(hops) || hops < 1 ? 1 : hops;
-
-    try {
-      setLoading(true);
-      setIsError(false); // 重置错误状态
-
-      // no hardcoded addresses anymore – data will come from API
-      const response = await transactionApi.getNhopGraph(
-        targetAddress,
-        effectiveHops,
-      );
-
-      if (response.success) {
-        console.log(response.data);
-        // 转换API返回的数据为组件需要的格式
-        const { node_list: nodes, edge_list: edges } = response.data;
-
-        // 转换节点数据 - 根据实际API响应结构调整
-        const convertedNodes: NodeItem[] = nodes.map((node: any, index) => ({
-          id: node.id,
-          label: node.label || "",
-          title: node.title,
-          addr: node.addr,
-          layer: node.layer,
-          value: node.value || 0,
-          malicious: node.malicious || undefined,
-          shape: node.shape || undefined,
-          image: node.image || undefined,
-          expanded: index === 0, // 只展开主节点
-          track: node.track || "one",
-          pid: node.pid || undefined,
-          color: node.color || undefined,
-          exg: node.exg || undefined,
-        }));
-
-        // 转换边数据 - 根据实际API响应结构调整
-        const convertedLinks: LinkItem[] = edges.map((edge: any) => {
-          // 查找对应的节点ID
-          const fromNode = convertedNodes.find((n) => n.addr === edge.from);
-          const toNode = convertedNodes.find((n) => n.addr === edge.to);
-
-          // 处理交易值 - 如果是ETH则从wei转换为eth，如果是BTC则保持原样
-          let processedVal = edge.val || edge.value || 0;
-          let processedLabel = edge.label || "";
-
-          if (currencySymbol === "ETH") {
-            // 将wei转换为eth
-            processedVal =
-              typeof processedVal === "string" ||
-              typeof processedVal === "number"
-                ? parseFloat(formatEthValue(processedVal))
-                : processedVal;
-            processedLabel =
-              processedLabel ||
-              `${formatEthValue(edge.val || edge.value || 0)} ${currencySymbol}`;
-          } else {
-            // BTC或其他货币，保持原样
-            processedLabel =
-              processedLabel || `${processedVal} ${currencySymbol}`;
-          }
-
-          return {
-            from: fromNode?.id || edge.from,
-            to: toNode?.id || edge.to,
-            label: processedLabel,
-            val: processedVal,
-            tx_time: (() => {
-              const timeValue = edge.tx_time || edge.timestamp;
-              const value = timeValue as unknown as string | number;
-              return typeof value === "string" && value.includes("-")
-                ? value.substring(0, 16)
-                : dayjs(Number(value)).format("YYYY-MM-DD HH:mm");
-            })(),
-            tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
-          };
-        });
-
-        setGraphData({ nodes: convertedNodes, links: convertedLinks });
-
-        // 数据更新时重置筛选条件
-        setFilter({
-          txType: "all",
-          addrType: "all",
-          minAmount: undefined,
-          maxAmount: undefined,
-          startDate: null,
-          endDate: null,
-        });
-
-        // 设置地址信息 - 根据实际API响应结构调整
-        const firstTimeValue: any =
-          response.data.address_first_tx_time ||
-          response.data.first_tx_time ||
-          Math.min(...edges.map((e: any) => e.timestamp));
-        const latestTimeValue: any =
-          response.data.address_latest_tx_time ||
-          response.data.latest_tx_time ||
-          Math.max(...edges.map((e: any) => e.timestamp));
-
-        setAddressInfo({
-          txCount: response.data.tx_count || edges.length, // 使用API返回的交易计数
-          firstTxTime: (() => {
-            const value = firstTimeValue as unknown as string | number;
-            if (typeof value === "string" && value.includes("-")) {
-              return value.substring(0, 16);
-            } else {
-              const timestamp =
-                typeof value === "string" ? parseInt(value) : Number(value);
-              return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
-            }
-          })(),
-          latestTxTime: (() => {
-            const value = latestTimeValue as unknown as string | number;
-            if (typeof value === "string" && value.includes("-")) {
-              return value.substring(0, 16);
-            } else {
-              const timestamp =
-                typeof value === "string" ? parseInt(value) : Number(value);
-              return dayjs(timestamp).format("YYYY-MM-DD HH:mm");
-            }
-          })(),
-        });
-
-        message.success("图谱数据加载成功");
-        setLoading(false);
-      } else {
-        message.error(`图谱数据加载失败: ${response.msg}`);
-        setIsError(true);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error("获取图谱数据失败:", error);
-      message.error("获取图谱数据失败，请稍后重试");
-      setIsError(true);
-      setLoading(false);
-    } finally {
-      //
-    }
-  };
-
-  useEffect(() => {
-    fetchGraphData();
-  }, [routeAddress, crypto, searchHops]);
+    fetchGraphData(effectiveHops);
+  }, [routeAddress, crypto, searchHops, fetchGraphData]);
 
   // 监听窗口大小变化，更新图表尺寸
   useEffect(() => {
@@ -321,7 +324,39 @@ const TransactionGraph: React.FC = () => {
         endDate: convertToUTC8(filter.endDate),
       };
 
-      // 构建快照请求数据
+      const graphDataPayload = {
+        nodes:
+          graphData.nodes?.map((node) => ({
+            id: node.id,
+            addr: node.addr,
+            label: node.label,
+            title: node.title,
+            layer: node.layer,
+            value: node.value,
+            pid: node.pid,
+            color: node.color,
+            shape: node.shape,
+            image: node.image,
+            track: node.track,
+            expanded: node.expanded,
+            malicious: node.malicious,
+            exg: node.exg,
+            x: node.x,
+            y: node.y,
+            fx: node.fx,
+            fy: node.fy,
+          })) || [],
+        links:
+          graphData.links?.map((link) => ({
+            from: link.from,
+            to: link.to,
+            label: link.label,
+            val: link.val,
+            tx_time: link.tx_time,
+            tx_hash_list: link.tx_hash_list,
+          })) || [],
+      };
+
       const snapshotRequest = {
         title: snapshotData.title,
         description: snapshotData.description,
@@ -332,6 +367,8 @@ const TransactionGraph: React.FC = () => {
         centerAddress,
         hops: searchHops,
         filterConfig: filterConfigWithUTC8,
+        graphData: graphDataPayload,
+        dataSource: "snapshot",
       };
 
       // 调用后端API创建快照
@@ -355,6 +392,9 @@ const TransactionGraph: React.FC = () => {
 
   return (
     <>
+      <Helmet>
+        <title>交易图谱 - 区块链AML反洗钱系统</title>
+      </Helmet>
       {hasRouteParams ? (
         <div ref={containerRef} style={{ padding: 16 }}>
           {/* 搜索栏 */}
@@ -371,6 +411,7 @@ const TransactionGraph: React.FC = () => {
             firstTxTime={addressInfo.firstTxTime}
             latestTxTime={addressInfo.latestTxTime}
             isMalicious={mainNode?.malicious === 1}
+            cryptoType={currencySymbol}
           />
 
           {/* 交易图谱主内容 */}
@@ -395,8 +436,8 @@ const TransactionGraph: React.FC = () => {
             bodyStyle={{ padding: 16 }}
           >
             {/* 图表内容 */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ flex: 1, position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
+              <div style={{ flex: 1, minWidth: "500px", position: "relative" }}>
                 {dimensions && !isError ? (
                   <TxGraph
                     nodes={graphData.nodes}
@@ -406,6 +447,16 @@ const TransactionGraph: React.FC = () => {
                     currencySymbol={currencySymbol}
                     filter={filter}
                     onFilterChange={setFilter}
+                    onGraphUpdate={(
+                      updatedNodes: NodeItem[],
+                      updatedLinks: LinkItem[],
+                    ) => {
+                      setGraphData((prev) => ({
+                        ...prev,
+                        nodes: updatedNodes,
+                        links: updatedLinks,
+                      }));
+                    }}
                   />
                 ) : (
                   <div
@@ -452,8 +503,8 @@ const TransactionGraph: React.FC = () => {
               <div
                 style={{
                   width: "400px",
-                  minWidth: "400px",
-                  marginLeft: 20,
+                  minWidth: "300px",
+                  maxWidth: "500px",
                   position: "relative",
                 }}
               >

@@ -12,8 +12,8 @@ import {
 } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
-import { transactionApi } from "../../services/transaction/index";
-import { formatEthValue } from "../../utils/ethUtils";
+import { transactionApi } from "@/services/transaction";
+import { formatEthValue } from "@/utils/ethUtils";
 
 // 自定义函数用于在文本中间添加省略号
 const truncateMiddle = (str: string, maxLength: number = 15) => {

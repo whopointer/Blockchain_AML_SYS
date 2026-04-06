@@ -2,13 +2,14 @@ import axios from "axios";
 import {
   CreateSnapshotRequest,
   CreateSnapshotResponse,
-  GetSnapshotResponse,
+  GetSnapshotsResponse,
+  GetSnapshotDetailResponse,
   DeleteSnapshotResponse,
   UpdateSnapshotRequest,
   UpdateSnapshotResponse,
 } from "./types";
 
-const GRAPH_SNAPSHOT_API_BASE_URL = "http://localhost:8080/api";
+const GRAPH_SNAPSHOT_API_BASE_URL = "http://localhost:8081/api";
 
 const graphSnapshotApiClient = axios.create({
   baseURL: GRAPH_SNAPSHOT_API_BASE_URL,
@@ -27,10 +28,16 @@ export const graphSnapshotApi = {
       .post("/neo4j/snapshot", snapshot)
       .then((response) => response.data),
 
-  // 获取所有图谱快照
-  getSnapshots: (): Promise<GetSnapshotResponse> =>
+  // 获取所有图谱快照（不包含 graphData）
+  getSnapshots: (): Promise<GetSnapshotsResponse> =>
     graphSnapshotApiClient
       .get("/neo4j/snapshots")
+      .then((response) => response.data),
+
+  // 获取单个图谱快照详情（包含 graphData）
+  getSnapshotDetail: (id: string): Promise<GetSnapshotDetailResponse> =>
+    graphSnapshotApiClient
+      .get(`/neo4j/snapshot/${id}`)
       .then((response) => response.data),
 
   // 修改图谱快照信息
