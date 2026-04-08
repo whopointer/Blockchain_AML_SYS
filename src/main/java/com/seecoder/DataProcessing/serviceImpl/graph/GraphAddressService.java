@@ -550,7 +550,7 @@ public class GraphAddressService extends AbstractGraphService {
                 Map<String, String> globalAddressToId = new HashMap<>();
                 
                 // 添加起始节点
-                String startNodeId = java.util.UUID.randomUUID().toString();
+                String startNodeId = address;
                 Map<String, Object> startNodeItem = new HashMap<>();
                 startNodeItem.put("id", startNodeId);
                 startNodeItem.put("label", GraphFormatUtils.shortenAddress(address));
@@ -601,8 +601,8 @@ public class GraphAddressService extends AbstractGraphService {
                         // 检查全局是否已有该地址的ID
                         String nodeId = globalAddressToId.get(nodeAddress);
                         if (nodeId == null) {
-                            // 生成新的ID并记录到全局映射
-                            nodeId = java.util.UUID.randomUUID().toString();
+                            // 直接使用地址作为ID
+                            nodeId = nodeAddress;
                             globalAddressToId.put(nodeAddress, nodeId);
                             
                             Map<String, Object> nodeItem = new HashMap<>();
