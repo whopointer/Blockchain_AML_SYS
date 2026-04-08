@@ -35,7 +35,7 @@ public class GraphAddressService extends AbstractGraphService {
                         "-[:TRANSFER*]->(b:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC')} ] AS nodeData, " +
-                        "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
+                        "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData LIMIT 50";
 
                 Map<String, Object> params = new java.util.HashMap<>();
@@ -105,7 +105,7 @@ public class GraphAddressService extends AbstractGraphService {
                     List<String> times = new ArrayList<>();
                     
                     for (Map<String, Object> rel : relData) {
-                        Object txHashObj = rel.get("tx_hash");
+                        Object txHashObj = rel.get("txHash");
                         String txHash = txHashObj != null ? txHashObj.toString() : "";
                         txHashes.add(txHash);
                         
@@ -150,8 +150,6 @@ public class GraphAddressService extends AbstractGraphService {
                 
                 Map<String, Integer> nodeLayers = GraphLayerCalculator.calculateNodeLayers(allPaths, fromAddress, toAddress);
                 
-                Map<String, String> globalAddressToId = new java.util.HashMap<>();
-                
                 for (List<Map<String, Object>> nodeData : allPaths) {
                     for (int i = 0; i < nodeData.size(); i++) {
                         Map<String, Object> nodeMap = nodeData.get(i);
@@ -178,39 +176,34 @@ public class GraphAddressService extends AbstractGraphService {
                             }
                         }
                         
-                        // 检查全局是否已有该地址的ID
-                        String nodeId = globalAddressToId.get(address);
-                        if (nodeId == null) {
-                            // 生成新的ID并记录到全局映射
-                            nodeId = java.util.UUID.randomUUID().toString();
-                            globalAddressToId.put(address, nodeId);
-                            
-                            Map<String, Object> nodeItem = new java.util.HashMap<>();
-                            nodeItem.put("id", nodeId);
-                            nodeItem.put("label", GraphFormatUtils.shortenAddress(address));
-                            nodeItem.put("title", address);
-                            nodeItem.put("addr", address);
-                            
-                            // 使用calculateNodeLayers方法计算出的连续层级
-                            int layer = nodeLayers.get(address);
-                            nodeItem.put("layer", layer);
-                            
-                            if (riskLevel > 0) {
-                                nodeItem.put("malicious", riskLevel);
+                        // 直接使用address作为节点id
+                        String nodeId = address;
+                        
+                        Map<String, Object> nodeItem = new java.util.HashMap<>();
+                        nodeItem.put("id", nodeId);
+                        nodeItem.put("label", GraphFormatUtils.shortenAddress(address));
+                        nodeItem.put("title", address);
+                        nodeItem.put("addr", address);
+                        
+                        // 使用calculateNodeLayers方法计算出的连续层级
+                        int layer = nodeLayers.get(address);
+                        nodeItem.put("layer", layer);
+                        
+                        if (riskLevel > 0) {
+                            nodeItem.put("malicious", riskLevel);
+                        }
+                        
+                        // 避免重复添加节点
+                        boolean exists = false;
+                        for (Map<String, Object> existingNode : allNodeList) {
+                            if (existingNode.get("addr").equals(address)) {
+                                exists = true;
+                                break;
                             }
-                            
-                            // 避免重复添加节点
-                            boolean exists = false;
-                            for (Map<String, Object> existingNode : allNodeList) {
-                                if (existingNode.get("addr").equals(address)) {
-                                    exists = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (!exists) {
-                                allNodeList.add(nodeItem);
-                            }
+                        }
+                        
+                        if (!exists) {
+                            allNodeList.add(nodeItem);
                         }
                     }
                 }
@@ -250,7 +243,7 @@ public class GraphAddressService extends AbstractGraphService {
                                 // 获取交易哈希
                                 List<String> txHashList = new java.util.ArrayList<>();
                                 if (relData.get(i) != null) {
-                                    Object txHashObj = ((Map<String, Object>) relData.get(i)).get("tx_hash");
+                                    Object txHashObj = ((Map<String, Object>) relData.get(i)).get("txHash");
                                     String txHash = txHashObj != null ? txHashObj.toString() : "";
                                     if (!txHash.isEmpty()) {
                                         txHashList.add(txHash);
@@ -316,14 +309,14 @@ public class GraphAddressService extends AbstractGraphService {
                         "WHERE start <> income " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
-                        "     [r IN relList | {tx_hash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
+                        "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData, 'income' as direction LIMIT 50";
 
                 String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:TRANSFER*1.." + maxHops + "]->(outcome:Address) " +
                         "WHERE start <> outcome " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
-                        "     [r IN relList | {tx_hash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
+                        "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData, 'outcome' as direction LIMIT 50";
 
                 Map<String, Object> params = new HashMap<>();
@@ -409,7 +402,7 @@ public class GraphAddressService extends AbstractGraphService {
                     List<String> times = new ArrayList<>();
                     
                     for (Map<String, Object> rel : relData) {
-                        Object txHashObj = rel.get("tx_hash");
+                        Object txHashObj = rel.get("txHash");
                         String txHash = txHashObj != null ? txHashObj.toString() : "";
                         txHashes.add(txHash);
                         
@@ -500,7 +493,7 @@ public class GraphAddressService extends AbstractGraphService {
                     List<String> times = new ArrayList<>();
                     
                     for (Map<String, Object> rel : relData) {
-                        Object txHashObj = rel.get("tx_hash");
+                        Object txHashObj = rel.get("txHash");
                         String txHash = txHashObj != null ? txHashObj.toString() : "";
                         txHashes.add(txHash);
                         
@@ -685,7 +678,7 @@ public class GraphAddressService extends AbstractGraphService {
                                 // 获取交易哈希
                                 List<String> txHashList = new ArrayList<>();
                                 if (relData.get(i) != null) {
-                                    Object txHashObj = ((Map<String, Object>) relData.get(i)).get("tx_hash");
+                                    Object txHashObj = ((Map<String, Object>) relData.get(i)).get("txHash");
                                     String txHash = txHashObj != null ? txHashObj.toString() : "";
                                     if (!txHash.isEmpty()) {
                                         txHashList.add(txHash);
