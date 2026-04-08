@@ -11,6 +11,7 @@ import PathTxAnalysis from "./PathTxAnalysis";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
 import AddressInfo from "../GraphCommon/AddressInfo";
 import GraphSnapshotButton from "../GraphCommon/GraphSnapshotButton";
+import GraphExportButton from "../GraphCommon/GraphExportButton";
 import PathTrackingSearch from "./PathTrackingSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
 import dayjs from "dayjs";
@@ -173,9 +174,13 @@ const PathTracking: React.FC = () => {
                 edge.tx_time.startsWith("+")
               ) {
                 const dateTimeStr = edge.tx_time.substring(1);
-                formattedTime = dayjs(dateTimeStr).format("YYYY-MM-DD HH:mm");
+                formattedTime = dayjs(dateTimeStr).format(
+                  "YYYY-MM-DD HH:mm:ss",
+                );
               } else if (typeof edge.tx_time === "string") {
-                formattedTime = dayjs(edge.tx_time).format("YYYY-MM-DD HH:mm");
+                formattedTime = dayjs(edge.tx_time).format(
+                  "YYYY-MM-DD HH:mm:ss",
+                );
               }
             } catch (error) {
               console.warn("时间格式转换失败:", edge.tx_time, error);
@@ -186,7 +191,8 @@ const PathTracking: React.FC = () => {
           return {
             from: fromNode?.id || edge.from,
             to: toNode?.id || edge.to,
-            label: `${edge.val || edge.value} ${curr.toUpperCase()}`,
+            label:
+              edge.label || `${edge.val || edge.value} ${curr.toUpperCase()}`,
             val: edge.val || edge.value || 0,
             tx_time: formattedTime,
             tx_hash_list: Array.isArray(edge.tx_hash_list)
@@ -373,13 +379,35 @@ const PathTracking: React.FC = () => {
           <Card
             title={
               <Row style={{ width: "100%", alignItems: "center" }}>
-                <Col flex={1} style={{ fontSize: 18 }}>
-                  路径追踪结果
+                <Col style={{ fontSize: 18 }}>路径追踪结果</Col>
+                <Col style={{ marginLeft: 16 }}>
+                  <GraphExportButton
+                    nodes={graphData.nodes || []}
+                    links={graphData.links || []}
+                    graphElementId="tx-graph-container"
+                    snapshot={{
+                      title: `路径追踪 - ${urlFromAddress || ""} → ${urlToAddress || ""}`,
+                      riskLevel: " - ",
+                      createTime: new Date().toISOString(),
+                      centerAddress: urlFromAddress || "",
+                      nodeCount: graphData.nodes?.length || 0,
+                      linkCount: graphData.links?.length || 0,
+                      tags: [],
+                    }}
+                    disabled={
+                      loading ||
+                      (graphData.nodes?.length === 0 &&
+                        graphData.links?.length === 0)
+                    }
+                  />
                 </Col>
                 <Col>
                   <Spin spinning={loading} size="small" />
                 </Col>
-                <Col>
+                <Col
+                  flex={1}
+                  style={{ display: "flex", justifyContent: "flex-end" }}
+                >
                   <GraphSnapshotButton
                     onCreateSnapshot={handleCreateSnapshot}
                   />
@@ -391,7 +419,10 @@ const PathTracking: React.FC = () => {
             bodyStyle={{ padding: 16 }}
           >
             {/* 图表内容 */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
+            <div
+              id="tx-graph-container"
+              style={{ display: "flex", justifyContent: "center", gap: 20 }}
+            >
               <div style={{ flex: 1, minWidth: "500px", position: "relative" }}>
                 {dimensions ? (
                   <TxGraph

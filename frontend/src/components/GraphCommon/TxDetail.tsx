@@ -13,7 +13,6 @@ import {
 import { CopyOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
 import { transactionApi } from "@/services/transaction";
-import { formatEthValue } from "@/utils/ethUtils";
 
 // 自定义函数用于在文本中间添加省略号
 const truncateMiddle = (str: string, maxLength: number = 15) => {
@@ -51,6 +50,12 @@ const TxDetail: React.FC<TxDetailProps> = ({
     from: string;
     to: string;
     value: number;
+    fee?: number;
+    blockHeight?: number;
+    txIndex?: number;
+    status?: string;
+    totalInput?: number;
+    totalOutput?: number;
     tx_hash: string;
     timestamp: number;
     from_label?: string;
@@ -88,20 +93,20 @@ const TxDetail: React.FC<TxDetailProps> = ({
                 const response =
                   await transactionApi.getEthereumTransactionDetail(txHash);
                 if (response.success && response.data) {
-                  // 新的接口在 data.transaction 下才是真正的字段
                   const ethData = response.data;
                   const txObj = ethData.transaction;
                   return {
-                    time: new Date(txObj.blockTime).toISOString(),
+                    time: ethData.blockTime,
                     from: txObj.fromAddress,
                     to: txObj.toAddress,
-                    // 如果外层有 value 字段就使用，否则降级到 transaction 内的输出
-                    value:
-                      typeof ethData.value === "number"
-                        ? ethData.value
-                        : txObj.getTotalOutputAsDouble || 0,
+                    value: ethData.value,
+                    fee: ethData.fee,
+                    blockHeight: ethData.blockHeight,
+                    txIndex: txObj.txIndex,
+                    status: txObj.status,
+                    totalInput: txObj.totalInput,
+                    totalOutput: txObj.totalOutput,
                     tx_hash: txObj.txHash,
-                    // 将 blockTime 转成 unix 时间戳
                     timestamp: new Date(txObj.blockTime).getTime() / 1000,
                   };
                 }
@@ -109,20 +114,17 @@ const TxDetail: React.FC<TxDetailProps> = ({
                 console.error(`获取以太坊交易详情失败 ${txHash}:`, error);
               }
             } else {
-              // 假设其他格式为比特币交易
               try {
                 const response =
                   await transactionApi.getBitcoinTransactionDetail(txHash);
                 if (response.success && response.data) {
                   const btcData = response.data;
                   const txObj = btcData.transaction;
-                  // 有些比特币接口可能不带 fromAddress/toAddress inside
                   return {
-                    time: new Date(txObj.blockTime).toISOString(),
+                    time: btcData.blockTime,
                     from: btcData.fromAddress || txObj.fromAddress || "Unknown",
                     to: btcData.toAddress || txObj.toAddress || "Unknown",
-                    value:
-                      typeof btcData.value === "number" ? btcData.value : 0,
+                    value: btcData.value,
                     tx_hash: txObj.txHash,
                     timestamp: new Date(txObj.blockTime).getTime() / 1000,
                   };
@@ -164,13 +166,18 @@ const TxDetail: React.FC<TxDetailProps> = ({
     from: tx.from,
     to: tx.to,
     value: tx.value,
+    fee: tx.fee,
+    blockHeight: tx.blockHeight,
+    status: tx.status,
+    totalInput: tx.totalInput,
+    totalOutput: tx.totalOutput,
     tx_hash: tx.tx_hash,
   }));
 
   // 定义表格列
   const columns: TableProps["columns"] = [
     {
-      title: "交易时间(UTC)",
+      title: "交易时间",
       dataIndex: "time",
       key: "time",
       width: 180,
@@ -178,30 +185,46 @@ const TxDetail: React.FC<TxDetailProps> = ({
         new Date(a.time).getTime() - new Date(b.time).getTime(),
       sortDirections: ["descend", "ascend"],
       showSorterTooltip: false,
+      render: (time: string) => {
+        const date = new Date(time);
+        const utc8Date = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+        const formatted = utc8Date.toISOString().slice(0, 19).replace("T", " ");
+        return <span>{formatted}</span>;
+      },
     },
     {
       title: "发送地址",
       dataIndex: "from",
       key: "from",
       render: (text: string) => (
-        <Space>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-            title={text}
-          >
-            {truncateMiddle(text)}
-          </span>
-          <Tooltip title="复制">
-            <CopyOutlined
-              onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#667eea" }}
-            />
-          </Tooltip>
-        </Space>
+        <Tooltip title={text}>
+          <Space align="center">
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: "12px",
+                display: "inline-block",
+                maxWidth: 150,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                verticalAlign: "middle",
+              }}
+            >
+              {truncateMiddle(text)}
+            </span>
+            <Tooltip title="复制">
+              <CopyOutlined
+                onClick={() => copyToClipboard(text)}
+                style={{
+                  cursor: "pointer",
+                  color: "#667eea",
+                  verticalAlign: "middle",
+                }}
+              />
+            </Tooltip>
+          </Space>
+        </Tooltip>
       ),
     },
     {
@@ -209,24 +232,34 @@ const TxDetail: React.FC<TxDetailProps> = ({
       dataIndex: "to",
       key: "to",
       render: (text: string) => (
-        <Space>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-            title={text}
-          >
-            {truncateMiddle(text)}
-          </span>
-          <Tooltip title="复制">
-            <CopyOutlined
-              onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#667eea" }}
-            />
-          </Tooltip>
-        </Space>
+        <Tooltip title={text}>
+          <Space align="center">
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: "12px",
+                display: "inline-block",
+                maxWidth: 150,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                verticalAlign: "middle",
+              }}
+            >
+              {truncateMiddle(text)}
+            </span>
+            <Tooltip title="复制">
+              <CopyOutlined
+                onClick={() => copyToClipboard(text)}
+                style={{
+                  cursor: "pointer",
+                  color: "#667eea",
+                  verticalAlign: "middle",
+                }}
+              />
+            </Tooltip>
+          </Space>
+        </Tooltip>
       ),
     },
     {
@@ -234,17 +267,56 @@ const TxDetail: React.FC<TxDetailProps> = ({
       dataIndex: "value",
       key: "value",
       width: 100,
-      sorter: (a: any, b: any) => a.value - b.value,
+      sorter: (a: any, b: any) => parseFloat(a.value) - parseFloat(b.value),
       sortDirections: ["descend", "ascend"],
       showSorterTooltip: false,
       render: (value: number) => {
-        const isETH = currencySymbol === "ETH";
-        const displayValue = isETH ? formatEthValue(value) : value;
         const displayCurrency = currencySymbol || "BTC";
         return (
           <Tag color="#667eea">
-            {displayValue} {displayCurrency}
+            {value} {displayCurrency}
           </Tag>
+        );
+      },
+    },
+    {
+      title: "手续费",
+      dataIndex: "fee",
+      key: "fee",
+      width: 90,
+      render: (fee: number) =>
+        fee ? <Tag color="orange">{fee} ETH</Tag> : <span>-</span>,
+    },
+    {
+      title: "区块高度",
+      dataIndex: "blockHeight",
+      key: "blockHeight",
+      width: 100,
+      render: (height: number) =>
+        height ? <Tag color="blue">{height}</Tag> : <span>-</span>,
+    },
+    {
+      title: "状态",
+      dataIndex: "status",
+      key: "status",
+      width: 80,
+      render: (status: string) => {
+        const statusMap: Record<string, string> = {
+          confirmed: "已确认",
+          pending: "pending",
+          failed: "失败",
+        };
+        const colorMap: Record<string, string> = {
+          confirmed: "green",
+          pending: "gold",
+          failed: "red",
+        };
+        return status ? (
+          <Tag color={colorMap[status] || "default"}>
+            {statusMap[status] || status}
+          </Tag>
+        ) : (
+          <span>-</span>
         );
       },
     },
@@ -253,24 +325,34 @@ const TxDetail: React.FC<TxDetailProps> = ({
       dataIndex: "tx_hash",
       key: "tx_hash",
       render: (text: string) => (
-        <Space>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-            title={text}
-          >
-            {truncateMiddle(text)}
-          </span>
-          <Tooltip title="复制">
-            <CopyOutlined
-              onClick={() => copyToClipboard(text)}
-              style={{ cursor: "pointer", color: "#667eea" }}
-            />
-          </Tooltip>
-        </Space>
+        <Tooltip title={text}>
+          <Space align="center">
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: "12px",
+                display: "inline-block",
+                maxWidth: 150,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                verticalAlign: "middle",
+              }}
+            >
+              {truncateMiddle(text)}
+            </span>
+            <Tooltip title="复制">
+              <CopyOutlined
+                onClick={() => copyToClipboard(text)}
+                style={{
+                  cursor: "pointer",
+                  color: "#667eea",
+                  verticalAlign: "middle",
+                }}
+              />
+            </Tooltip>
+          </Space>
+        </Tooltip>
       ),
     },
   ];
@@ -299,7 +381,8 @@ const TxDetail: React.FC<TxDetailProps> = ({
                 dataSource={transactionData}
                 columns={columns}
                 pagination={{ pageSize: 10 }}
-                scroll={{ y: 400 }}
+                scroll={{ x: "max-content", y: 400 }}
+                rowClassName="table-row-center"
               />
             </Spin>
           </div>

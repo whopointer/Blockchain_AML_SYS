@@ -6,6 +6,7 @@ import TxAnalysis from "./TxAnalysis";
 import TxGraphFilter from "../GraphCommon/TxGraphFilter";
 import AddressInfo from "../GraphCommon/AddressInfo";
 import GraphSnapshotButton from "../GraphCommon/GraphSnapshotButton";
+import GraphExportButton from "../GraphCommon/GraphExportButton";
 import SearchBar from "./SearchBar";
 import TransactionGraphSearch from "./TransactionGraphSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
@@ -14,7 +15,6 @@ import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import { transactionApi } from "@/services/transaction";
 import { graphSnapshotApi } from "@/services/graph-snapshot/api";
-import { formatEthValue } from "@/utils/ethUtils";
 
 dayjs.locale("zh-cn");
 
@@ -116,25 +116,10 @@ const TransactionGraph: React.FC = () => {
             const fromNode = convertedNodes.find((n) => n.addr === edge.from);
             const toNode = convertedNodes.find((n) => n.addr === edge.to);
 
-            // 处理交易值 - 如果是ETH则从wei转换为eth，如果是BTC则保持原样
-            let processedVal = edge.val || edge.value || 0;
-            let processedLabel = edge.label || "";
-
-            if (currencySymbol === "ETH") {
-              // 将wei转换为eth
-              processedVal =
-                typeof processedVal === "string" ||
-                typeof processedVal === "number"
-                  ? parseFloat(formatEthValue(processedVal))
-                  : processedVal;
-              processedLabel =
-                processedLabel ||
-                `${formatEthValue(edge.val || edge.value || 0)} ${currencySymbol}`;
-            } else {
-              // BTC或其他货币，保持原样
-              processedLabel =
-                processedLabel || `${processedVal} ${currencySymbol}`;
-            }
+            // 后端返回的 val 已经是 ETH 单位，label 已经格式化好了
+            const processedVal = edge.val || edge.value || 0;
+            const processedLabel =
+              edge.label || `${processedVal} ${currencySymbol}`;
 
             return {
               from: fromNode?.id || edge.from,
@@ -145,8 +130,8 @@ const TransactionGraph: React.FC = () => {
                 const timeValue = edge.tx_time || edge.timestamp;
                 const value = timeValue as unknown as string | number;
                 return typeof value === "string" && value.includes("-")
-                  ? value.substring(0, 16)
-                  : dayjs(Number(value)).format("YYYY-MM-DD HH:mm");
+                  ? value.substring(0, 19)
+                  : dayjs(Number(value)).format("YYYY-MM-DD HH:mm:ss");
               })(),
               tx_hash_list: edge.tx_hash_list || [edge.tx_hash],
             };
@@ -418,13 +403,35 @@ const TransactionGraph: React.FC = () => {
           <Card
             title={
               <Row style={{ width: "100%", alignItems: "center" }}>
-                <Col flex={1} style={{ fontSize: 18 }}>
-                  交易图谱
+                <Col style={{ fontSize: 18 }}>交易图谱</Col>
+                <Col style={{ marginLeft: 16 }}>
+                  <GraphExportButton
+                    nodes={graphData.nodes || []}
+                    links={graphData.links || []}
+                    graphElementId="tx-graph-container"
+                    snapshot={{
+                      title: `交易图谱 - ${routeAddress}`,
+                      riskLevel: " - ",
+                      createTime: new Date().toISOString(),
+                      centerAddress: routeAddress,
+                      nodeCount: graphData.nodes?.length || 0,
+                      linkCount: graphData.links?.length || 0,
+                      tags: [],
+                    }}
+                    disabled={
+                      loading ||
+                      (graphData.nodes?.length === 0 &&
+                        graphData.links?.length === 0)
+                    }
+                  />
                 </Col>
                 <Col>
                   <Spin spinning={loading} size="small" />
                 </Col>
-                <Col>
+                <Col
+                  flex={1}
+                  style={{ display: "flex", justifyContent: "flex-end" }}
+                >
                   <GraphSnapshotButton
                     onCreateSnapshot={handleCreateSnapshot}
                   />
@@ -436,7 +443,10 @@ const TransactionGraph: React.FC = () => {
             bodyStyle={{ padding: 16 }}
           >
             {/* 图表内容 */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
+            <div
+              id="tx-graph-container"
+              style={{ display: "flex", justifyContent: "center", gap: 20 }}
+            >
               <div style={{ flex: 1, minWidth: "500px", position: "relative" }}>
                 {dimensions && !isError ? (
                   <TxGraph

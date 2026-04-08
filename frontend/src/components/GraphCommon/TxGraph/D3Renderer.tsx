@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { NodeItem, LinkItem } from "../types";
-import { formatEthValue } from "@/utils/ethUtils";
 import { message } from "antd";
 import { transactionApi } from "@/services/transaction";
 import { computeMissingPositions, mergeNodes, mergeLinks } from "./layoutUtils";
@@ -305,15 +304,6 @@ const D3Renderer: React.FC<D3RendererProps> = ({
       .append("text")
       .attr("class", "link-label")
       .text((d: LinkItem) => {
-        // Check if this is an ETH transaction and needs conversion
-        if (d.label && d.label.includes("ETH")) {
-          // Extract the numeric value from the label (e.g., "374708330000000000 ETH" -> "374708330000000000")
-          const ethMatch = d.label.match(/^([\d.]+)\s*ETH$/);
-          if (ethMatch) {
-            const weiValue = ethMatch[1];
-            return `${formatEthValue(weiValue)} ETH`;
-          }
-        }
         return d.label || "";
       })
       .attr("x", (d: any) => {

@@ -16,13 +16,11 @@ export const convertGraphToCSV = (
   snapshot: GraphSnapshot,
 ): string => {
   // 节点CSV
-  const nodeHeaders = ["节点ID", "地址", "标签", "风险等级", "金额", "类型"];
+  const nodeHeaders = ["节点地址", "标签", "风险等级", "类型"];
   const nodeRows = nodes.map((node) => [
-    node.id,
     node.addr || "",
     node.label || "",
     node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
-    node.value?.toString() || "0",
     node.image ? "标记地址" : "普通地址",
   ]);
 
@@ -33,7 +31,9 @@ export const convertGraphToCSV = (
     link.from,
     link.to,
     link.val?.toString() || "0",
-    link.tx_time || "",
+    dayjs(link.tx_time).isValid()
+      ? dayjs(link.tx_time).format("YYYY-MM-DD HH:mm:ss")
+      : link.tx_time || "",
   ]);
 
   const csvContent = [
