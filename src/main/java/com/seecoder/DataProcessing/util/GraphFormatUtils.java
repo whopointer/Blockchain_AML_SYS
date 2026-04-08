@@ -29,7 +29,7 @@ public class GraphFormatUtils {
      * @return 格式化后的金额标签
      */
     public static String formatAmountLabel(double amount, String chain) {
-        String unit = (chain != null && chain.equalsIgnoreCase("ethereum")) ? "ETH" : "BNB";
+        String unit = (chain != null && (chain.equalsIgnoreCase("ethereum") || chain.equalsIgnoreCase("ETH"))) ? "ETH" : "BTC";
         if (amount >= 1.0) {
             return String.format("%.3f %s", amount, unit);
         } else {

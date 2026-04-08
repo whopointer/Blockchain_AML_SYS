@@ -34,7 +34,7 @@ public class GraphAddressService extends AbstractGraphService {
                 String pathQuery = "MATCH path = (a:Address {address: $fromAddress})" +
                         "-[:TRANSFER*]->(b:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
-                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BNB')} ] AS nodeData, " +
+                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC')} ] AS nodeData, " +
                         "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData LIMIT 50";
 
@@ -238,7 +238,7 @@ public class GraphAddressService extends AbstractGraphService {
                                 linkItem.put("from", fromAddr);
                                 linkItem.put("to", toAddr);
                                 
-                                String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BNB";
+                                String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BTC";
                                 linkItem.put("label", GraphFormatUtils.formatAmountLabel(
                                     relData.get(i) != null ? 
                                         (Double) ((Map<String, Object>) relData.get(i)).get("amount") : 0.0, 
@@ -315,15 +315,15 @@ public class GraphAddressService extends AbstractGraphService {
                 String incomeQuery = "MATCH path = (start:Address {address: $address})<-[:TRANSFER*1.." + maxHops + "]-(income:Address) " +
                         "WHERE start <> income " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
-                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BNB'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
-                        "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
+                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
+                        "     [r IN relList | {tx_hash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData, 'income' as direction LIMIT 50";
 
                 String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:TRANSFER*1.." + maxHops + "]->(outcome:Address) " +
                         "WHERE start <> outcome " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
-                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BNB'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
-                        "     [r IN relList | {tx_hash: coalesce(r.tx_hash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
+                        "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
+                        "     [r IN relList | {tx_hash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
                         "RETURN nodeData, relData, 'outcome' as direction LIMIT 50";
 
                 Map<String, Object> params = new HashMap<>();
@@ -673,7 +673,7 @@ public class GraphAddressService extends AbstractGraphService {
                                 linkItem.put("from", fromAddr);
                                 linkItem.put("to", toAddr);
                                 
-                                String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BNB";
+                                String chain = fromNodeData != null ? fromNodeData.get("chain").toString() : "BTC";
                                 linkItem.put("label", GraphFormatUtils.formatAmountLabel(
                                     relData.get(i) != null ? 
                                         (Double) ((Map<String, Object>) relData.get(i)).get("amount") : 0.0, 
