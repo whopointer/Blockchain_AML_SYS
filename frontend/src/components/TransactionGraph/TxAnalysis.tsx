@@ -54,105 +54,116 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
   const handleCountClick = (address: string, isOutgoing: boolean) => {
     if (!nodes.length || !links.length) return;
 
-    // 找到对应的链接
-    let foundLink: LinkItem | undefined;
+    const centerNodeId = nodes[0]?.id;
+    let foundLinks: LinkItem[] = [];
 
     if (isOutgoing) {
-      // 查找从当前节点到指定地址的链接
-      const targetNode = nodes.find(
-        (node) => (node.addr || node.title || node.id) === address,
-      );
-
-      if (targetNode) {
-        foundLink = links.find(
-          (link) => link.from === nodes[0]?.id && link.to === targetNode.id,
-        );
-      }
-    } else {
-      // 查找从指定地址到当前节点的链接
+      // 查找所有从指定地址发出的链接（排除中心节点）
       const sourceNode = nodes.find(
         (node) => (node.addr || node.title || node.id) === address,
       );
 
-      if (sourceNode) {
-        foundLink = links.find(
-          (link) => link.from === sourceNode.id && link.to === nodes[0]?.id,
-        );
+      if (sourceNode && sourceNode.id !== centerNodeId) {
+        foundLinks = links.filter((link) => link.from === sourceNode.id);
+      }
+    } else {
+      // 查找所有发送到指定地址的链接（排除中心节点）
+      const targetNode = nodes.find(
+        (node) => (node.addr || node.title || node.id) === address,
+      );
+
+      if (targetNode && targetNode.id !== centerNodeId) {
+        foundLinks = links.filter((link) => link.to === targetNode.id);
       }
     }
 
-    if (foundLink) {
-      setSelectedLink(foundLink);
+    if (foundLinks.length > 0) {
+      // 合并所有交易哈希列表
+      const allTxHashes = foundLinks.flatMap((link) => link.tx_hash_list || []);
+
+      // 创建一个包含所有交易哈希的新链接对象
+      const mergedLink: LinkItem = {
+        ...foundLinks[0],
+        tx_hash_list: allTxHashes,
+        val: foundLinks.reduce((total, link) => total + (link.val || 0), 0),
+      };
+
+      setSelectedLink(mergedLink);
       setShowTxDetail(true);
     }
   };
 
   // 计算地址统计数据
   useEffect(() => {
-    // 发送地址和接收地址统计: 去除nodes[0]本身
     if (!nodes.length || !links.length) {
       setOutgoingStats([]);
       setIncomingStats([]);
       return;
     }
 
-    const outgoingMap: Record<string, AddressStat> = {};
-    const incomingMap: Record<string, AddressStat> = {};
+    const outgoingMap: Record<
+      string,
+      { count: Set<string>; totalValue: number }
+    > = {};
+    const incomingMap: Record<
+      string,
+      { count: Set<string>; totalValue: number }
+    > = {};
 
-    const currentNodeAddr = nodes[0]?.addr || nodes[0]?.title || nodes[0]?.id;
+    const centerNodeId = nodes[0]?.id;
 
     links.forEach((link) => {
-      // 发送地址统计（来自当前节点的链接）
-      if (link.from === nodes[0]?.id) {
-        const targetNode = nodes.find((node) => node.id === link.to);
-        if (targetNode) {
-          const targetAddr =
-            targetNode.addr || targetNode.title || targetNode.id;
-          // 排除当前节点自身
-          if (targetAddr !== currentNodeAddr) {
-            if (!outgoingMap[targetAddr]) {
-              outgoingMap[targetAddr] = {
-                address: targetAddr,
-                count: 0,
-                totalValue: 0,
-              };
-            }
-            outgoingMap[targetAddr].count += link.tx_hash_list.length;
-            outgoingMap[targetAddr].totalValue += link.val || 0;
-          }
+      // 发送地址统计：统计所有边的起点节点
+      const sourceNode = nodes.find((node) => node.id === link.from);
+      if (sourceNode && sourceNode.id !== centerNodeId) {
+        const sourceAddr = sourceNode.addr || sourceNode.title || sourceNode.id;
+        if (!outgoingMap[sourceAddr]) {
+          outgoingMap[sourceAddr] = {
+            count: new Set(),
+            totalValue: 0,
+          };
         }
+        link.tx_hash_list.forEach((txHash) =>
+          outgoingMap[sourceAddr].count.add(txHash),
+        );
+        outgoingMap[sourceAddr].totalValue += link.val || 0;
       }
 
-      // 接收地址统计（发送到当前节点的链接）
-      if (link.to === nodes[0]?.id) {
-        const sourceNode = nodes.find((node) => node.id === link.from);
-        if (sourceNode) {
-          const sourceAddr =
-            sourceNode.addr || sourceNode.title || sourceNode.id;
-          // 排除当前节点自身
-          if (sourceAddr !== currentNodeAddr) {
-            if (!incomingMap[sourceAddr]) {
-              incomingMap[sourceAddr] = {
-                address: sourceAddr,
-                count: 0,
-                totalValue: 0,
-              };
-            }
-            incomingMap[sourceAddr].count += link.tx_hash_list.length;
-            incomingMap[sourceAddr].totalValue += link.val || 0;
-          }
+      // 接收地址统计：统计所有边的终点节点
+      const targetNode = nodes.find((node) => node.id === link.to);
+      if (targetNode && targetNode.id !== centerNodeId) {
+        const targetAddr = targetNode.addr || targetNode.title || targetNode.id;
+        if (!incomingMap[targetAddr]) {
+          incomingMap[targetAddr] = {
+            count: new Set(),
+            totalValue: 0,
+          };
         }
+        link.tx_hash_list.forEach((txHash) =>
+          incomingMap[targetAddr].count.add(txHash),
+        );
+        incomingMap[targetAddr].totalValue += link.val || 0;
       }
     });
 
-    const outgoingStatsArray = Object.values(outgoingMap).map((stat) => ({
-      ...stat,
-      key: stat.address,
-    }));
-    const incomingStatsArray = Object.values(incomingMap).map((stat) => ({
-      ...stat,
-      key: stat.address,
-    }));
+    const outgoingStatsArray = Object.values(outgoingMap).map((stat, index) => {
+      const address = Object.keys(outgoingMap)[index];
+      return {
+        address: address,
+        count: stat.count.size,
+        totalValue: stat.totalValue,
+        key: address,
+      };
+    });
+    const incomingStatsArray = Object.values(incomingMap).map((stat, index) => {
+      const address = Object.keys(incomingMap)[index];
+      return {
+        address: address,
+        count: stat.count.size,
+        totalValue: stat.totalValue,
+        key: address,
+      };
+    });
 
     setOutgoingStats(outgoingStatsArray);
     setIncomingStats(incomingStatsArray);

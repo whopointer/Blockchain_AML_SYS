@@ -53,31 +53,41 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
   const handleCountClick = (address: string, isOutgoing: boolean) => {
     if (!nodes.length || !links.length) return;
 
-    // 找到对应的链接
-    let foundLink: LinkItem | undefined;
+    // 找到所有符合条件的链接
+    let foundLinks: LinkItem[] = [];
 
     if (isOutgoing) {
-      // 查找从指定地址发出的链接
+      // 查找从指定地址发出的所有链接
       const sourceNode = nodes.find(
         (node) => (node.addr || node.title || node.id) === address,
       );
 
       if (sourceNode) {
-        foundLink = links.find((link) => link.from === sourceNode.id);
+        foundLinks = links.filter((link) => link.from === sourceNode.id);
       }
     } else {
-      // 查找发送到指定地址的链接
+      // 查找发送到指定地址的所有链接
       const targetNode = nodes.find(
         (node) => (node.addr || node.title || node.id) === address,
       );
 
       if (targetNode) {
-        foundLink = links.find((link) => link.to === targetNode.id);
+        foundLinks = links.filter((link) => link.to === targetNode.id);
       }
     }
 
-    if (foundLink) {
-      setSelectedLink(foundLink);
+    if (foundLinks.length > 0) {
+      // 合并所有交易哈希列表
+      const allTxHashes = foundLinks.flatMap((link) => link.tx_hash_list || []);
+
+      // 创建一个包含所有交易哈希的新链接对象
+      const mergedLink: LinkItem = {
+        ...foundLinks[0],
+        tx_hash_list: allTxHashes,
+        val: foundLinks.reduce((total, link) => total + (link.val || 0), 0),
+      };
+
+      setSelectedLink(mergedLink);
       setShowTxDetail(true);
     }
   };
@@ -90,49 +100,69 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
       return;
     }
 
-    const outgoingMap: Record<string, AddressStat> = {};
-    const incomingMap: Record<string, AddressStat> = {};
+    const outgoingMap: Record<
+      string,
+      { count: Set<string>; totalValue: number }
+    > = {};
+    const incomingMap: Record<
+      string,
+      { count: Set<string>; totalValue: number }
+    > = {};
+
+    const centerNodeId = nodes[0]?.id;
 
     links.forEach((link) => {
-      // 发送地址统计
+      // 发送地址统计：统计所有边的起点节点（排除中心节点）
       const sourceNode = nodes.find((node) => node.id === link.from);
-      if (sourceNode) {
+      if (sourceNode && sourceNode.id !== centerNodeId) {
         const sourceAddr = sourceNode.addr || sourceNode.title || sourceNode.id;
         if (!outgoingMap[sourceAddr]) {
           outgoingMap[sourceAddr] = {
-            address: sourceAddr,
-            count: 0,
+            count: new Set(),
             totalValue: 0,
           };
         }
-        outgoingMap[sourceAddr].count += link.tx_hash_list.length;
+        link.tx_hash_list.forEach((txHash) =>
+          outgoingMap[sourceAddr].count.add(txHash),
+        );
         outgoingMap[sourceAddr].totalValue += link.val || 0;
       }
 
-      // 接收地址统计
+      // 接收地址统计：统计所有边的终点节点（排除中心节点）
       const targetNode = nodes.find((node) => node.id === link.to);
-      if (targetNode) {
+      if (targetNode && targetNode.id !== centerNodeId) {
         const targetAddr = targetNode.addr || targetNode.title || targetNode.id;
         if (!incomingMap[targetAddr]) {
           incomingMap[targetAddr] = {
-            address: targetAddr,
-            count: 0,
+            count: new Set(),
             totalValue: 0,
           };
         }
-        incomingMap[targetAddr].count += link.tx_hash_list.length;
+        link.tx_hash_list.forEach((txHash) =>
+          incomingMap[targetAddr].count.add(txHash),
+        );
         incomingMap[targetAddr].totalValue += link.val || 0;
       }
     });
 
-    const outgoingStatsArray = Object.values(outgoingMap).map((stat) => ({
-      ...stat,
-      key: stat.address,
-    }));
-    const incomingStatsArray = Object.values(incomingMap).map((stat) => ({
-      ...stat,
-      key: stat.address,
-    }));
+    const outgoingStatsArray = Object.values(outgoingMap).map((stat, index) => {
+      const address = Object.keys(outgoingMap)[index];
+      return {
+        address: address,
+        count: stat.count.size,
+        totalValue: stat.totalValue,
+        key: address,
+      };
+    });
+    const incomingStatsArray = Object.values(incomingMap).map((stat, index) => {
+      const address = Object.keys(incomingMap)[index];
+      return {
+        address: address,
+        count: stat.count.size,
+        totalValue: stat.totalValue,
+        key: address,
+      };
+    });
 
     setOutgoingStats(outgoingStatsArray);
     setIncomingStats(incomingStatsArray);

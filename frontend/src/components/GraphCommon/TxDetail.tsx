@@ -9,8 +9,9 @@ import {
   message,
   ConfigProvider,
   Spin,
+  Input,
 } from "antd";
-import { CopyOutlined } from "@ant-design/icons";
+import { CopyOutlined, SearchOutlined } from "@ant-design/icons";
 import { LinkItem } from "./types";
 import { transactionApi } from "@/services/transaction";
 
@@ -66,6 +67,39 @@ const TxDetail: React.FC<TxDetailProps> = ({
     [],
   );
   const [loading, setLoading] = useState<boolean>(false);
+  const [searchText, setSearchText] = useState<string>("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState<string>("");
+
+  // 防抖处理
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // 弹窗关闭时清空搜索框
+  useEffect(() => {
+    if (!show) {
+      setSearchText("");
+      setDebouncedSearchText("");
+    }
+  }, [show]);
+
+  // 过滤交易数据
+  const filteredTransactions = useMemo(() => {
+    if (!debouncedSearchText.trim()) {
+      return transactions;
+    }
+    const searchLower = debouncedSearchText.toLowerCase();
+    return transactions.filter(
+      (tx) =>
+        tx.from.toLowerCase().includes(searchLower) ||
+        tx.to.toLowerCase().includes(searchLower) ||
+        tx.tx_hash.toLowerCase().includes(searchLower),
+    );
+  }, [transactions, debouncedSearchText]);
 
   // 复制文本到剪贴板的函数
   const copyToClipboard = (text: string) => {
@@ -160,7 +194,7 @@ const TxDetail: React.FC<TxDetailProps> = ({
   }
 
   // 生成交易数据列表
-  const transactionData = transactions.map((tx, index) => ({
+  const transactionData = filteredTransactions.map((tx, index) => ({
     key: index,
     time: tx.time,
     from: tx.from,
@@ -375,12 +409,21 @@ const TxDetail: React.FC<TxDetailProps> = ({
           <Modal.Title>交易明细</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          <div style={{ marginBottom: 16 }}>
+            <Input
+              placeholder="搜索发送地址、接收地址或交易哈希"
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </div>
           <div>
             <Spin spinning={loading} tip="加载交易详情中...">
               <Table
                 dataSource={transactionData}
                 columns={columns}
-                pagination={{ pageSize: 10 }}
+                pagination={false}
                 scroll={{ x: "max-content", y: 400 }}
                 rowClassName="table-row-center"
               />
