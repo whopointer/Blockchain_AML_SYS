@@ -10,6 +10,7 @@ interface TxGraphCoreProps {
   width: number;
   height: number;
   currencySymbol?: string;
+  cryptoType?: string; // 添加 cryptoType 参数
   filter?: {
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";
@@ -29,6 +30,7 @@ interface TxGraphCoreProps {
   onGraphUpdate?: (nodes: NodeItem[], links: LinkItem[]) => void;
   initialTransform?: { x: number; y: number; k: number };
   onTransformChange?: (transform: { x: number; y: number; k: number }) => void;
+  onNodeClick?: (node: NodeItem) => void;
 }
 
 const TxGraphCore: React.FC<TxGraphCoreProps> = ({
@@ -37,11 +39,13 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
   width,
   height,
   currencySymbol,
+  cryptoType,
   filter,
   onFilterChange,
   onGraphUpdate,
   initialTransform,
   onTransformChange,
+  onNodeClick,
 }) => {
   const [selectedLink, setSelectedLink] = useState<LinkItem | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -239,6 +243,29 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
     setShowDetail(true);
   };
 
+  const handleNodeClick = (node: NodeItem) => {
+    if (node.type === "transaction") {
+      const relatedLinks = (links || []).filter(
+        (l) => l.from === node.id || l.to === node.id,
+      );
+      if (relatedLinks.length > 0) {
+        const mockLink: LinkItem = {
+          from: relatedLinks[0].from,
+          to: relatedLinks[0].to,
+          val: node.value || relatedLinks[0].val,
+          tx_time: node.time || relatedLinks[0].tx_time,
+          tx_hash_list: relatedLinks[0].tx_hash_list || [],
+        };
+        setSelectedLink(mockLink);
+        setShowDetail(true);
+      }
+    } else {
+      if (onNodeClick) {
+        onNodeClick(node);
+      }
+    }
+  };
+
   // 计算金额范围用于灰度映射
   const {
     minAmount,
@@ -341,6 +368,7 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
         width={width}
         height={height}
         onLinkClick={handleLinkClick}
+        onNodeClick={handleNodeClick}
         onGraphUpdate={onGraphUpdate}
         nodeAmountMap={nodeAmountMap}
         minNodeAmount={minNodeAmount}
@@ -349,6 +377,8 @@ const TxGraphCore: React.FC<TxGraphCoreProps> = ({
         colorForNode={colorForNode}
         isLinkToMalicious={isLinkToMalicious}
         getEdgeColor={getEdgeColor}
+        currencySymbol={currencySymbol}
+        cryptoType={cryptoType}
         initialTransform={initialTransform}
         onTransformChange={onTransformChange}
       />

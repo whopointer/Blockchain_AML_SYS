@@ -4,6 +4,7 @@ import {
   EthereumTransactionDetail,
   BitcoinTransactionDetail,
   SingleTransactionDetailResponse,
+  BTCNhopResponse,
 } from "./types";
 
 const TRANSACTION_API_BASE_URL = "http://localhost:8080/api";
@@ -49,6 +50,15 @@ export const transactionApi = {
   ): Promise<GraphAnalysisResponse> =>
     transactionApiClient
       .get(`/neo4j/path?fromAddress=${address1}&toAddress=${address2}`)
+      .then((response) => response.data),
+
+  // BTC N-hop 图谱检索
+  getBTCNhopGraph: (
+    address: string,
+    maxHops: number,
+  ): Promise<BTCNhopResponse> =>
+    transactionApiClient
+      .get(`/neo4j/btc/hops?address=${address}&maxHops=${maxHops}`)
       .then((response) => response.data),
 };
 

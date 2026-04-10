@@ -19,6 +19,10 @@ export interface GraphNodeData {
   y?: number;
   fx?: number | null;
   fy?: number | null;
+  type?: "address" | "transaction";
+  txHash?: string;
+  blockHeight?: number;
+  time?: string;
 }
 
 export interface GraphLinkData {
@@ -49,6 +53,7 @@ export interface CreateSnapshotRequest {
   filterConfig?: any;
   graphData?: GraphDataPayload;
   dataSource?: "api" | "snapshot" | string;
+  chain?: string;
 }
 
 export interface CreateSnapshotResponse {

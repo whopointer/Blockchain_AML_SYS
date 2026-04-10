@@ -13,7 +13,11 @@ import { NodeItem, LinkItem } from "../GraphCommon/types";
 import { Row, Col, message, Card, Spin } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import { transactionApi } from "@/services/transaction";
+import {
+  transactionApi,
+  GraphAnalysisResponse,
+  BTCNhopResponse,
+} from "@/services/transaction";
 import { graphSnapshotApi } from "@/services/graph-snapshot/api";
 
 dayjs.locale("zh-cn");
@@ -82,12 +86,31 @@ const TransactionGraph: React.FC = () => {
         setIsError(false); // 重置错误状态
 
         // no hardcoded addresses anymore – data will come from API
-        const response = await transactionApi.getNhopGraph(
-          targetAddress,
-          effectiveHops,
-        );
+        let response;
+        let isBTC = crypto?.toLowerCase() === "btc";
+        if (isBTC) {
+          // BTC N-hop 图谱检索
+          response = await transactionApi.getBTCNhopGraph(
+            targetAddress,
+            effectiveHops,
+          );
+        } else {
+          // Ethereum/其他链 N-hop 图谱检索
+          response = await transactionApi.getNhopGraph(
+            targetAddress,
+            effectiveHops,
+          );
+        }
 
-        if (response.success) {
+        // 统一处理响应格式（BTC API 返回 message，ETH API 返回 msg）
+        const isSuccess = isBTC
+          ? (response as BTCNhopResponse).success
+          : (response as GraphAnalysisResponse).success;
+        const responseMsg = isBTC
+          ? (response as BTCNhopResponse).message
+          : (response as GraphAnalysisResponse).msg;
+
+        if (isSuccess) {
           console.log(response.data);
           // 转换API返回的数据为组件需要的格式
           const { node_list: nodes, edge_list: edges } = response.data;
@@ -108,6 +131,10 @@ const TransactionGraph: React.FC = () => {
             pid: node.pid || undefined,
             color: node.color || undefined,
             exg: node.exg || undefined,
+            type: node.type || "address",
+            txHash: node.txHash || undefined,
+            blockHeight: node.blockHeight || undefined,
+            time: node.time || undefined,
           }));
 
           // 转换边数据 - 根据实际API响应结构调整
@@ -186,7 +213,7 @@ const TransactionGraph: React.FC = () => {
           message.success("图谱数据加载成功");
           setLoading(false);
         } else {
-          message.error(`图谱数据加载失败: ${response.msg}`);
+          message.error(`图谱数据加载失败: ${responseMsg}`);
           setIsError(true);
           setLoading(false);
         }
@@ -330,6 +357,10 @@ const TransactionGraph: React.FC = () => {
             y: node.y,
             fx: node.fx,
             fy: node.fy,
+            type: node.type,
+            txHash: node.txHash,
+            blockHeight: node.blockHeight,
+            time: node.time,
           })) || [],
         links:
           graphData.links?.map((link) => ({
@@ -354,6 +385,7 @@ const TransactionGraph: React.FC = () => {
         filterConfig: filterConfigWithUTC8,
         graphData: graphDataPayload,
         dataSource: "snapshot",
+        chain: currencySymbol,
       };
 
       // 调用后端API创建快照
@@ -455,6 +487,7 @@ const TransactionGraph: React.FC = () => {
                     width={dimensions.width}
                     height={dimensions.height}
                     currencySymbol={currencySymbol}
+                    cryptoType={crypto}
                     filter={filter}
                     onFilterChange={setFilter}
                     onGraphUpdate={(

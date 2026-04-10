@@ -9,40 +9,114 @@ import dayjs from "dayjs";
 
 /**
  * 将图谱数据转换为CSV格式
+ * 针对BTC和ETH链的特点进行适配
+ * 将地址节点和交易节点分开显示
  */
 export const convertGraphToCSV = (
   nodes: NodeItem[],
   links: LinkItem[],
   snapshot: GraphSnapshot,
 ): string => {
-  // 节点CSV
-  const nodeHeaders = ["节点地址", "标签", "风险等级", "类型"];
-  const nodeRows = nodes.map((node) => [
-    node.addr || "",
-    node.label || "",
-    node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
-    node.image ? "标记地址" : "普通地址",
-  ]);
+  const chain = snapshot.chain?.toUpperCase() || "ETH";
+  const isBTC = chain === "BTC";
 
-  // 边CSV
-  const linkHeaders = ["交易哈希", "来源地址", "目标地址", "金额", "时间"];
-  const linkRows = links.map((link) => [
-    (link.tx_hash_list || []).join(", "),
-    link.from,
-    link.to,
-    link.val?.toString() || "0",
-    dayjs(link.tx_time).isValid()
-      ? dayjs(link.tx_time).format("YYYY-MM-DD HH:mm:ss")
-      : link.tx_time || "",
-  ]);
+  const addressNodes = nodes.filter((node) => node.type !== "transaction");
+  const transactionNodes = nodes.filter((node) => node.type === "transaction");
+
+  let addressNodeHeaders: string[];
+  let addressNodeRows: string[][];
+  let txNodeHeaders: string[];
+  let txNodeRows: string[][];
+
+  if (isBTC) {
+    addressNodeHeaders = [
+      "节点地址",
+      "标签",
+      "风险等级",
+      "类型",
+      "区块高度",
+      "时间",
+    ];
+    addressNodeRows = addressNodes.map((node) => [
+      node.addr || "",
+      node.label || "",
+      node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
+      node.image ? "标记地址" : "普通地址",
+      node.blockHeight?.toString() || "",
+      node.time
+        ? dayjs(node.time).isValid()
+          ? dayjs(node.time).format("YYYY-MM-DD HH:mm:ss")
+          : node.time
+        : "",
+    ]);
+
+    txNodeHeaders = ["交易哈希", "标签", "风险等级", "区块高度", "时间"];
+    txNodeRows = transactionNodes.map((node) => [
+      node.txHash || "",
+      node.label || "",
+      node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
+      node.blockHeight?.toString() || "",
+      node.time
+        ? dayjs(node.time).isValid()
+          ? dayjs(node.time).format("YYYY-MM-DD HH:mm:ss")
+          : node.time
+        : "",
+    ]);
+  } else {
+    addressNodeHeaders = ["节点地址", "标签", "风险等级", "类型"];
+    addressNodeRows = addressNodes.map((node) => [
+      node.addr || "",
+      node.label || "",
+      node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
+      node.image ? "标记地址" : "普通地址",
+    ]);
+
+    txNodeHeaders = ["交易哈希", "标签", "风险等级"];
+    txNodeRows = transactionNodes.map((node) => [
+      node.txHash || "",
+      node.label || "",
+      node.malicious === 1 ? "高风险" : node.malicious === 0 ? "正常" : "未知",
+    ]);
+  }
+
+  let linkHeaders: string[];
+  let linkRows: string[][];
+
+  if (isBTC) {
+    linkHeaders = ["交易哈希", "来源地址", "目标地址", "金额(BTC)", "时间"];
+    linkRows = links.map((link) => [
+      (link.tx_hash_list || []).join(", "),
+      link.from,
+      link.to,
+      link.val ? link.val.toString() : "0",
+      dayjs(link.tx_time).isValid()
+        ? dayjs(link.tx_time).format("YYYY-MM-DD HH:mm:ss")
+        : link.tx_time || "",
+    ]);
+  } else {
+    linkHeaders = ["交易哈希", "来源地址", "目标地址", "金额(ETH)", "时间"];
+    linkRows = links.map((link) => [
+      (link.tx_hash_list || []).join(", "),
+      link.from,
+      link.to,
+      link.val?.toString() || "0",
+      dayjs(link.tx_time).isValid()
+        ? dayjs(link.tx_time).format("YYYY-MM-DD HH:mm:ss")
+        : link.tx_time || "",
+    ]);
+  }
+
+  const formatRow = (row: string[]) =>
+    row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",");
 
   const csvContent = [
     "=".repeat(50),
-    "案件信息",
+    "快照信息",
     "=".repeat(50),
-    `案件标题,${snapshot.title}`,
-    `案件描述,${snapshot.description || ""}`,
+    `快照标题,${snapshot.title}`,
+    `快照描述,${snapshot.description || ""}`,
     `风险等级,${snapshot.riskLevel}`,
+    `链,${chain}`,
     `创建时间,${dayjs(snapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}`,
     `中心地址,${snapshot.centerAddress || ""}`,
     `节点数量,${snapshot.nodeCount}`,
@@ -50,16 +124,24 @@ export const convertGraphToCSV = (
     `标签,${snapshot.tags.join(", ")}`,
     "",
     "=".repeat(50),
-    "节点数据",
+    "地址节点数据",
     "=".repeat(50),
-    nodeHeaders.join(","),
-    ...nodeRows.map((row) => row.join(",")),
+    `地址节点数量,${addressNodes.length}`,
+    addressNodeHeaders.join(","),
+    ...addressNodeRows.map(formatRow),
     "",
     "=".repeat(50),
-    "交易数据",
+    "交易节点数据",
+    "=".repeat(50),
+    `交易节点数量,${transactionNodes.length}`,
+    txNodeHeaders.join(","),
+    ...txNodeRows.map(formatRow),
+    "",
+    "=".repeat(50),
+    "交易边数据",
     "=".repeat(50),
     linkHeaders.join(","),
-    ...linkRows.map((row) => row.join(",")),
+    ...linkRows.map(formatRow),
   ].join("\n");
 
   return csvContent;
@@ -426,13 +508,13 @@ export const generatePDFReport = async (
       <div style="padding: 30px;">
         <!-- 标题 -->
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="font-size: 22px; color: #667eea; margin: 0 0 8px 0; font-weight: 600;">区块链AML案件报告 - ${snapshot.title || "未命名快照"}</h1>
+          <h1 style="font-size: 22px; color: #667eea; margin: 0 0 8px 0; font-weight: 600;">区块链AML图谱快照 - ${snapshot.title || "未命名快照"}</h1>
           <div style="width: 60px; height: 3px; background: #667eea; margin: 0 auto;"></div>
         </div>
 
-        <!-- 案件信息 -->
+        <!-- 快照信息 -->
         <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 16px; color: #333; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e8e8e8;">案件信息</h3>
+          <h3 style="font-size: 16px; color: #333; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e8e8e8;">快照信息</h3>
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="padding: 8px; background: #fafafa; border: 1px solid #e8e8e8; width: 120px; font-weight: 500;">快照 ID</td>
@@ -468,6 +550,12 @@ export const generatePDFReport = async (
             <tr>
               <td style="padding: 8px; background: #fafafa; border: 1px solid #e8e8e8; font-weight: 500;">创建时间</td>
               <td style="padding: 8px; border: 1px solid #e8e8e8;">${dayjs(snapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; background: #fafafa; border: 1px solid #e8e8e8; font-weight: 500;">链</td>
+              <td style="padding: 8px; border: 1px solid #e8e8e8;">
+                <span style="display: inline-block; padding: 2px 8px; background: ${snapshot.chain?.toUpperCase() === "BTC" ? "#fff3e0" : "#e3f2fd"}; color: ${snapshot.chain?.toUpperCase() === "BTC" ? "#ef6c00" : "#1565c0"}; border-radius: 4px; font-size: 12px;">${snapshot.chain || "ETH"}</span>
+              </td>
             </tr>
             <tr>
               <td style="padding: 8px; background: #fafafa; border: 1px solid #e8e8e8; font-weight: 500;">风险等级</td>
@@ -602,20 +690,20 @@ export const generatePDFReport = async (
     }
 
     // 保存 PDF
-    pdf.save(`${snapshot.title}-案件报告.pdf`);
+    pdf.save(`${snapshot.title}-图谱快照.pdf`);
 
     // 清理临时元素
     document.body.removeChild(tempDiv);
 
     return true;
   } catch (error) {
-    console.error("生成PDF报告失败:", error);
+    console.error("生成PDF快照失败:", error);
     return false;
   }
 };
 
 /**
- * 导出完整案件包（PDF + CSV + PNG）
+ * 导出完整快照包（PDF + CSV + PNG）
  */
 export const exportCasePackage = async (
   snapshot: GraphSnapshot,
@@ -626,7 +714,7 @@ export const exportCasePackage = async (
   const results: string[] = [];
 
   try {
-    // 1. 导出PDF报告
+    // 1. 导出PDF快照
     const pdfSuccess = await generatePDFReport(
       snapshot,
       nodes,
@@ -634,7 +722,7 @@ export const exportCasePackage = async (
       graphElementId,
     );
     if (pdfSuccess) {
-      results.push("PDF报告");
+      results.push("PDF快照");
     }
 
     // 2. 导出CSV数据
@@ -663,7 +751,7 @@ export const exportCasePackage = async (
       message: `成功导出: ${results.join(", ")}`,
     };
   } catch (error) {
-    console.error("导出案件包失败:", error);
+    console.error("导出快照包失败:", error);
     return {
       success: false,
       message: "导出失败: " + (error as Error).message,

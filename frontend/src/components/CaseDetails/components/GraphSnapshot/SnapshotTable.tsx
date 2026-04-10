@@ -170,10 +170,21 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
         title: "风险等级",
         dataIndex: "riskLevel",
         key: "riskLevel",
-        width: "12%",
+        width: "10%",
         render: (riskLevel: "LOW" | "MEDIUM" | "HIGH") => (
           <Tag color={getRiskLevelColor(riskLevel)}>
             {getRiskLevelLabel(riskLevel)}
+          </Tag>
+        ),
+      },
+      {
+        title: "链",
+        dataIndex: "chain",
+        key: "chain",
+        width: "8%",
+        render: (chain: string) => (
+          <Tag color={chain?.toUpperCase() === "BTC" ? "orange" : "blue"}>
+            {chain || "ETH"}
           </Tag>
         ),
       },

@@ -22,6 +22,7 @@ export interface GraphSnapshot {
   fromAddress?: string;
   toAddress?: string;
   hops?: number;
+  chain?: string;
   filterConfig?: {
     txType: "all" | "inflow" | "outflow";
     addrType: "all" | "tagged" | "malicious" | "normal" | "tagged_malicious";

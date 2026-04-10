@@ -11,6 +11,7 @@ interface D3RendererProps {
   width: number;
   height: number;
   onLinkClick: (link: LinkItem) => void;
+  onNodeClick?: (node: NodeItem) => void;
   onGraphUpdate?: (nodes: NodeItem[], links: LinkItem[]) => void;
   nodeAmountMap: Map<string, number>;
   minNodeAmount: number;
@@ -24,6 +25,7 @@ interface D3RendererProps {
   isLinkToMalicious: (link: LinkItem) => boolean;
   getEdgeColor: (val: number) => string;
   currencySymbol?: string;
+  cryptoType?: string; // 添加 cryptoType 参数
   initialTransform?: { x: number; y: number; k: number };
   onTransformChange?: (transform: { x: number; y: number; k: number }) => void;
 }
@@ -34,6 +36,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
   width,
   height,
   onLinkClick,
+  onNodeClick,
   onGraphUpdate,
   nodeAmountMap,
   minNodeAmount,
@@ -43,6 +46,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
   isLinkToMalicious,
   getEdgeColor,
   currencySymbol,
+  cryptoType,
   initialTransform,
   onTransformChange,
 }) => {
@@ -518,84 +522,137 @@ const D3Renderer: React.FC<D3RendererProps> = ({
     const rootNode = nodes.find((n) => n.layer === 0) ||
       nodes[0] || { id: "", layer: 0 };
 
-    // 绘制节点圆圈
-    nodeGroup
-      .append("circle")
-      .attr("r", (d: any) => (d.id === rootNode.id ? 14 : 8))
-      .attr("fill", (d: any) => {
-        const nodeAmount = nodeAmountMap.get(d.id) || 0;
-        const amountRatio = (nodeAmount - minNodeAmount) / nodeAmountRange;
-        const isCenter = d.id === rootNode.id;
-        return colorForNode(d, amountRatio, isCenter);
-      })
-      .attr("stroke", (d: any) => {
-        // 风险节点用红色描边
-        if (d.malicious && d.malicious > 0) {
-          return "#E74C3C"; // 柔和的红色
-        }
-        // 普通节点描边根据金额设置灰度
-        const nodeAmount = nodeAmountMap.get(d.id) || 0;
-        const amountRatio = (nodeAmount - minNodeAmount) / nodeAmountRange;
-        const grayValue = Math.round(150 - amountRatio * 120);
-        return `rgb(${grayValue}, ${grayValue}, ${grayValue})`;
-      })
-      .attr("stroke-width", (d: any) => (d.id === rootNode.id ? 1.5 : 1))
-      .style("cursor", "pointer")
-      .on("mouseover", function (event, d) {
-        if (isDragging) return;
-        d3.select(this).style("cursor", "pointer");
-        tooltip.style("visibility", "visible").html(
-          `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
-             <div style="font-size: 11px; opacity: 0.8;">点击复制地址, 双击展开节点</div>`,
-        );
-      })
-      .on("mousemove", function (event) {
-        if (isDragging) return;
-        tooltip
-          .style("top", event.pageY - 10 + "px")
-          .style("left", event.pageX + 10 + "px");
-      })
-      .on("mouseout", function () {
-        d3.select(this).style("cursor", "default");
-        // 隐藏 tooltip
-        tooltip.style("visibility", "hidden");
-      })
-      .on("click", function (event, d) {
-        // 复制地址到剪贴板
-        const addressToCopy = d.addr || d.title || d.label || d.id;
-        if (addressToCopy) {
-          navigator.clipboard
-            .writeText(addressToCopy)
-            .then(() => {
-              // 临时改变 tooltip 内容
-              tooltip.html(
-                `<div style="color: #52c41a; font-weight: 600;">✓ 已复制</div>`,
-              );
-              setTimeout(() => {
-                tooltip.style("visibility", "hidden");
-              }, 1000);
-            })
-            .catch(() => {
-              tooltip.html(`<div style="color: #ff4d4f;">复制失败</div>`);
-            });
-        }
-        event.stopPropagation();
-      });
+    // 根据节点类型和金额获取颜色
+    const getNodeColor = (d: any) => {
+      const nodeAmount = nodeAmountMap.get(d.id) || 0;
+      const amountRatio = (nodeAmount - minNodeAmount) / nodeAmountRange;
+      const isCenter = d.id === rootNode.id;
 
-    // 添加节点标签
+      // transaction 节点：根据金额从浅蓝绿到深蓝绿
+      if (d.type === "transaction") {
+        const tealR = Math.round(100 - amountRatio * 60); // 100 -> 40
+        const tealG = Math.round(200 - amountRatio * 80); // 200 -> 120
+        const tealB = Math.round(180 - amountRatio * 60); // 180 -> 120
+        return `rgb(${tealR}, ${tealG}, ${tealB})`;
+      }
+
+      return colorForNode(d, amountRatio, isCenter);
+    };
+
+    // 绘制节点
+    nodeGroup.each(function (d: any) {
+      const nodeEl = d3.select(this);
+      const isTxNode = d.type === "transaction";
+      const nodeSize = isTxNode ? 6 : d.id === rootNode.id ? 14 : 8;
+
+      if (isTxNode) {
+        // 绘制菱形（正方形旋转45度）
+        nodeEl
+          .append("polygon")
+          .attr(
+            "points",
+            `${-nodeSize},0 0,${-nodeSize} ${nodeSize},0 0,${nodeSize}`,
+          )
+          .attr("fill", getNodeColor(d))
+          .attr("stroke", "#2E8B8B")
+          .attr("stroke-width", 1)
+          .style("cursor", "pointer")
+          .on("mouseover", function (event) {
+            if (isDragging) return;
+            d3.select(this).style("cursor", "pointer");
+            tooltip.style("visibility", "visible").html(
+              `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
+                 <div style="font-size: 11px; opacity: 0.8;">点击在右侧查看交易分析</div>`,
+            );
+          })
+          .on("mousemove", function (event) {
+            if (isDragging) return;
+            tooltip
+              .style("top", event.pageY - 10 + "px")
+              .style("left", event.pageX + 10 + "px");
+          })
+          .on("mouseout", function () {
+            d3.select(this).style("cursor", "default");
+            tooltip.style("visibility", "hidden");
+          })
+          .on("click", function (event) {
+            if (onNodeClick) {
+              onNodeClick(d);
+            }
+            event.stopPropagation();
+          });
+      } else {
+        // 绘制圆形（地址节点）
+        nodeEl
+          .append("circle")
+          .attr("r", nodeSize)
+          .attr("fill", getNodeColor(d))
+          .attr("stroke", () => {
+            if (d.malicious && d.malicious > 0) {
+              return "#E74C3C";
+            }
+            const nodeAmount = nodeAmountMap.get(d.id) || 0;
+            const amountRatio = (nodeAmount - minNodeAmount) / nodeAmountRange;
+            const grayValue = Math.round(150 - amountRatio * 120);
+            return `rgb(${grayValue}, ${grayValue}, ${grayValue})`;
+          })
+          .attr("stroke-width", d.id === rootNode.id ? 1.5 : 1)
+          .style("cursor", "pointer")
+          .on("mouseover", function (event) {
+            if (isDragging) return;
+            d3.select(this).style("cursor", "pointer");
+            tooltip.style("visibility", "visible").html(
+              `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
+                 <div style="font-size: 11px; opacity: 0.8;">点击复制地址, 双击展开节点</div>`,
+            );
+          })
+          .on("mousemove", function (event) {
+            if (isDragging) return;
+            tooltip
+              .style("top", event.pageY - 10 + "px")
+              .style("left", event.pageX + 10 + "px");
+          })
+          .on("mouseout", function () {
+            d3.select(this).style("cursor", "default");
+            tooltip.style("visibility", "hidden");
+          })
+          .on("click", function (event) {
+            const addressToCopy = d.addr || d.title || d.label || d.id;
+            if (addressToCopy) {
+              navigator.clipboard
+                .writeText(addressToCopy)
+                .then(() => {
+                  tooltip.html(
+                    `<div style="color: #52c41a; font-weight: 600;">✓ 已复制</div>`,
+                  );
+                  setTimeout(() => {
+                    tooltip.style("visibility", "hidden");
+                  }, 1000);
+                })
+                .catch(() => {
+                  tooltip.html(`<div style="color: #ff4d4f;">复制失败</div>`);
+                });
+            }
+            event.stopPropagation();
+          });
+      }
+    });
+
+    // 添加节点标签（transaction 节点不显示标签）
     nodeGroup
       .append("text")
-      .text((d: any) => d.label)
+      .text((d: any) => (d.type === "transaction" ? "" : d.label))
       .attr("x", 0)
       .attr("y", (d: any) => (d.id === rootNode.id ? -20 : -12))
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "var(--text-secondary)")
-      .style("pointer-events", "none"); // 文字不响应鼠标事件，拖拽时不影响
+      .style("pointer-events", "none");
 
     nodeGroup
       .append("text")
       .text((d: any) => {
+        if (d.type === "transaction") return "";
         const t = d.title || "";
         if (t.length <= 14) return t;
         return `${t.slice(0, 7)}...${t.slice(-7)}`;
@@ -605,7 +662,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
       .attr("text-anchor", "middle")
       .attr("font-size", 12)
       .attr("fill", "var(--text-color)")
-      .style("pointer-events", "none"); // 文字不响应鼠标事件，拖拽时不影响
+      .style("pointer-events", "none");
 
     // 双击节点事件处理
     nodeGroup.on("dblclick", async function (event, d) {
@@ -615,8 +672,13 @@ const D3Renderer: React.FC<D3RendererProps> = ({
       const loadingMsg = message.loading(`正在查询 ${d.addr} 的交易数据...`);
 
       try {
-        // 调用 API 查询该节点的交易数据（使用 1 跳查询）
-        const response = await transactionApi.getNhopGraph(d.addr, 1);
+        // 根据网络类型调用不同的 API
+        let response;
+        if (cryptoType?.toLowerCase() === "btc") {
+          response = await transactionApi.getBTCNhopGraph(d.addr, 1);
+        } else {
+          response = await transactionApi.getNhopGraph(d.addr, 1);
+        }
 
         if (response.success) {
           // 更新当前节点的 expanded 属性为 true
@@ -633,12 +695,28 @@ const D3Renderer: React.FC<D3RendererProps> = ({
             // 查找现有节点中是否已有该地址的节点
             const existingNode = updatedNodes.find((n) => n.addr === node.addr);
 
+            // 判断是否为交易节点
+            const isTransaction = node.type === "transaction";
+
+            // 交易节点不继承 API 返回的 x,y 坐标，统一按层级布局
+            // 地址节点如果有现有节点则保留现有位置，否则不设置坐标让布局算法计算
+            const useExistingPosition =
+              !isTransaction &&
+              existingNode?.x !== undefined &&
+              existingNode?.y !== undefined;
+
             return {
-              id: existingNode?.id || node.id || node.addr,
-              label: node.label || node.addr,
-              title: node.title || node.addr,
-              addr: node.addr,
-              layer: node.addr === d.addr ? d.layer : d.layer + node.layer,
+              id: node.id || node.txHash || node.addr,
+              label:
+                node.label ||
+                (isTransaction ? node.txHash?.slice(0, 8) + "..." : node.addr),
+              title: node.title || node.txHash || node.addr,
+              addr: isTransaction ? node.txHash : node.addr, // 交易节点使用 txHash 作为 addr
+              layer: isTransaction
+                ? d.layer + node.layer
+                : node.addr === d.addr
+                  ? d.layer
+                  : d.layer + node.layer,
               value: node.value || 0,
               pid: node.pid || undefined,
               color: node.color || undefined,
@@ -648,8 +726,10 @@ const D3Renderer: React.FC<D3RendererProps> = ({
               expanded: node.expanded || false,
               malicious: node.malicious || 0,
               exg: node.exg || undefined,
-              x: existingNode?.x || node.x || undefined,
-              y: existingNode?.y || node.y || undefined,
+              type: isTransaction ? ("transaction" as const) : undefined,
+              time: node.time || node.tx_time || undefined,
+              x: useExistingPosition ? existingNode.x : undefined,
+              y: useExistingPosition ? existingNode.y : undefined,
             };
           });
 
@@ -659,18 +739,20 @@ const D3Renderer: React.FC<D3RendererProps> = ({
             let fromNodeId = edge.from;
             let toNodeId = edge.to;
 
-            // 先在现有节点中查找
+            // 先在现有节点中查找（同时检查addr和id，因为edge.from/to可能是地址或交易ID）
             const existingFromNode = updatedNodes.find(
-              (n) => n.addr === edge.from,
+              (n) => n.addr === edge.from || n.id === edge.from,
             );
-            const existingToNode = updatedNodes.find((n) => n.addr === edge.to);
+            const existingToNode = updatedNodes.find(
+              (n) => n.addr === edge.to || n.id === edge.to,
+            );
 
             if (existingFromNode) {
               fromNodeId = existingFromNode.id;
             } else {
               // 在新节点中查找
               const newFromNode = convertedNewNodes.find(
-                (n) => n.addr === edge.from,
+                (n) => n.addr === edge.from || n.id === edge.from,
               );
               if (newFromNode) {
                 fromNodeId = newFromNode.id;
@@ -682,7 +764,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
             } else {
               // 在新节点中查找
               const newToNode = convertedNewNodes.find(
-                (n) => n.addr === edge.to,
+                (n) => n.addr === edge.to || n.id === edge.to,
               );
               if (newToNode) {
                 toNodeId = newToNode.id;
@@ -706,15 +788,29 @@ const D3Renderer: React.FC<D3RendererProps> = ({
           // 合并边数据（去重）
           const mergedLinks = mergeLinks(links || [], convertedNewLinks);
 
+          // 过滤孤立节点：只保留与边有连接的节点
+          const linkedNodeIds = new Set<string>();
+          mergedLinks.forEach((link) => {
+            linkedNodeIds.add(link.from);
+            linkedNodeIds.add(link.to);
+          });
+          const filteredNodes = mergedNodes.filter(
+            (n) => n.layer === 0 || linkedNodeIds.has(n.id),
+          ) as NodeItem[];
+
           // 通知父组件更新数据
           if (onGraphUpdate) {
-            onGraphUpdate(mergedNodes, mergedLinks);
+            onGraphUpdate(filteredNodes, mergedLinks);
           }
 
           message.success(`成功查询到 ${d.addr} 的交易数据`);
           loadingMsg();
         } else {
-          message.error(`查询交易数据失败: ${response.msg}`);
+          const errorMsg =
+            cryptoType?.toLowerCase() === "btc"
+              ? (response as any).message
+              : (response as any).msg;
+          message.error(`查询交易数据失败: ${errorMsg}`);
           loadingMsg();
         }
       } catch (error) {

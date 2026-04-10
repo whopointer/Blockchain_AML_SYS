@@ -298,6 +298,10 @@ const PathTracking: React.FC = () => {
             y: node.y,
             fx: node.fx,
             fy: node.fy,
+            type: node.type,
+            txHash: node.txHash,
+            blockHeight: node.blockHeight,
+            time: node.time,
           })) || [],
         links:
           graphData.links?.map((link) => ({
@@ -322,6 +326,7 @@ const PathTracking: React.FC = () => {
         filterConfig: filterConfigWithUTC8,
         graphData: graphDataPayload,
         dataSource: "snapshot",
+        chain: currency?.toUpperCase() || "ETH",
       };
 
       const response = await graphSnapshotApi.createSnapshot(snapshotRequest);

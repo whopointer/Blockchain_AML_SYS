@@ -17,6 +17,10 @@ export interface NodeItem {
   y?: number;
   fx?: number | null;
   fy?: number | null;
+  type?: "address" | "transaction";
+  txHash?: string;
+  blockHeight?: number;
+  time?: string;
 }
 
 export interface LinkItem {

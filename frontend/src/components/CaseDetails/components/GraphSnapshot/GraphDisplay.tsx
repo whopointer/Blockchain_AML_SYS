@@ -148,29 +148,41 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
         // 注意：这里不保存到缓存，只有用户实际交互后才保存
       }
     }
-  }, [selectedSnapshot?.id, graphTransform.x, graphTransform.y, graphTransform.k]);
+  }, [
+    selectedSnapshot?.id,
+    graphTransform.x,
+    graphTransform.y,
+    graphTransform.k,
+  ]);
 
   // 使用防抖来减少变换更新的频率
   const transformChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingTransformRef = useRef<{ x: number; y: number; k: number } | null>(null);
+  const pendingTransformRef = useRef<{
+    x: number;
+    y: number;
+    k: number;
+  } | null>(null);
 
   // 处理变换状态变化，保存到对应的快照（防抖处理）
   const handleTransformChange = useCallback(
     (transform: { x: number; y: number; k: number }) => {
       if (selectedSnapshot?.id) {
         const snapshotId = selectedSnapshot.id;
-        
+
         // 保存待处理的变换
         pendingTransformRef.current = transform;
-        
+
         // 清除之前的定时器
         if (transformChangeTimeoutRef.current) {
           clearTimeout(transformChangeTimeoutRef.current);
         }
-        
+
         // 设置新的定时器（防抖：延迟50ms后执行，因为现在只在交互结束时触发）
         transformChangeTimeoutRef.current = setTimeout(() => {
-          if (pendingTransformRef.current && selectedSnapshot?.id === snapshotId) {
+          if (
+            pendingTransformRef.current &&
+            selectedSnapshot?.id === snapshotId
+          ) {
             const finalTransform = pendingTransformRef.current;
             // 检查变换是否实际发生变化，避免不必要的更新
             const currentTransform = snapshotTransformsRef.current[snapshotId];
@@ -201,7 +213,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
       }
     };
   }, []);
-  
+
   // 快照切换时取消未完成的定时器
   useEffect(() => {
     // 取消未完成的定时器
@@ -243,6 +255,10 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
             y: node.y,
             fx: node.fx,
             fy: node.fy,
+            type: node.type || undefined,
+            txHash: node.txHash || undefined,
+            blockHeight: node.blockHeight || undefined,
+            time: node.time || undefined,
           }));
 
           const convertedLinks: LinkItem[] = links.map((edge: any) => {
@@ -536,8 +552,8 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
         message.error(result.message);
       }
     } catch (error) {
-      console.error("导出案件包失败:", error);
-      message.error("导出案件包失败");
+      console.error("导出快照包失败:", error);
+      message.error("导出快照包失败");
     } finally {
       setExportLoading((prev) => ({ ...prev, package: false }));
     }
@@ -546,31 +562,6 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   return (
     <div>
       <div>
-        {(exportLoading.pdf ||
-          exportLoading.csv ||
-          exportLoading.png ||
-          exportLoading.package) && (
-          <div
-            style={{
-              padding: "10px 16px",
-              marginBottom: "16px",
-              borderRadius: "4px",
-              backgroundColor: "#e6f7ff",
-              border: "1px solid #91d5ff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Spin size="small" style={{ marginRight: "8px" }} />
-            <span>
-              {exportLoading.pdf && "正在导出PDF"}
-              {exportLoading.csv && "正在导出CSV"}
-              {exportLoading.png && "正在导出PNG"}
-              {exportLoading.package && "正在导出完整包"}
-            </span>
-          </div>
-        )}
         <div style={{ marginBottom: 20 }}>
           <Space wrap>
             <Button
@@ -766,6 +757,17 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           <Descriptions.Item label="创建时间">
             {dayjs(selectedSnapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}
           </Descriptions.Item>
+          <Descriptions.Item label="链">
+            <Tag
+              color={
+                selectedSnapshot.chain?.toUpperCase() === "BTC"
+                  ? "orange"
+                  : "blue"
+              }
+            >
+              {selectedSnapshot.chain || "ETH"}
+            </Tag>
+          </Descriptions.Item>
           <Descriptions.Item label="风险等级">
             {editingField === "riskLevel" ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
@@ -923,11 +925,12 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           >
             {dimensions && !isError ? (
               <TxGraph
-                key={selectedSnapshot.id} // 添加key确保快照切换时重新渲染
+                key={selectedSnapshot.id}
                 nodes={graphData.nodes}
                 links={graphData.links}
                 width={dimensions.width}
                 height={dimensions.height}
+                cryptoType={selectedSnapshot.chain || "ETH"}
                 filter={{
                   ...filterConfig,
                   startDate:
