@@ -1,5 +1,6 @@
 package com.seecoder.DataProcessing.serviceImpl.graph;
 
+import com.seecoder.DataProcessing.po.ChainTx;
 import com.seecoder.DataProcessing.repository.graph.AddressNodeRepository;
 import com.seecoder.DataProcessing.repository.graph.TransactionNodeRepository;
 import com.seecoder.DataProcessing.repository.graph.TransferRelationRepository;
@@ -143,6 +144,7 @@ public abstract class AbstractGraphService {
             }
         } catch (Exception e) {
             log.error("值转换失败: {} to {}", value, targetType, e);
+
         }
 
         // 默认值
@@ -257,4 +259,6 @@ public abstract class AbstractGraphService {
         }
         return result;
     }
+
+
 }

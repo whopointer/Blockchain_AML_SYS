@@ -174,4 +174,10 @@ public class GraphServiceImpl implements GraphService {
             return ApiResponse.error(500, "删除快照失败: " + e.getMessage());
         }
     }
+
+    @Override
+    public void saveTransactionsBatchToGraph(List<ChainTx> txs){
+        transactionService.saveTransactionsBatchToGraph(txs);
+    }
+
 }

@@ -42,10 +42,10 @@ spring:
       password: 123456
     database: neo4j
 
-# BigQuery配置
 bigquery:
-  project-id: dataprocessingamlsys
-  credentials-path: service-account-key.json   # 去掉 classpath: 前缀
+  project-id: dataprocessing-492902
+  credentials-path: classpath:dataprocessing-492902-50bc2d592e8c.json   # 注意添加 classpath: 前缀
+
 # 事务管理器配置（重要！）
 transaction:
   default-timeout: 30
@@ -70,9 +70,9 @@ logging:
     org.hibernate.type.descriptor.sql: TRACE
     org.hibernate.stat: DEBUG
 clickhouse:
-  jdbc-url: jdbc:clickhouse://172.27.32.44:8123/data_processing
-  username: ccroot
-  password: 123456
+  jdbc-url: jdbc:clickhouse://localhost:8123/data_processing   # 关键修改：改为 localhost
+  username: default
+  password:
 # 服务器配置
 server:
   port: 8080
@@ -82,7 +82,7 @@ server:
 # 代理配置（如果需要的话）
 proxy:
   host: 127.0.0.1
-  port: 7897
+  port: 7890
 
 # application.yml 配置示例
 blacklist:

@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface ChainTxRepository extends JpaRepository<ChainTx, Long> {
@@ -109,4 +110,11 @@ public interface ChainTxRepository extends JpaRepository<ChainTx, Long> {
             "SELECT to_address AS addr FROM chain_tx WHERE chain = ?1 AND block_time BETWEEN ?2 AND ?3" +
             ") AS u", nativeQuery = true)
     Long countDistinctAddressByChainAndTimeRange(String chain, LocalDateTime start, LocalDateTime end);
+
+
+    // ChainTxRepository.java
+    @Query("SELECT t.txHash FROM ChainTx t WHERE t.chain = :chain AND t.blockTime BETWEEN :start AND :end")
+    Set<String> findTxHashesByTimeRange(@Param("chain") String chain,
+                                        @Param("start") LocalDateTime start,
+                                        @Param("end") LocalDateTime end);
 }

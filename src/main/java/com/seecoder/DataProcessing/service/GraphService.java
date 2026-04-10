@@ -87,4 +87,7 @@ public interface GraphService {
 
     // 删除图谱快照
     ApiResponse<Void> deleteGraphSnapshot(Long id);
+
+    // 新增：高性能批量保存
+    void saveTransactionsBatchToGraph(List<ChainTx> txs);
 }

@@ -280,4 +280,11 @@ public class EthereumController {
         ApiResponse<String> response = ethereumDataService.exportTransactionsToCsv(startTime, endTime);
         return ResponseEntity.ok(response);
     }
+
+    // 在 EthereumController 或新建 Controller 中添加
+    @GetMapping("/export-prices")
+    public ApiResponse<String> exportCoreTokenPrices(@RequestParam Integer startBlockId,
+                                                     @RequestParam Integer endBlockId) {
+        return ethereumDataService.exportCoreTokenPrices(startBlockId, endBlockId);
+    }
 }

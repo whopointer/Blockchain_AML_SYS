@@ -52,11 +52,8 @@ public class GraphExportServiceImpl implements GraphExportService {
     private Set<String> blacklist = new HashSet<>();
     private Set<String> whitelist = new HashSet<>();
 
-    @PostConstruct
-    public void init() {
-        refreshBlackWhitelist();
-    }
 
+//生成边表和class表，加载黑白名单
     @Override
     public ApiResponse<Void> refreshBlackWhitelist() {
         try {

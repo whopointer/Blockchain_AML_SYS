@@ -40,9 +40,8 @@ public class ChainTokenTransfer {
     @Column(name = "to_address", length = 42)
     private String toAddress;
 
-    @Column(name = "value", precision = 38, scale = 0)
-    private BigInteger value;
-
+    @Column(name = "value", length = 255)
+    private String value;   // 改为 String 类型
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

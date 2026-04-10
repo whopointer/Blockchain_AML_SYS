@@ -208,7 +208,7 @@ public class MinIOServiceImpl implements MinIOService {
     /**
      * 定时归档应用日志（每天凌晨2点执行）
      */
-    @Scheduled(cron = "0 0 2 * * ?")
+//    @Scheduled(cron = "0 0 2 * * ?")
     public void scheduledLogArchive() {
         if (!archiveEnabled) {
             return;
@@ -251,10 +251,50 @@ public class MinIOServiceImpl implements MinIOService {
         }
     }
 
+    // MinIOServiceImpl.java 新增/修改
+    @Override
+    public ApiResponse<String> archiveBlockBatch(String fileName, String jsonArray) {
+        if (!archiveEnabled) {
+            return ApiResponse.success("归档功能已禁用", null);
+        }
+        try {
+            // 添加元数据包装（可选）
+            Map<String, Object> wrapper = new HashMap<>();
+            wrapper.put("archiveTime", LocalDateTime.now().toString());
+            wrapper.put("dataType", "block_batch");
+            wrapper.put("count", objectMapper.readValue(jsonArray, List.class).size());
+            wrapper.put("data", objectMapper.readValue(jsonArray, Object.class));
+            String enhancedJson = objectMapper.writeValueAsString(wrapper);
+            return minIOUtil.uploadJsonData("blockchain/ETH/blocks/batch", fileName, enhancedJson);
+        } catch (Exception e) {
+            log.error("批量上传区块失败: {}", fileName, e);
+            return ApiResponse.error(500, "批量上传失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ApiResponse<String> archiveTransactionBatch(String fileName, String jsonArray) {
+        if (!archiveEnabled) {
+            return ApiResponse.success("归档功能已禁用", null);
+        }
+        try {
+            Map<String, Object> wrapper = new HashMap<>();
+            wrapper.put("archiveTime", LocalDateTime.now().toString());
+            wrapper.put("dataType", "transaction_batch");
+            wrapper.put("count", objectMapper.readValue(jsonArray, List.class).size());
+            wrapper.put("data", objectMapper.readValue(jsonArray, Object.class));
+            String enhancedJson = objectMapper.writeValueAsString(wrapper);
+            return minIOUtil.uploadJsonData("blockchain/ETH/transactions/batch", fileName, enhancedJson);
+        } catch (Exception e) {
+            log.error("批量上传交易失败: {}", fileName, e);
+            return ApiResponse.error(500, "批量上传失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 每周清理一次旧数据（每周日凌晨3点执行）
      */
-    @Scheduled(cron = "0 0 3 ? * SUN")
+//    @Scheduled(cron = "0 0 3 ? * SUN")
     public void scheduledDataCleanup() {
         if (!archiveEnabled) {
             return;

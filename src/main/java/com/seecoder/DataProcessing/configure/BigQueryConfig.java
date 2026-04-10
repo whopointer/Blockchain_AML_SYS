@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,7 +21,7 @@ import java.net.Proxy;
 @Configuration
 public class BigQueryConfig {
 
-    @Value("dataprocessingamlsys") // 请确保这是您的项目ID
+    @Value("${bigquery.project-id:dataprocessingamlsys}")
     private String projectId;
 
     @Value("${bigquery.credentials-path:classpath:service-account-key.json}")
@@ -31,7 +32,7 @@ public class BigQueryConfig {
      * 这个工厂将用于构建所有Google客户端库内部的HTTP请求，包括认证和API调用。
      */
     private com.google.api.client.http.HttpTransport createProxiedHttpTransport() {
-        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7897));
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 7890));
         return new com.google.api.client.http.javanet.NetHttpTransport.Builder()
                 .setProxy(proxy)
                 .build();
@@ -40,10 +41,14 @@ public class BigQueryConfig {
     @Bean
     public BigQuery bigQuery() {
         try {
-            log.info("正在配置BigQuery客户端，使用HTTP代理: 127.0.0.1:7897");
+            log.info("正在配置BigQuery客户端，使用HTTP代理: 127.0.0.1:7890");
 
-            // 1. 使用自定义的、带代理的传输层来加载凭证
-            InputStream credentialsStream = new ClassPathResource(credentialsPath).getInputStream();
+            // 1. 根据路径类型获取凭证输入流
+            InputStream credentialsStream = getCredentialsInputStream(credentialsPath);
+            if (credentialsStream == null) {
+                throw new FileNotFoundException("无法找到凭证文件: " + credentialsPath);
+            }
+
             GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream, () -> createProxiedHttpTransport());
             credentialsStream.close();
 
@@ -68,5 +73,42 @@ public class BigQueryConfig {
             // 在开发环境中返回null，应用程序将使用模拟数据
             return null;
         }
+    }
+
+    /**
+     * 根据路径字符串获取输入流，支持以下格式：
+     * - classpath:xxx  -> 从类路径加载
+     * - /xxx 或 C:/xxx -> 绝对路径
+     * - xxx             -> 相对路径（尝试类路径，若失败则尝试文件系统相对路径）
+     */
+    private InputStream getCredentialsInputStream(String path) throws IOException {
+        if (path == null || path.isEmpty()) {
+            throw new FileNotFoundException("凭证路径为空");
+        }
+
+        // 1. 明确 classpath: 前缀
+        if (path.startsWith("classpath:")) {
+            String classpathLocation = path.substring("classpath:".length());
+            ClassPathResource resource = new ClassPathResource(classpathLocation);
+            if (resource.exists()) {
+                return resource.getInputStream();
+            } else {
+                throw new FileNotFoundException("Classpath resource不存在: " + classpathLocation);
+            }
+        }
+
+        // 2. 绝对路径（Unix 或 Windows 盘符）
+        if (path.startsWith("/") || path.matches("^[A-Za-z]:.*")) {
+            return new FileInputStream(path);
+        }
+
+        // 3. 既不是classpath也不是绝对路径，先尝试作为类路径资源，再尝试作为相对文件路径
+        ClassPathResource classPathResource = new ClassPathResource(path);
+        if (classPathResource.exists()) {
+            return classPathResource.getInputStream();
+        }
+
+        // 最后尝试相对文件路径
+        return new FileInputStream(path);
     }
 }

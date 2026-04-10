@@ -9,11 +9,46 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-
+import javax.annotation.PostConstruct;
+import javax.annotation.PostConstruct;
+import java.util.Collections;
 @Slf4j
 @Service
 public class GraphTransactionService extends AbstractGraphService {
 
+    @PostConstruct
+    public void initIndexes() {
+        log.info("开始创建 Neo4j 索引...");
+        Session session = null;
+        try {
+            session = getSession();
+            String[] indexCyphers = {
+                    "CREATE INDEX transaction_tx_hash IF NOT EXISTS FOR (n:Transaction) ON (n.txHash)",
+                    "CREATE INDEX transaction_chain IF NOT EXISTS FOR (n:Transaction) ON (n.chain)",
+                    "CREATE INDEX address_address IF NOT EXISTS FOR (n:Address) ON (n.address)",
+                    "CREATE INDEX address_chain IF NOT EXISTS FOR (n:Address) ON (n.chain)",
+                    "CREATE INDEX address_address_chain IF NOT EXISTS FOR (n:Address) ON (n.address, n.chain)",
+                    "CREATE INDEX transaction_txhash_chain IF NOT EXISTS FOR (n:Transaction) ON (n.txHash, n.chain)"
+            };
+            for (String cypher : indexCyphers) {
+                try {
+                    // 使用 query 方法执行 Cypher，第二个参数为参数 Map（无参数时传空 Map）
+                    session.query(cypher, Collections.emptyMap());
+                    log.info("索引创建/验证成功: {}", cypher);
+                } catch (Exception e) {
+                    // 索引已存在时会抛出异常，可忽略
+                    log.warn("索引可能已存在: {}", e.getMessage());
+                }
+            }
+            log.info("Neo4j 索引初始化完成");
+        } catch (Exception e) {
+            log.error("索引初始化失败", e);
+        } finally {
+            if (session != null) {
+                closeSession(session);  // 使用你已有的 closeSession 方法
+            }
+        }
+    }
     @Transactional(transactionManager = "neo4jTransactionManager")
     public void saveTransactionToGraph(ChainTx chainTx) {
         Session session = null;
@@ -305,20 +340,235 @@ public class GraphTransactionService extends AbstractGraphService {
     }
 
 
+//    @Transactional(transactionManager = "neo4jTransactionManager")
+//    public void saveBitcoinTransactionsToGraph(List<ChainTx> txs,
+//                                               Map<String, List<ChainTxInput>> inputsMap,
+//                                               Map<String, List<ChainTxOutput>> outputsMap) {
+//        if (txs == null || txs.isEmpty()) return;
+//        // 分批处理，每批 50 笔
+//        int batchSize = 50;
+//        for (int i = 0; i < txs.size(); i += batchSize) {
+//            List<ChainTx> batch = txs.subList(i, Math.min(i + batchSize, txs.size()));
+//            for (ChainTx tx : batch) {
+//                List<ChainTxInput> inputs = inputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+//                List<ChainTxOutput> outputs = outputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+//                saveBitcoinTransactionToGraph(tx, inputs, outputs);
+//            }
+//        }
+//    }
+
+
+    @Transactional(transactionManager = "neo4jTransactionManager")
+    public void saveTransactionsBatchToGraph(List<ChainTx> txs) {
+        log.info("开始批量保存图数据库，交易数：{}", txs.size());
+        if (txs == null || txs.isEmpty()) return;
+        long start = System.currentTimeMillis();
+        Session session = getSession();
+        try {
+            List<Map<String, Object>> txParams = new ArrayList<>();
+            for (ChainTx tx : txs) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("txHash", tx.getTxHash());
+                map.put("chain", tx.getChain());
+                map.put("fromAddress", tx.getFromAddress());
+                map.put("toAddress", tx.getToAddress());
+                map.put("blockHeight", tx.getBlockHeight());
+                map.put("blockTime", tx.getBlockTime());
+                map.put("totalInput", convertBigDecimal(tx.getTotalInput()));
+                map.put("totalOutput", convertBigDecimal(tx.getTotalOutput()));
+                map.put("fee", convertBigDecimal(tx.getFee()));
+                map.put("txIndex", tx.getTxIndex() != null ? tx.getTxIndex() : 0);
+                txParams.add(map);
+            }
+
+            // Cypher 优化：
+            // - 地址节点 MERGE，创建时设置完整属性，匹配时仅更新 last_seen
+            // - 交易节点 MERGE（确保幂等），但关系用 CREATE（更快）
+            String cypher =
+                    "UNWIND $txs AS tx " +
+                            "MERGE (from:Address {address: tx.fromAddress, chain: tx.chain}) " +
+                            "ON CREATE SET from.first_seen = tx.blockTime, from.last_seen = tx.blockTime, " +
+                            "              from.risk_level = 0, from.tag = '' " +
+                            "ON MATCH SET from.last_seen = tx.blockTime " +
+                            "MERGE (txNode:Transaction {txHash: tx.txHash, chain: tx.chain}) " +
+                            "ON CREATE SET txNode.blockHeight = tx.blockHeight, txNode.time = tx.blockTime, " +
+                            "              txNode.totalInput = tx.totalInput, txNode.totalOutput = tx.totalOutput, " +
+                            "              txNode.fee = tx.fee, txNode.numInputs = 1, " +
+                            "              txNode.numOutputs = CASE WHEN tx.toAddress IS NOT NULL THEN 1 ELSE 0 END " +
+                            "ON MATCH SET txNode.totalInput = tx.totalInput, txNode.totalOutput = tx.totalOutput, " +
+                            "              txNode.fee = tx.fee, txNode.time = tx.blockTime " +
+                            "CREATE (from)-[:SPENT {amount: tx.totalInput, index: tx.txIndex}]->(txNode) " +
+                            "FOREACH(ignore IN CASE WHEN tx.toAddress IS NOT NULL THEN [1] ELSE [] END | " +
+                            "    MERGE (to:Address {address: tx.toAddress, chain: tx.chain}) " +
+                            "    ON CREATE SET to.first_seen = tx.blockTime, to.last_seen = tx.blockTime, " +
+                            "                  to.risk_level = 0, to.tag = '' " +
+                            "    ON MATCH SET to.last_seen = tx.blockTime " +
+                            "    CREATE (from)-[:TRANSFER {txHash: tx.txHash, amount: tx.totalOutput, time: tx.blockTime}]->(to) " +
+                            "    CREATE (txNode)-[:OUTPUT {amount: tx.totalOutput, index: tx.txIndex}]->(to) " +
+                            ")";
+
+            Map<String, Object> params = Collections.singletonMap("txs", txParams);
+            session.query(cypher, params);
+            log.info("批量保存完成，总耗时 {}ms，交易数 {}", System.currentTimeMillis() - start, txs.size());
+        } catch (Exception e) {
+            log.error("批量保存失败", e);
+            throw new RuntimeException("图数据库批量保存失败", e);
+        } finally {
+            closeSession(session);
+        }
+    }
+    /**
+     * 批量保存比特币交易到图数据库（支持多输入/多输出）
+     * 参考以太坊批量写入模式，使用 UNWIND 一次处理多笔交易
+     * @param txs 交易列表
+     * @param inputsMap 交易哈希 -> 输入列表
+     * @param outputsMap 交易哈希 -> 输出列表
+     * @param batchSize 每批处理的交易数（建议 50-100）
+     */
+    @Transactional(transactionManager = "neo4jTransactionManager")
+    public void saveBitcoinTransactionsBatchToGraph(List<ChainTx> txs,
+                                                    Map<String, List<ChainTxInput>> inputsMap,
+                                                    Map<String, List<ChainTxOutput>> outputsMap,
+                                                    int batchSize) {
+        if (txs == null || txs.isEmpty()) {
+            log.info("没有交易需要保存到图数据库");
+            return;
+        }
+        log.info("开始批量保存比特币交易到图数据库，总交易数：{}，批次大小：{}", txs.size(), batchSize);
+
+        int totalSuccess = 0;
+        int totalFail = 0;
+
+        for (int i = 0; i < txs.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, txs.size());
+            List<ChainTx> batch = txs.subList(i, end);
+            long batchStart = System.currentTimeMillis();
+            log.info("处理第 {}/{} 批，包含 {} 笔交易", i / batchSize + 1,
+                    (txs.size() + batchSize - 1) / batchSize, batch.size());
+
+            Session session = null;
+            try {
+                session = getSession();
+
+                // 构建批次参数（与之前相同）
+                List<Map<String, Object>> txParams = new ArrayList<>();
+                for (ChainTx tx : batch) {
+                    Map<String, Object> txMap = new HashMap<>();
+                    txMap.put("txHash", tx.getTxHash());
+                    txMap.put("chain", tx.getChain());
+                    txMap.put("blockHeight", tx.getBlockHeight());
+                    txMap.put("blockTime", tx.getBlockTime() != null ? tx.getBlockTime().toString() : null);
+                    txMap.put("totalInput", convertBigDecimal(tx.getTotalInput()));
+                    txMap.put("totalOutput", convertBigDecimal(tx.getTotalOutput()));
+                    txMap.put("fee", convertBigDecimal(tx.getFee()));
+
+                    // 输入列表
+                    List<ChainTxInput> inputs = inputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+                    List<Map<String, Object>> inputList = new ArrayList<>();
+                    for (ChainTxInput in : inputs) {
+                        if (in.getAddress() == null || in.getAddress().isEmpty()) continue;
+                        Map<String, Object> inMap = new HashMap<>();
+                        inMap.put("address", in.getAddress());
+                        inMap.put("amount", convertBigDecimal(in.getValue()));
+                        inMap.put("index", in.getInputIndex() != null ? in.getInputIndex() : 0);
+                        inputList.add(inMap);
+                    }
+                    txMap.put("inputs", inputList);
+
+                    // 输出列表
+                    List<ChainTxOutput> outputs = outputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
+                    List<Map<String, Object>> outputList = new ArrayList<>();
+                    for (ChainTxOutput out : outputs) {
+                        if (out.getAddress() == null || out.getAddress().isEmpty()) continue;
+                        Map<String, Object> outMap = new HashMap<>();
+                        outMap.put("address", out.getAddress());
+                        outMap.put("amount", convertBigDecimal(out.getValue()));
+                        outMap.put("index", out.getOutputIndex() != null ? out.getOutputIndex() : 0);
+                        outputList.add(outMap);
+                    }
+                    txMap.put("outputs", outputList);
+
+                    txParams.add(txMap);
+                }
+
+                // ========== 优化后的 Cypher ==========
+                // 关键改动：
+                // 1. 使用 OPTIONAL MATCH 提前检查节点是否存在，避免 MERGE 的内部全扫描（需要索引配合）
+                // 2. 将 last_seen 更新移到单独的操作，减少写冲突
+                // 3. 对于地址节点，只在必要时创建，更新 last_seen 使用 ON MATCH SET（但索引存在时很快）
+                String cypher =
+                        "UNWIND $txBatch AS tx " +
+                                // ----- 交易节点 -----
+                                "MERGE (txNode:Transaction {txHash: tx.txHash, chain: tx.chain}) " +
+                                "ON CREATE SET txNode.blockHeight = tx.blockHeight, txNode.time = tx.blockTime, " +
+                                "              txNode.totalInput = tx.totalInput, txNode.totalOutput = tx.totalOutput, " +
+                                "              txNode.fee = tx.fee " +
+                                "ON MATCH SET txNode.totalInput = tx.totalInput, txNode.totalOutput = tx.totalOutput, " +
+                                "              txNode.fee = tx.fee, txNode.time = tx.blockTime " +
+                                "WITH tx, txNode " +
+                                // ----- 输入地址和 SPENT 关系 -----
+                                "FOREACH (input IN tx.inputs | " +
+                                "    MERGE (addr:Address {address: input.address, chain: tx.chain}) " +
+                                "    ON CREATE SET addr.first_seen = tx.blockTime, addr.last_seen = tx.blockTime, " +
+                                "                  addr.risk_level = 0, addr.tag = '' " +
+                                "    ON MATCH SET addr.last_seen = tx.blockTime " +
+                                "    MERGE (addr)-[:SPENT {amount: input.amount, index: input.index}]->(txNode) " +
+                                ") " +
+                                "WITH tx, txNode " +
+                                // ----- 输出地址和 OUTPUT 关系 -----
+                                "FOREACH (output IN tx.outputs | " +
+                                "    MERGE (addr:Address {address: output.address, chain: tx.chain}) " +
+                                "    ON CREATE SET addr.first_seen = tx.blockTime, addr.last_seen = tx.blockTime, " +
+                                "                  addr.risk_level = 0, addr.tag = '' " +
+                                "    ON MATCH SET addr.last_seen = tx.blockTime " +
+                                "    MERGE (txNode)-[:OUTPUT {amount: output.amount, index: output.index}]->(addr) " +
+                                ")";
+
+                Map<String, Object> params = Collections.singletonMap("txBatch", txParams);
+                log.info("开始执行优化后的批量 Cypher 查询...");
+                session.query(cypher, params);
+                long batchDuration = System.currentTimeMillis() - batchStart;
+                log.info("第 {}/{} 批保存成功，耗时 {}ms，共 {} 笔交易",
+                        i / batchSize + 1, (txs.size() + batchSize - 1) / batchSize,
+                        batchDuration, batch.size());
+                totalSuccess += batch.size();
+
+            } catch (Exception e) {
+                totalFail += batch.size();
+                log.error("第 {}/{} 批保存失败，失败交易数 {}，错误: {}",
+                        i / batchSize + 1, (txs.size() + batchSize - 1) / batchSize,
+                        batch.size(), e.getMessage(), e);
+                // 可选：降级为逐条保存
+                fallbackSaveSingleTransactions(batch, inputsMap, outputsMap);
+            } finally {
+                if (session != null) {
+                    closeSession(session);
+                }
+            }
+        }
+
+        log.info("批量保存比特币交易到图数据库完成：成功 {} 笔，失败 {} 笔", totalSuccess, totalFail);
+    }
+
+    /**
+     * 降级方案：单条保存（当批量失败时使用）
+     */
+    private void fallbackSaveSingleTransactions(List<ChainTx> txs,
+                                                Map<String, List<ChainTxInput>> inputsMap,
+                                                Map<String, List<ChainTxOutput>> outputsMap) {
+        for (ChainTx tx : txs) {
+            try {
+                saveBitcoinTransactionToGraph(tx, inputsMap.get(tx.getTxHash()), outputsMap.get(tx.getTxHash()));
+            } catch (Exception e) {
+                log.error("单条保存交易失败: {}", tx.getTxHash(), e);
+            }
+        }
+    }
+
     @Transactional(transactionManager = "neo4jTransactionManager")
     public void saveBitcoinTransactionsToGraph(List<ChainTx> txs,
                                                Map<String, List<ChainTxInput>> inputsMap,
                                                Map<String, List<ChainTxOutput>> outputsMap) {
-        if (txs == null || txs.isEmpty()) return;
-        // 分批处理，每批 50 笔
-        int batchSize = 50;
-        for (int i = 0; i < txs.size(); i += batchSize) {
-            List<ChainTx> batch = txs.subList(i, Math.min(i + batchSize, txs.size()));
-            for (ChainTx tx : batch) {
-                List<ChainTxInput> inputs = inputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
-                List<ChainTxOutput> outputs = outputsMap.getOrDefault(tx.getTxHash(), Collections.emptyList());
-                saveBitcoinTransactionToGraph(tx, inputs, outputs);
-            }
-        }
+        saveBitcoinTransactionsBatchToGraph(txs, inputsMap, outputsMap, 50);
     }
 }

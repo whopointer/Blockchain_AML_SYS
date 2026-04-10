@@ -28,6 +28,10 @@ public interface MinIOService {
     ApiResponse<String> cleanupOldData(int daysToKeep);
     ApiResponse<Map<String, Object>> getStorageStats();
 
+    // 批量上传区块数据（合并为一个 JSON 数组）
+    ApiResponse<String> archiveBlockBatch(String fileName, String jsonArray);
 
-    void uploadFile(String fileName) throws IOException;
+    // 批量上传交易数据
+    ApiResponse<String> archiveTransactionBatch(String fileName, String jsonArray);
+ void uploadFile(String fileName) throws IOException;
 }

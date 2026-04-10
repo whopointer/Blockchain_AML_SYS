@@ -1008,11 +1008,12 @@ public class GraphAddressService extends AbstractGraphService {
      * 获取指定地址在时间范围内的直接交易对手地址
      */
     public Set<String> getNeighborAddresses(String address, LocalDateTime startTime, LocalDateTime endTime) {
-        String cypher = "MATCH (a:Address {address: $addr}) " +
-                "-[:TRANSFER]-(neighbor:Address) " +
+        String cypher = "MATCH (a:Address {address: $addr}) -[:TRANSFER]-(neighbor:Address) " +
                 "WHERE a <> neighbor " +
-                "AND EXISTS((a)-[:TRANSFER]->(t:Transaction)-[:TRANSFER]->(neighbor)) " +
-                "AND t.time >= $start AND t.time <= $end " +
+                "OPTIONAL MATCH (a)-[:TRANSFER]->(t:Transaction)-[:TRANSFER]->(neighbor) " +
+                "WHERE t.time >= $start AND t.time <= $end " +
+                "WITH a, neighbor, COUNT(t) AS cnt " +
+                "WHERE cnt > 0 " +
                 "RETURN DISTINCT neighbor.address";
         Map<String, Object> params = new HashMap<>();
         params.put("addr", address);
@@ -1036,9 +1037,12 @@ public class GraphAddressService extends AbstractGraphService {
      * 获取指定地址在时间范围内的交易哈希
      */
     public Set<String> getTransactionHashes(String address, LocalDateTime startTime, LocalDateTime endTime) {
-        String cypher = "MATCH (a:Address {address: $addr})-[r:TRANSFER]->(t:Transaction) " +
-                "WHERE t.time >= $start AND t.time <= $end " +
-                "RETURN DISTINCT t.txHash";
+        // 只获取地址作为发送方的交易哈希（SPENT 关系）
+        String cypher =
+                "MATCH (a:Address {address: $addr})-[:SPENT]->(tx:Transaction) " +
+                        "WHERE tx.time >= $start AND tx.time <= $end " +
+                        "RETURN DISTINCT tx.txHash";
+
         Map<String, Object> params = new HashMap<>();
         params.put("addr", address);
         params.put("start", startTime.toString());
@@ -1049,7 +1053,7 @@ public class GraphAddressService extends AbstractGraphService {
             Iterable<Map<String, Object>> result = session.query(cypher, params);
             Set<String> txHashes = new HashSet<>();
             for (Map<String, Object> row : result) {
-                txHashes.add((String) row.get("t.txHash"));
+                txHashes.add((String) row.get("tx.txHash"));
             }
             return txHashes;
         } finally {

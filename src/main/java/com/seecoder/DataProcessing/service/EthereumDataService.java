@@ -120,14 +120,19 @@ public interface EthereumDataService {
     ApiResponse<Map<String, Object>> getLatestData();
 
 
+    // 其他方法不变
     @Async
-    CompletableFuture<ApiResponse<List<String>>> exploreAndExport(String taskId,
-                                                                  List<String> sources,
-                                                                  List<String> allowed,
-                                                                  List<String> forbidden,
-                                                                  LocalDateTime startTime,
-                                                                  LocalDateTime endTime);
+    CompletableFuture<ApiResponse<Map<String, Object>>> exploreAndExport(
+            String taskId,
+            List<String> sources,
+            List<String> allowed,
+            List<String> forbidden,
+            LocalDateTime startTime,
+            LocalDateTime endTime);
 
+
+    // 在 EthereumDataService 接口中添加
+    ApiResponse<String> exportCoreTokenPrices(Integer startBlockId, Integer endBlockId);
     // ============= 缓存清理方法 =============
 
     /**
