@@ -562,7 +562,7 @@ const D3Renderer: React.FC<D3RendererProps> = ({
             d3.select(this).style("cursor", "pointer");
             tooltip.style("visibility", "visible").html(
               `<div style="margin-bottom: 4px; font-weight: 600;">${d.title || d.label || d.id}</div>
-                 <div style="font-size: 11px; opacity: 0.8;">点击在右侧查看交易分析</div>`,
+                 <div style="font-size: 11px; opacity: 0.8;">点击查看交易详情</div>`,
             );
           })
           .on("mousemove", function (event) {
@@ -579,6 +579,9 @@ const D3Renderer: React.FC<D3RendererProps> = ({
             if (onNodeClick) {
               onNodeClick(d);
             }
+            event.stopPropagation();
+          })
+          .on("dblclick", function (event) {
             event.stopPropagation();
           });
       } else {

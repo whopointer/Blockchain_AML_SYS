@@ -5,6 +5,7 @@ import {
   BitcoinTransactionDetail,
   SingleTransactionDetailResponse,
   BTCNhopResponse,
+  BTCPathResponse,
 } from "./types";
 
 const TRANSACTION_API_BASE_URL = "http://localhost:8080/api";
@@ -59,6 +60,15 @@ export const transactionApi = {
   ): Promise<BTCNhopResponse> =>
     transactionApiClient
       .get(`/neo4j/btc/hops?address=${address}&maxHops=${maxHops}`)
+      .then((response) => response.data),
+
+  // BTC 路径追踪
+  getBTCPath: (
+    fromAddress: string,
+    toAddress: string,
+  ): Promise<BTCPathResponse> =>
+    transactionApiClient
+      .get(`/neo4j/btc/path?fromAddress=${fromAddress}&toAddress=${toAddress}`)
       .then((response) => response.data),
 };
 

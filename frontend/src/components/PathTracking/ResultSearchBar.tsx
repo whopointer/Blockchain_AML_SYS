@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Select, Input, Button, Form, Row, Col, Card } from "antd";
-import { useSearchParams } from "react-router-dom";
 
 const { Option } = Select;
 
@@ -63,15 +62,8 @@ const ResultSearchBar: React.FC<ResultSearchBarProps> = ({
   defaultToAddress = "",
 }) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
-  const [currency, setCurrency] = React.useState<string>(
-    () => searchParams.get("crypto") || defaultCrypto,
-  );
-
-  const routeCrypto = searchParams.get("crypto");
-  const urlFromAddress = searchParams.get("fromAddress");
-  const urlToAddress = searchParams.get("toAddress");
+  const [currency, setCurrency] = React.useState<string>(defaultCrypto);
 
   // 根据币种获取 placeholder
   const getPlaceholder = (crypto: string): string => {
@@ -111,9 +103,9 @@ const ResultSearchBar: React.FC<ResultSearchBarProps> = ({
           layout="vertical"
           onFinish={onFinish}
           initialValues={{
-            currency: routeCrypto || defaultCrypto,
-            fromAddress: urlFromAddress || defaultFromAddress,
-            toAddress: urlToAddress || defaultToAddress,
+            currency: defaultCrypto,
+            fromAddress: defaultFromAddress,
+            toAddress: defaultToAddress,
           }}
         >
           <Row gutter={16}>

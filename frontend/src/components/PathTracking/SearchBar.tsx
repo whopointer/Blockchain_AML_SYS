@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Select, Input, Button, Card, Form, Row, Col } from "antd";
-import { useSearchParams } from "react-router-dom";
 
 const { Option } = Select;
 
@@ -63,16 +62,9 @@ const SearchBar: React.FC<PathTrackingSearchBarProps> = ({
   defaultToAddress = "",
 }) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
 
-  const routeCrypto = searchParams.get("crypto");
-  const urlFromAddress = searchParams.get("fromAddress");
-  const urlToAddress = searchParams.get("toAddress");
-
-  const [currency, setCurrency] = React.useState<string>(
-    routeCrypto || defaultCrypto,
-  );
+  const [currency, setCurrency] = React.useState<string>(defaultCrypto);
 
   // 根据币种获取 placeholder
   const getPlaceholder = (crypto: string): string => {
@@ -88,18 +80,14 @@ const SearchBar: React.FC<PathTrackingSearchBarProps> = ({
     // 校验起始地址
     const fromError = validateAddressByCrypto(currency, fromAddress);
     if (fromError) {
-      form.setFields([
-        { name: "fromAddress", errors: [fromError] },
-      ]);
+      form.setFields([{ name: "fromAddress", errors: [fromError] }]);
       return;
     }
 
     // 校验目标地址
     const toError = validateAddressByCrypto(currency, toAddress);
     if (toError) {
-      form.setFields([
-        { name: "toAddress", errors: [toError] },
-      ]);
+      form.setFields([{ name: "toAddress", errors: [toError] }]);
       return;
     }
 
@@ -116,9 +104,9 @@ const SearchBar: React.FC<PathTrackingSearchBarProps> = ({
           layout="vertical"
           onFinish={onFinish}
           initialValues={{
-            currency: routeCrypto || defaultCrypto,
-            fromAddress: urlFromAddress || defaultFromAddress,
-            toAddress: urlToAddress || defaultToAddress,
+            currency: defaultCrypto,
+            fromAddress: defaultFromAddress,
+            toAddress: defaultToAddress,
           }}
         >
           <Row gutter={16}>

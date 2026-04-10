@@ -131,9 +131,9 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
     [filterConfig, onFilterChange],
   );
 
-  const handleTagsChange = useCallback(
+  const handleChainChange = useCallback(
     (value: string[]) => {
-      onFilterChange({ ...filterConfig, tags: value });
+      onFilterChange({ ...filterConfig, chain: value });
     },
     [filterConfig, onFilterChange],
   );
@@ -178,7 +178,7 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
         ),
       },
       {
-        title: "链",
+        title: "货币类型",
         dataIndex: "chain",
         key: "chain",
         width: "8%",
@@ -333,15 +333,12 @@ const SnapshotTable: React.FC<SnapshotTableProps> = ({
           <Select
             mode="multiple"
             style={{ width: "100%" }}
-            placeholder="标签"
-            value={filterConfig.tags}
-            onChange={handleTagsChange}
+            placeholder="货币类型"
+            value={filterConfig.chain}
+            onChange={handleChainChange}
           >
-            {allTags.map((tag) => (
-              <Select.Option key={tag} value={tag}>
-                {tag}
-              </Select.Option>
-            ))}
+            <Select.Option value="BTC">BTC</Select.Option>
+            <Select.Option value="ETH">ETH</Select.Option>
           </Select>
         </Col>
         <Col xs={24} sm={12} md={5}>

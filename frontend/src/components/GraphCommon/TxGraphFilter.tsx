@@ -19,9 +19,17 @@ interface Props {
   value?: FilterValue;
   onChange?: (v: FilterValue) => void;
   links?: LinkItem[];
+  firstTxTime?: Dayjs;
+  latestTxTime?: Dayjs;
 }
 
-const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
+const TxGraphFilter: React.FC<Props> = ({
+  value,
+  onChange,
+  links,
+  firstTxTime,
+  latestTxTime,
+}) => {
   const lastUpdateRef = useRef<{
     startDate?: dayjs.Dayjs | null;
     endDate?: dayjs.Dayjs | null;
@@ -62,7 +70,16 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
     return dayjs(timeValue);
   };
 
-  const { firstTxTime, latestTxTime } = useMemo(() => {
+  const {
+    firstTxTime: calculatedFirstTxTime,
+    latestTxTime: calculatedLatestTxTime,
+  } = useMemo(() => {
+    // 优先使用传入的时间范围
+    if (firstTxTime && latestTxTime) {
+      return { firstTxTime, latestTxTime };
+    }
+
+    // 如果没有传入时间范围，则从链接中计算
     if (links && links.length > 0) {
       const times = links.map((l) => parseLinkTimeSafely(l.tx_time));
       const sorted = times.sort((a, b) => a.valueOf() - b.valueOf());
@@ -73,10 +90,16 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange, links }) => {
     }
     const now = dayjs();
     return { firstTxTime: now, latestTxTime: now };
-  }, [links]);
+  }, [links, firstTxTime, latestTxTime]);
 
-  const firstTxTimeMs = useMemo(() => firstTxTime.valueOf(), [firstTxTime]);
-  const latestTxTimeMs = useMemo(() => latestTxTime.valueOf(), [latestTxTime]);
+  const firstTxTimeMs = useMemo(
+    () => calculatedFirstTxTime.valueOf(),
+    [calculatedFirstTxTime],
+  );
+  const latestTxTimeMs = useMemo(
+    () => calculatedLatestTxTime.valueOf(),
+    [calculatedLatestTxTime],
+  );
 
   const totalSeconds = useMemo(
     () => (latestTxTimeMs - firstTxTimeMs) / 1000,

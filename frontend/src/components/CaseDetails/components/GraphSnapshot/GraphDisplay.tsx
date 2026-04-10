@@ -47,6 +47,10 @@ interface GraphDisplayProps {
   onDeleteSnapshot: (snapshot: GraphSnapshot) => void;
   onToggleArchiveSnapshot?: (snapshot: GraphSnapshot) => void;
   onAddComment?: (snapshotId: string, content: string) => void;
+  onTransformChange?: (
+    snapshotId: string,
+    transform: { x: number; y: number; k: number },
+  ) => void;
   editingField: string | null;
   tempValue: any;
   setTempValue: React.Dispatch<React.SetStateAction<any>>;
@@ -62,6 +66,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
   onDeleteSnapshot,
   onToggleArchiveSnapshot,
   onAddComment,
+  onTransformChange,
   editingField,
   tempValue,
   setTempValue,
@@ -196,13 +201,15 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
               setGraphTransform(finalTransform);
               // 保存到缓存（只有用户实际交互后才保存）
               snapshotTransformsRef.current[snapshotId] = finalTransform;
+              // 通知父组件变换状态变化
+              onTransformChange?.(snapshotId, finalTransform);
             }
             pendingTransformRef.current = null;
           }
         }, 50); // 50ms防抖延迟，因为现在只在交互结束时触发
       }
     },
-    [selectedSnapshot?.id],
+    [selectedSnapshot?.id, onTransformChange],
   );
 
   // 清理定时器
@@ -757,7 +764,7 @@ const GraphDisplay: React.FC<GraphDisplayProps> = ({
           <Descriptions.Item label="创建时间">
             {dayjs(selectedSnapshot.createTime).format("YYYY-MM-DD HH:mm:ss")}
           </Descriptions.Item>
-          <Descriptions.Item label="链">
+          <Descriptions.Item label="货币类型">
             <Tag
               color={
                 selectedSnapshot.chain?.toUpperCase() === "BTC"

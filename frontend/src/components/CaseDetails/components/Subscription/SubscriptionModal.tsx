@@ -56,7 +56,6 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             fromAddress: tx.fromAddress,
             toAddress: tx.toAddress,
             amount: tx.amount,
-            token: tx.token,
             riskLevel: tx.riskLevel,
             tags: tx.tags,
             remark: tx.remark,
@@ -70,7 +69,6 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           riskLevel: "MEDIUM",
           tags: [],
           alertEnabled: true,
-          token: "ETH",
           cryptoType: "ETH",
           ...(isNode && address ? { address } : {}),
         });
@@ -154,9 +152,9 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </Row>
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item 
-                  label="加密货币类型" 
-                  name="cryptoType" 
+                <Form.Item
+                  label="加密货币类型"
+                  name="cryptoType"
                   rules={[{ required: true, message: "请选择加密货币类型" }]}
                   initialValue="ETH"
                 >
@@ -217,67 +215,37 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </Row>
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item
-                  label="发送方地址"
-                  name="fromAddress"
-                  rules={[{ required: true, message: "请输入发送方地址" }]}
-                >
+                <Form.Item label="发送方地址" name="fromAddress">
                   <Input placeholder="发送方地址" />
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item
-                  label="接收方地址"
-                  name="toAddress"
-                  rules={[{ required: true, message: "请输入接收方地址" }]}
-                >
+                <Form.Item label="接收方地址" name="toAddress">
                   <Input placeholder="接收方地址" />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item
-                  label="金额"
-                  name="amount"
-                  rules={[{ required: true, message: "请输入金额" }]}
-                >
+                <Form.Item label="金额" name="amount">
                   <Input type="number" placeholder="交易金额" />
                 </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item
                   label="代币"
-                  name="token"
-                  rules={[{ required: true, message: "请输入代币类型" }]}
+                  name="cryptoType"
+                  rules={[{ required: true, message: "请选择代币类型" }]}
                 >
                   <Select placeholder="选择代币类型">
                     <Select.Option value="ETH">ETH</Select.Option>
                     <Select.Option value="BTC">BTC</Select.Option>
-                    <Select.Option value="USDT">USDT</Select.Option>
-                    <Select.Option value="USDC">USDC</Select.Option>
-                    <Select.Option value="BNB">BNB</Select.Option>
-                    <Select.Option value="其他">其他</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item 
-                  label="区块链类型" 
-                  name="cryptoType" 
-                  rules={[{ required: true, message: "请选择区块链类型" }]}
-                  initialValue="ETH"
-                >
-                  <Select placeholder="选择区块链类型">
-                    <Select.Option value="ETH">以太坊</Select.Option>
-                    <Select.Option value="BTC">比特币</Select.Option>
-                    <Select.Option value="OTHER">其他</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
+              <Col span={24}>
                 <Form.Item
                   label="风险等级"
                   name="riskLevel"
@@ -325,11 +293,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
         <Row gutter={16}>
           <Col span={24}>
-            <Form.Item
-              label="备注"
-              name="remark"
-              rules={[{ required: true, message: "请输入备注信息" }]}
-            >
+            <Form.Item label="备注" name="remark">
               <TextArea
                 rows={3}
                 placeholder="添加备注信息，说明订阅原因或监控重点"

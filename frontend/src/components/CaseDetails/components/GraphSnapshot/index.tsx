@@ -34,6 +34,7 @@ const GraphSnapshotPage: React.FC = () => {
     title: "",
     riskLevel: "",
     tags: [],
+    chain: [],
     dateRange: [null, null],
   });
   const [statusFilter, setStatusFilter] = useState<CaseStatusFilter>("ALL");
@@ -171,6 +172,13 @@ const GraphSnapshotPage: React.FC = () => {
     if (filterConfig.tags.length > 0) {
       filtered = filtered.filter((snapshot) =>
         filterConfig.tags.some((tag) => snapshot.tags.includes(tag)),
+      );
+    }
+
+    // 按货币类型过滤
+    if (filterConfig.chain && filterConfig.chain.length > 0) {
+      filtered = filtered.filter((snapshot) =>
+        filterConfig.chain.some((chain) => snapshot.chain === chain),
       );
     }
 
@@ -406,6 +414,7 @@ const GraphSnapshotPage: React.FC = () => {
       title: "",
       riskLevel: "",
       tags: [],
+      chain: [],
       dateRange: [null, null],
     });
     setStatusFilter("ALL");

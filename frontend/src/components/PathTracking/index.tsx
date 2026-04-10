@@ -5,6 +5,7 @@ import { Row, Col, Form, Card, message, Spin } from "antd";
 import {
   transactionApi,
   GraphAnalysisResponse,
+  BTCPathResponse,
 } from "@/services/transaction/index";
 import TxGraph from "../GraphCommon/TxGraph";
 import PathTxAnalysis from "./PathTxAnalysis";
@@ -14,7 +15,7 @@ import GraphSnapshotButton from "../GraphCommon/GraphSnapshotButton";
 import GraphExportButton from "../GraphCommon/GraphExportButton";
 import PathTrackingSearch from "./PathTrackingSearch";
 import { NodeItem, LinkItem } from "../GraphCommon/types";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/zh-cn";
 import { graphSnapshotApi } from "@/services/graph-snapshot/api";
 import ResultSearchBar from "./ResultSearchBar";
@@ -38,6 +39,9 @@ const PathTracking: React.FC = () => {
     !!(urlFromAddress && urlToAddress),
   );
   const [currency, setCurrency] = useState<string>(routeCrypto || "eth");
+
+  const [firstTxTime, setFirstTxTime] = useState<Dayjs | null>(null);
+  const [latestTxTime, setLatestTxTime] = useState<Dayjs | null>(null);
 
   const [dimensions, setDimensions] = useState<{
     width: number;
@@ -130,16 +134,47 @@ const PathTracking: React.FC = () => {
     setLoading(true);
     setHasSearched(true);
 
+    const isBTC = curr.toLowerCase() === "btc";
+
     try {
-      const response: GraphAnalysisResponse = await transactionApi.getAllPath(
-        fromAddr,
-        toAddr,
-      );
+      let response: GraphAnalysisResponse | BTCPathResponse;
+
+      if (isBTC) {
+        response = await transactionApi.getBTCPath(fromAddr, toAddr);
+      } else {
+        response = await transactionApi.getAllPath(fromAddr, toAddr);
+      }
 
       if (response.success) {
         console.log(response.data);
 
-        const { node_list: nodes, edge_list: edges } = response.data;
+        const {
+          node_list: nodes,
+          edge_list: edges,
+          first_tx_time,
+          latest_tx_time,
+        } = response.data;
+
+        // 处理时间字段
+        let firstTime: Dayjs | null = null;
+        let lastTime: Dayjs | null = null;
+
+        if (first_tx_time) {
+          firstTime =
+            typeof first_tx_time === "number"
+              ? dayjs.unix(first_tx_time)
+              : dayjs(first_tx_time);
+        }
+
+        if (latest_tx_time) {
+          lastTime =
+            typeof latest_tx_time === "number"
+              ? dayjs.unix(latest_tx_time)
+              : dayjs(latest_tx_time);
+        }
+
+        setFirstTxTime(firstTime);
+        setLatestTxTime(lastTime);
 
         const convertedNodes: NodeItem[] = nodes.map((node: any, index) => {
           const address = node.address || node.addr || "";
@@ -159,6 +194,7 @@ const PathTracking: React.FC = () => {
             pid: node.pid || undefined,
             color: node.color || undefined,
             exg: node.exg || undefined,
+            type: node.type || undefined,
           };
         });
 
@@ -215,7 +251,10 @@ const PathTracking: React.FC = () => {
 
         message.success("路径数据加载成功");
       } else {
-        message.error(`路径数据加载失败: ${response.msg}`);
+        const errorMsg = isBTC
+          ? (response as BTCPathResponse).message
+          : (response as GraphAnalysisResponse).msg;
+        message.error(`路径数据加载失败: ${errorMsg || "未知错误"}`);
       }
     } catch (error) {
       console.error("获取路径数据失败:", error);
@@ -361,7 +400,11 @@ const PathTracking: React.FC = () => {
         />
       ) : (
         <div style={{ padding: "0 16px" }}>
-          <ResultSearchBar />
+          <ResultSearchBar
+            defaultCrypto={routeCrypto || "eth"}
+            defaultFromAddress={urlFromAddress || ""}
+            defaultToAddress={urlToAddress || ""}
+          />
         </div>
       )}
 
@@ -498,6 +541,8 @@ const PathTracking: React.FC = () => {
                     value={filter}
                     onChange={(v) => setFilter(v)}
                     links={graphData.links}
+                    firstTxTime={firstTxTime || undefined}
+                    latestTxTime={latestTxTime || undefined}
                   />
                 </div>
                 <PathTxAnalysis

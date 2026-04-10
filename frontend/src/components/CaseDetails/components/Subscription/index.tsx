@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Card, Tabs, Button, Row, Col, message, Modal } from "antd";
+import { Card, Tabs, Button, message, Modal } from "antd";
 import { PlusOutlined, WalletOutlined, SwapOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import NodeSubscription from "./NodeSubscription";
@@ -10,6 +10,8 @@ import {
   SubscribedTransaction,
   SubscriptionFilter,
 } from "../../types";
+import TxDetail from "@/components/GraphCommon/TxDetail";
+import { LinkItem } from "@/components/GraphCommon/types";
 import "./Subscription.css";
 import { subscriptionApi } from "@/services/case/api";
 
@@ -68,18 +70,22 @@ const convertFrontendNodeToBackend = (
   frontendNode: Partial<SubscribedNode>,
 ): any => {
   // 优先使用表单中的cryptoType，如果没有则根据地址推断
-  const address = frontendNode.address || '';
+  const address = frontendNode.address || "";
   let cryptoType = frontendNode.cryptoType || "ETH"; // 默认值
-  
+
   // 如果没有提供cryptoType，根据地址前缀推断
   if (!frontendNode.cryptoType) {
-    if (address.startsWith("1") || address.startsWith("3") || address.startsWith("bc1")) {
+    if (
+      address.startsWith("1") ||
+      address.startsWith("3") ||
+      address.startsWith("bc1")
+    ) {
       cryptoType = "BTC";
     } else if (address.startsWith("0x")) {
       cryptoType = "ETH";
     }
   }
-  
+
   return {
     address: frontendNode.address,
     cryptoType: cryptoType,
@@ -96,27 +102,16 @@ const convertFrontendNodeToBackend = (
 const convertFrontendTxToBackend = (
   frontendTx: Partial<SubscribedTransaction>,
 ): any => {
-  // 优先使用表单中的cryptoType，如果没有则根据代币推断
-  const token = frontendTx.token || "ETH";
-  let cryptoType = frontendTx.cryptoType || "ETH"; // 默认值
-  
-  // 如果没有提供cryptoType，根据代币类型推断
-  if (!frontendTx.cryptoType) {
-    if (token === "BTC") {
-      cryptoType = "BTC";
-    } else {
-      // 默认以太坊链（ETH、USDT、USDC、BNB等）
-      cryptoType = "ETH";
-    }
-  }
-  
+  // 直接使用表单中的cryptoType
+  const cryptoType = frontendTx.cryptoType || "ETH";
+
   return {
     txHash: frontendTx.txHash,
     cryptoType: cryptoType,
     fromAddress: frontendTx.fromAddress,
     toAddress: frontendTx.toAddress,
     amount: frontendTx.amount,
-    token: frontendTx.token,
+    token: frontendTx.cryptoType,
     riskLevel: frontendTx.riskLevel,
     tags: frontendTx.tags || [],
     notes: frontendTx.remark,
@@ -139,6 +134,9 @@ const Subscription: React.FC = () => {
     SubscribedNode | SubscribedTransaction | null
   >(null);
   const [loading, setLoading] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<SubscribedTransaction | null>(null);
 
   // 加载节点订阅数据
   const loadNodeSubscriptions = useCallback(async () => {
@@ -267,6 +265,12 @@ const Subscription: React.FC = () => {
         );
       }
 
+      if (filters.cryptoType && filters.cryptoType.length > 0) {
+        filtered = filtered.filter((t) =>
+          filters.cryptoType.some((type) => t.cryptoType === type),
+        );
+      }
+
       if (filters.alertOnly) {
         filtered = filtered.filter((t) => t.alertEnabled);
       }
@@ -306,7 +310,7 @@ const Subscription: React.FC = () => {
           fromAddress: values.fromAddress,
           toAddress: values.toAddress,
           amount: values.amount,
-          token: values.token,
+          cryptoType: values.cryptoType,
           riskLevel: values.riskLevel,
           tags: values.tags || [],
           remark: values.remark,
@@ -369,7 +373,7 @@ const Subscription: React.FC = () => {
           fromAddress: values.fromAddress,
           toAddress: values.toAddress,
           amount: values.amount,
-          token: values.token,
+          cryptoType: values.cryptoType,
           riskLevel: values.riskLevel,
           tags: values.tags || [],
           remark: values.remark,
@@ -511,6 +515,12 @@ const Subscription: React.FC = () => {
     setModalVisible(true);
   };
 
+  // 打开交易明细弹窗
+  const openDetailModal = (tx: SubscribedTransaction) => {
+    setSelectedTransaction(tx);
+    setDetailModalVisible(true);
+  };
+
   // 获取所有标签
   const allNodeTags = Array.from(new Set(allNodes.flatMap((n) => n.tags)));
   const allTxTags = Array.from(new Set(allTransactions.flatMap((t) => t.tags)));
@@ -521,7 +531,7 @@ const Subscription: React.FC = () => {
       label: (
         <span>
           <WalletOutlined />
-          节点订阅 ({nodes.length})
+          地址订阅 ({nodes.length})
         </span>
       ),
       children: (
@@ -553,6 +563,7 @@ const Subscription: React.FC = () => {
           onDelete={handleDeleteTransaction}
           onToggleAlert={handleToggleTxAlert}
           onEdit={(tx) => openEditModal(tx, "transaction")}
+          onView={openDetailModal}
         />
       ),
     },
@@ -560,49 +571,6 @@ const Subscription: React.FC = () => {
 
   return (
     <div className="subscription-container">
-      {/* 统计卡片 */}
-      <Row gutter={16} className="subscription-stats-row">
-        <Col span={6}>
-          <Card className="subscription-stat-card">
-            <div className="subscription-stat-value">{currentStats.total}</div>
-            <div className="subscription-stat-label">总订阅数</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="subscription-stat-card high">
-            <div
-              className="subscription-stat-value"
-              style={{ color: "#faad14" }}
-            >
-              {currentStats.high}
-            </div>
-            <div className="subscription-stat-label">高风险</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="subscription-stat-card high">
-            <div
-              className="subscription-stat-value"
-              style={{ color: "#faad14" }}
-            >
-              {currentStats.high}
-            </div>
-            <div className="subscription-stat-label">高风险</div>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card className="subscription-stat-card">
-            <div
-              className="subscription-stat-value"
-              style={{ color: "#52c41a" }}
-            >
-              {currentStats.alertEnabled}
-            </div>
-            <div className="subscription-stat-label">告警开启</div>
-          </Card>
-        </Col>
-      </Row>
-
       {/* 标签页 */}
       <Card className="subscription-tabs">
         <Tabs
@@ -634,6 +602,27 @@ const Subscription: React.FC = () => {
           setEditingItem(null);
         }}
         onSubmit={editingItem ? handleEditSubscription : handleAddSubscription}
+      />
+
+      {/* 交易明细弹窗 */}
+      <TxDetail
+        show={detailModalVisible}
+        onHide={() => setDetailModalVisible(false)}
+        link={
+          selectedTransaction
+            ? ({
+                from: selectedTransaction.fromAddress,
+                to: selectedTransaction.toAddress,
+                val: parseFloat(selectedTransaction.amount) || 0,
+                tx_time: selectedTransaction.txTime
+                  ? typeof selectedTransaction.txTime === "string"
+                    ? selectedTransaction.txTime
+                    : selectedTransaction.txTime.toString()
+                  : dayjs().toString(),
+                tx_hash_list: [selectedTransaction.txHash],
+              } as LinkItem)
+            : null
+        }
       />
     </div>
   );

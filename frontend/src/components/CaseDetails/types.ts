@@ -47,6 +47,7 @@ export interface FilterConfig {
   title: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
   tags: string[];
+  chain: string[];
   dateRange: [Dayjs | null, Dayjs | null];
 }
 
@@ -82,6 +83,7 @@ export interface SubscribedNode {
   id: string;
   address: string;
   label?: string;
+  cryptoType?: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tags: string[];
   remark: string;
@@ -98,6 +100,7 @@ export interface SubscribedTransaction {
   toAddress: string;
   amount: string;
   token: string;
+  cryptoType?: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tags: string[];
   remark: string;
@@ -111,6 +114,7 @@ export interface SubscriptionFilter {
   keyword: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
   tags: string[];
+  cryptoType: string[];
   alertOnly: boolean;
 }
 

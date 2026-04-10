@@ -159,3 +159,46 @@ export interface BTCNhopResponse {
   total: number;
   code: number;
 }
+
+export interface BTCPathNode {
+  id: string;
+  label: string;
+  title: string;
+  addr?: string;
+  layer?: number;
+  blockHeight?: number;
+  time?: string;
+  type?: string;
+  txHash?: string;
+  malicious?: number;
+  image?: string;
+  shape?: string;
+  color?: string;
+}
+
+export interface BTCPathEdge {
+  val: number;
+  tx_hash_list: string[];
+  tx_time: string;
+  from: string;
+  to: string;
+  label: string;
+}
+
+export interface BTCPathData {
+  tx_count: number;
+  address_first_tx_time: string;
+  address_latest_tx_time: string;
+  latest_tx_time: string;
+  node_list: BTCPathNode[];
+  first_tx_time: string;
+  edge_list: BTCPathEdge[];
+}
+
+export interface BTCPathResponse {
+  success: boolean;
+  message: string;
+  data: BTCPathData;
+  total: number;
+  code: number;
+}

@@ -31,7 +31,7 @@ const menuItems: MenuItem[] = [
   {
     key: "subscription",
     icon: <BellOutlined />,
-    label: "订阅节点/交易",
+    label: "订阅节点",
   },
 ];
 

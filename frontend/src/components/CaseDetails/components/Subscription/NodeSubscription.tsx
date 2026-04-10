@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Input,
   Select,
@@ -42,6 +43,7 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
   onEdit,
 }) => {
   const [form] = Form.useForm();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<SubscriptionFilter>({
     keyword: "",
     riskLevel: "",
@@ -143,14 +145,12 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
 
                 <div className="subscription-card-content">
                   <div className="subscription-card-item">
-                    <span className="subscription-card-label">风险等级:</span>
                     <Skeleton.Input
                       active
                       style={{ width: 60, height: 24, marginLeft: 8 }}
                     />
                   </div>
                   <div className="subscription-card-item">
-                    <span className="subscription-card-label">最近活动:</span>
                     <Skeleton.Input
                       active
                       style={{ width: 100, height: 16, marginLeft: 8 }}
@@ -308,7 +308,15 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
                         <div>
                           <div className="subscription-card-title">
                             <Tooltip title={node.address}>
-                              <span className="subscription-address-text">
+                              <span
+                                className="subscription-address-text"
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                  navigate(
+                                    `/transaction-graph/${node.cryptoType?.toLowerCase() || "eth"}/${node.address}`,
+                                  )
+                                }
+                              >
                                 {truncateAddress(node.address)}
                               </span>
                             </Tooltip>
@@ -358,6 +366,12 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
                           <Tag color={getRiskLevelColor(node.riskLevel)}>
                             {getRiskLevelLabel(node.riskLevel)}
                           </Tag>
+                        </div>
+                        <div className="subscription-card-item">
+                          <span className="subscription-card-label">
+                            货币类型:
+                          </span>
+                          <Tag color="default">{node.cryptoType || "ETH"}</Tag>
                         </div>
                         {node.lastActivity && (
                           <div className="subscription-card-item">

@@ -20,6 +20,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   ArrowRightOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import { SubscribedTransaction, SubscriptionFilter } from "../../types";
 
@@ -31,6 +32,7 @@ interface TransactionSubscriptionProps {
   onDelete: (id: string) => void;
   onToggleAlert: (id: string) => void;
   onEdit: (tx: SubscribedTransaction) => void;
+  onView: (tx: SubscribedTransaction) => void;
 }
 
 const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
@@ -41,12 +43,14 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
   onDelete,
   onToggleAlert,
   onEdit,
+  onView,
 }) => {
   const [form] = Form.useForm();
   const [filters, setFilters] = useState<SubscriptionFilter>({
     keyword: "",
     riskLevel: "",
     tags: [],
+    cryptoType: [],
     alertOnly: false,
   });
 
@@ -62,6 +66,7 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
       keyword: "",
       riskLevel: "",
       tags: [],
+      cryptoType: [],
       alertOnly: false,
     };
     setFilters(resetFilters);
@@ -95,11 +100,13 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
   };
 
   const truncateHash = (hash: string) => {
+    if (!hash) return "";
     if (hash.length <= 20) return hash;
     return `${hash.slice(0, 10)}...${hash.slice(-10)}`;
   };
 
   const truncateAddress = (address: string) => {
+    if (!address) return "";
     if (address.length <= 16) return address;
     return `${address.slice(0, 6)}...${address.slice(-6)}`;
   };
@@ -254,20 +261,18 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={5}>
-              <Form.Item label="标签" style={{ marginBottom: 0 }}>
+              <Form.Item label="货币类型" style={{ marginBottom: 0 }}>
                 <Select
                   mode="multiple"
-                  placeholder="选择标签"
-                  value={filters.tags}
-                  onChange={(value) => setFilters({ ...filters, tags: value })}
-                  maxTagCount={1}
+                  placeholder="选择货币类型"
+                  value={filters.cryptoType}
+                  onChange={(value) =>
+                    setFilters({ ...filters, cryptoType: value })
+                  }
                   allowClear
                 >
-                  {allTags.map((tag) => (
-                    <Select.Option key={tag} value={tag}>
-                      {tag}
-                    </Select.Option>
-                  ))}
+                  <Select.Option value="BTC">BTC</Select.Option>
+                  <Select.Option value="ETH">ETH</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -333,31 +338,60 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
                       <div className="subscription-card-header">
                         <div>
                           <div className="subscription-card-title">
+                            <Tag
+                              color={
+                                tx.cryptoType?.toUpperCase() === "BTC"
+                                  ? "orange"
+                                  : "blue"
+                              }
+                              style={{ marginRight: 8 }}
+                            >
+                              {tx.cryptoType || "ETH"}
+                            </Tag>
                             <Tooltip title={tx.txHash}>
-                              <span className="subscription-address-text">
+                              <span
+                                className="subscription-address-text"
+                                style={{
+                                  cursor: "pointer",
+                                  textDecoration: "underline",
+                                }}
+                                onClick={() => onView(tx)}
+                              >
                                 {truncateHash(tx.txHash)}
                               </span>
                             </Tooltip>
                           </div>
-                          <div
-                            className="subscription-card-subtitle"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              marginTop: 8,
-                            }}
-                          >
-                            <Tooltip title={tx.fromAddress}>
-                              <span>{truncateAddress(tx.fromAddress)}</span>
-                            </Tooltip>
-                            <ArrowRightOutlined style={{ color: "#8c8c8c" }} />
-                            <Tooltip title={tx.toAddress}>
-                              <span>{truncateAddress(tx.toAddress)}</span>
-                            </Tooltip>
-                          </div>
+                          {(tx.fromAddress || tx.toAddress) && (
+                            <div
+                              className="subscription-card-subtitle"
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                marginTop: 8,
+                              }}
+                            >
+                              <Tooltip title={tx.fromAddress}>
+                                <span>{truncateAddress(tx.fromAddress)}</span>
+                              </Tooltip>
+                              <ArrowRightOutlined
+                                style={{ color: "#8c8c8c" }}
+                              />
+                              <Tooltip title={tx.toAddress}>
+                                <span>{truncateAddress(tx.toAddress)}</span>
+                              </Tooltip>
+                            </div>
+                          )}
                         </div>
                         <div className="subscription-card-actions">
+                          <Tooltip title="查看详情">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EyeOutlined />}
+                              onClick={() => onView(tx)}
+                            />
+                          </Tooltip>
                           <Tooltip
                             title={tx.alertEnabled ? "关闭告警" : "开启告警"}
                           >

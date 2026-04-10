@@ -135,6 +135,12 @@
   font-size: 13px;
   color: #667eea;
   word-break: break-all;
+  text-decoration: none;
+  transition: text-decoration 0.2s ease;
+}
+
+.subscription-address-text:hover {
+  text-decoration: underline;
 }
 
 .subscription-stats-row {

@@ -26,7 +26,11 @@ const PathTrackingSearch: React.FC<PathTrackingSearchProps> = ({
           通过起始地址和目标地址查询交易路径关系
         </p>
         <div style={{ maxWidth: 800, padding: "0 16px", margin: "0 auto" }}>
-          <SearchBar />
+          <SearchBar
+            defaultCrypto={routeCrypto || "eth"}
+            defaultFromAddress={urlFromAddress || ""}
+            defaultToAddress={urlToAddress || ""}
+          />
         </div>
       </div>
     </div>

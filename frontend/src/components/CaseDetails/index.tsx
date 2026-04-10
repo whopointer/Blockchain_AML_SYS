@@ -40,7 +40,7 @@ const CaseDetails: React.FC = () => {
   }, [location.pathname]);
 
   const handleMenuSelect = (key: MenuKey) => {
-    navigate(`/case-details/${key}`);
+      navigate(`/case-details/${key}`);
   };
 
   const renderContent = () => {
