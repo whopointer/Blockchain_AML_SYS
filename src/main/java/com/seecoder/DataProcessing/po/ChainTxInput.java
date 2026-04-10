@@ -1,6 +1,7 @@
 // com/seecoder/DataProcessing/po/ChainTxInput.java
 package com.seecoder.DataProcessing.po;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import javax.persistence.*;
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ public class ChainTxInput {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tx_id", nullable = false)
+    @JsonIgnore
     private ChainTx transaction;
 
     @Column(name = "input_index", nullable = false)
