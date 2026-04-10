@@ -180,4 +180,14 @@ public class GraphServiceImpl implements GraphService {
         transactionService.saveTransactionsBatchToGraph(txs);
     }
 
+    @Override
+    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops) {
+        return addressService.findBTCAddressesWithinNHops(address, maxHops);
+    }
+
+    @Override
+    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress) {
+        return addressService.findBTCNhopTransactionPath(fromAddress, toAddress);
+    }
+
 }

@@ -1202,6 +1202,790 @@ public class GraphAddressService extends AbstractGraphService {
         }
     }
 
+    @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
+    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops) {
+        try {
+            if (address == null || address.isEmpty()) {
+                return ApiResponse.error(400, "地址参数不能为空");
+            }
+
+            if (maxHops == null || maxHops <= 0 || maxHops > 6) {
+                maxHops = 1;
+            }
+
+            Session session = getSession();
+            try {
+                // BTC UTXO模型：
+                // - 支出侧(OUTCOME)：中心地址 --SPENT--> Transaction --OUTPUT--> 接收方地址
+                // - 收入侧(INCOME)：上游支出方地址 --SPENT--> Transaction --OUTPUT--> 中心地址
+                String incomeQuery = "MATCH path = (income:Address)-[:SPENT]->(tx:Transaction)-[:OUTPUT]->(start:Address {address: $address}) " +
+                        "WHERE start <> income " +
+                        "WITH path, nodes(path) AS nodeList, relationships(path) AS relList " +
+                        "WITH [n IN nodeList | CASE WHEN 'Address' IN labels(n) THEN {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, ''), type: 'address'} ELSE {txHash: n.txHash, blockHeight: n.blockHeight, time: coalesce(n.time, ''), type: 'transaction'} END] AS nodeData, " +
+                        "     [r IN relList | {amount: coalesce(toFloat(r.amount), 0.0), index: coalesce(r.index, 0), time: coalesce(r.time, '')}] AS relData " +
+                        "RETURN nodeData, relData, 'income' as direction LIMIT 50";
+
+                String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:SPENT]->(tx:Transaction)-[:OUTPUT]->(outcome:Address) " +
+                        "WHERE start <> outcome " +
+                        "WITH path, nodes(path) AS nodeList, relationships(path) AS relList " +
+                        "WITH [n IN nodeList | CASE WHEN 'Address' IN labels(n) THEN {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, ''), type: 'address'} ELSE {txHash: n.txHash, blockHeight: n.blockHeight, time: coalesce(n.time, ''), type: 'transaction'} END] AS nodeData, " +
+                        "     [r IN relList | {amount: coalesce(toFloat(r.amount), 0.0), index: coalesce(r.index, 0), time: coalesce(r.time, '')}] AS relData " +
+                        "RETURN nodeData, relData, 'outcome' as direction LIMIT 50";
+
+                Map<String, Object> params = new HashMap<>();
+                params.put("address", address);
+
+                Iterable<Map<String, Object>> incomeQueryResult;
+                try {
+                    incomeQueryResult = session.query(incomeQuery, params);
+                } catch (Exception e) {
+                    log.error("执行BTC收入侧N跳查询时发生错误: {}", e.getMessage(), e);
+                    return ApiResponse.error(500, "查询执行失败: " + e.getMessage());
+                }
+
+                Iterable<Map<String, Object>> outcomeQueryResult;
+                try {
+                    outcomeQueryResult = session.query(outcomeQuery, params);
+                } catch (Exception e) {
+                    log.error("执行BTC支出侧N跳查询时发生错误: {}", e.getMessage(), e);
+                    return ApiResponse.error(500, "查询执行失败: " + e.getMessage());
+                }
+
+                Map<String, Object> graphDic = new HashMap<>();
+                List<Map<String, Object>> allNodeList = new ArrayList<>();
+                List<Map<String, Object>> allEdgeList = new ArrayList<>();
+                int totalTxCount = 0;
+                String firstTime = null;
+                String latestTime = null;
+                String addressFirstTime = null;
+                String addressLatestTime = null;
+
+                List<List<Map<String, Object>>> allPaths = new ArrayList<>();
+                List<List<Map<String, Object>>> allPathRels = new ArrayList<>();
+                List<List<String>> allPathTimes = new ArrayList<>();
+                List<String> allPathDirections = new ArrayList<>();
+
+                for (Map<String, Object> result : incomeQueryResult) {
+                    List<Map<String, Object>> nodeData = extractNodeData(result.get("nodeData"));
+                    List<Map<String, Object>> relData = extractRelData(result.get("relData"));
+                    String direction = (String) result.get("direction");
+
+                    List<String> times = new ArrayList<>();
+                    for (Map<String, Object> rel : relData) {
+                        Object timeObj = rel.get("time");
+                        String time = timeObj != null ? timeObj.toString() : "";
+                        times.add(GraphFormatUtils.parseAndFormatTimestamp(time));
+                    }
+
+                    allPaths.add(nodeData);
+                    allPathRels.add(relData);
+                    allPathTimes.add(times);
+                    allPathDirections.add(direction);
+
+                    totalTxCount += relData.size();
+                    for (String t : times) {
+                        if (t != null && !t.isEmpty()) {
+                            if (firstTime == null || t.compareTo(firstTime) < 0) {
+                                firstTime = t;
+                            }
+                            if (latestTime == null || t.compareTo(latestTime) > 0) {
+                                latestTime = t;
+                            }
+                        }
+                    }
+                }
+
+                for (Map<String, Object> result : outcomeQueryResult) {
+                    List<Map<String, Object>> nodeData = extractNodeData(result.get("nodeData"));
+                    List<Map<String, Object>> relData = extractRelData(result.get("relData"));
+                    String direction = (String) result.get("direction");
+
+                    List<String> times = new ArrayList<>();
+                    for (Map<String, Object> rel : relData) {
+                        Object timeObj = rel.get("time");
+                        String time = timeObj != null ? timeObj.toString() : "";
+                        times.add(GraphFormatUtils.parseAndFormatTimestamp(time));
+                    }
+
+                    allPaths.add(nodeData);
+                    allPathRels.add(relData);
+                    allPathTimes.add(times);
+                    allPathDirections.add(direction);
+
+                    totalTxCount += relData.size();
+                    for (String t : times) {
+                        if (t != null && !t.isEmpty()) {
+                            if (firstTime == null || t.compareTo(firstTime) < 0) {
+                                firstTime = t;
+                            }
+                            if (latestTime == null || t.compareTo(latestTime) > 0) {
+                                latestTime = t;
+                            }
+                        }
+                    }
+                }
+
+                Map<String, Integer> nodeLayers = calculateBTCNodeLayers(allPaths, allPathDirections, address);
+
+                Map<String, String> globalAddressToId = new HashMap<>();
+                Map<String, String> globalTxHashToId = new HashMap<>();
+
+                String startNodeId = address;
+                Map<String, Object> startNodeItem = new HashMap<>();
+                startNodeItem.put("id", startNodeId);
+                startNodeItem.put("label", GraphFormatUtils.shortenAddress(address));
+                startNodeItem.put("title", address);
+                startNodeItem.put("addr", address);
+                startNodeItem.put("layer", 0);
+                globalAddressToId.put(address, startNodeId);
+                allNodeList.add(startNodeItem);
+
+                for (List<Map<String, Object>> nodeData : allPaths) {
+                    for (int i = 0; i < nodeData.size(); i++) {
+                        Map<String, Object> nodeMap = nodeData.get(i);
+                        String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+
+                        if ("transaction".equals(nodeType)) {
+                            String txHash = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                            if (txHash.isEmpty()) continue;
+
+                            if (!globalTxHashToId.containsKey(txHash)) {
+                                globalTxHashToId.put(txHash, txHash);
+
+                                Map<String, Object> txNodeItem = new HashMap<>();
+                                txNodeItem.put("id", txHash);
+                                txNodeItem.put("label", GraphFormatUtils.shortenAddress(txHash));
+                                txNodeItem.put("title", txHash);
+                                txNodeItem.put("type", "transaction");
+                                txNodeItem.put("txHash", txHash);
+                                txNodeItem.put("layer", nodeLayers.getOrDefault(txHash, 0));
+
+                                Object blockHeightObj = nodeMap.get("blockHeight");
+                                if (blockHeightObj != null) {
+                                    txNodeItem.put("blockHeight", blockHeightObj);
+                                }
+
+                                Object timeObj = nodeMap.get("time");
+                                if (timeObj != null && !timeObj.toString().isEmpty()) {
+                                    String txTime = GraphFormatUtils.parseAndFormatTimestamp(timeObj.toString());
+                                    txNodeItem.put("time", txTime);
+                                }
+
+                                boolean exists = false;
+                                for (Map<String, Object> existingNode : allNodeList) {
+                                    if ("transaction".equals(existingNode.get("type")) && txHash.equals(existingNode.get("txHash"))) {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!exists) {
+                                    allNodeList.add(txNodeItem);
+                                }
+                            }
+                        } else {
+                            String nodeAddress = nodeMap.get("address") != null ? nodeMap.get("address").toString() : null;
+                            if (nodeAddress == null || nodeAddress.equals(address)) {
+                                continue;
+                            }
+
+                            Object riskLevelObj = nodeMap.get("risk_level");
+                            Integer riskLevel = 0;
+                            if (riskLevelObj != null) {
+                                if (riskLevelObj instanceof Integer) {
+                                    riskLevel = (Integer) riskLevelObj;
+                                } else if (riskLevelObj instanceof Number) {
+                                    riskLevel = ((Number) riskLevelObj).intValue();
+                                }
+                            }
+
+                            Object firstSeenObj = nodeMap.get("first_seen");
+                            String firstSeen = firstSeenObj != null ? firstSeenObj.toString() : "";
+                            if (firstSeen != null && !firstSeen.isEmpty() && (addressFirstTime == null || firstSeen.compareTo(addressFirstTime) < 0)) {
+                                addressFirstTime = firstSeen;
+                            }
+
+                            Object lastSeenObj = nodeMap.get("last_seen");
+                            String lastSeen = lastSeenObj != null ? lastSeenObj.toString() : "";
+                            if (lastSeen != null && !lastSeen.isEmpty() && (addressLatestTime == null || lastSeen.compareTo(addressLatestTime) > 0)) {
+                                addressLatestTime = lastSeen;
+                            }
+
+                            String nodeId = globalAddressToId.get(nodeAddress);
+                            if (nodeId == null) {
+                                nodeId = nodeAddress;
+                                globalAddressToId.put(nodeAddress, nodeId);
+
+                                Map<String, Object> nodeItem = new HashMap<>();
+                                nodeItem.put("id", nodeId);
+                                nodeItem.put("label", GraphFormatUtils.shortenAddress(nodeAddress));
+                                nodeItem.put("title", nodeAddress);
+                                nodeItem.put("addr", nodeAddress);
+                                nodeItem.put("layer", nodeLayers.getOrDefault(nodeAddress, 0));
+
+                                if (riskLevel > 0) {
+                                    nodeItem.put("malicious", riskLevel);
+                                }
+
+                                boolean exists = false;
+                                for (Map<String, Object> existingNode : allNodeList) {
+                                    if (nodeAddress.equals(existingNode.get("addr"))) {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!exists) {
+                                    allNodeList.add(nodeItem);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (int pathIdx = 0; pathIdx < allPaths.size(); pathIdx++) {
+                    List<Map<String, Object>> nodeData = allPaths.get(pathIdx);
+                    List<Map<String, Object>> relData = allPathRels.get(pathIdx);
+                    List<String> times = allPathTimes.get(pathIdx);
+                    String direction = allPathDirections.get(pathIdx);
+
+                    for (int i = 0; i < nodeData.size() - 1 && i < relData.size(); i++) {
+                        Map<String, Object> fromNodeData = nodeData.get(i);
+                        Map<String, Object> toNodeData = nodeData.get(i + 1);
+                        Map<String, Object> relItem = relData.get(i);
+
+                        String fromId;
+                        String toId;
+                        String fromType = fromNodeData.get("type") != null ? fromNodeData.get("type").toString() : "address";
+                        String toType = toNodeData.get("type") != null ? toNodeData.get("type").toString() : "address";
+
+                        if ("transaction".equals(fromType)) {
+                            fromId = fromNodeData.get("txHash") != null ? fromNodeData.get("txHash").toString() : "";
+                        } else {
+                            fromId = fromNodeData.get("address") != null ? fromNodeData.get("address").toString() : "";
+                        }
+
+                        if ("transaction".equals(toType)) {
+                            toId = toNodeData.get("txHash") != null ? toNodeData.get("txHash").toString() : "";
+                        } else {
+                            toId = toNodeData.get("address") != null ? toNodeData.get("address").toString() : "";
+                        }
+
+                        if (fromId.isEmpty() || toId.isEmpty()) continue;
+
+                        boolean edgeExists = allEdgeList.stream()
+                            .anyMatch(edge -> fromId.equals(edge.get("from")) && toId.equals(edge.get("to")));
+
+                        if (!edgeExists) {
+                            Map<String, Object> linkItem = new HashMap<>();
+                            linkItem.put("from", fromId);
+                            linkItem.put("to", toId);
+
+                            Double amount = safeGetDouble(relItem.get("amount"));
+                            linkItem.put("label", GraphFormatUtils.formatAmountLabel(amount, "BTC"));
+                            linkItem.put("val", amount);
+
+                            String txTime = "";
+                            List<String> txHashList = new ArrayList<>();
+
+                            if ("transaction".equals(fromType)) {
+                                Object txTimeObj = fromNodeData.get("time");
+                                if (txTimeObj != null && !txTimeObj.toString().isEmpty()) {
+                                    txTime = GraphFormatUtils.parseAndFormatTimestamp(txTimeObj.toString());
+                                }
+                                String txHash = fromNodeData.get("txHash") != null ? fromNodeData.get("txHash").toString() : "";
+                                if (!txHash.isEmpty()) {
+                                    txHashList.add(txHash);
+                                }
+                            } else if ("transaction".equals(toType)) {
+                                Object txTimeObj = toNodeData.get("time");
+                                if (txTimeObj != null && !txTimeObj.toString().isEmpty()) {
+                                    txTime = GraphFormatUtils.parseAndFormatTimestamp(txTimeObj.toString());
+                                }
+                                String txHash = toNodeData.get("txHash") != null ? toNodeData.get("txHash").toString() : "";
+                                if (!txHash.isEmpty()) {
+                                    txHashList.add(txHash);
+                                }
+                            }
+
+                            linkItem.put("tx_time", txTime);
+                            linkItem.put("tx_hash_list", txHashList);
+
+                            allEdgeList.add(linkItem);
+                        }
+                    }
+                }
+
+                graphDic.put("node_list", allNodeList);
+                graphDic.put("edge_list", allEdgeList);
+                graphDic.put("tx_count", totalTxCount);
+                graphDic.put("first_tx_time", firstTime != null ? firstTime : "");
+                graphDic.put("latest_tx_time", latestTime != null ? latestTime : "");
+                graphDic.put("address_first_tx_time", addressFirstTime != null ? GraphFormatUtils.parseAndFormatTimestamp(addressFirstTime) : "");
+                graphDic.put("address_latest_tx_time", addressLatestTime != null ? GraphFormatUtils.parseAndFormatTimestamp(addressLatestTime) : "");
+
+                Object nodeListObj = graphDic.get("node_list");
+                long nodeListSize = 0;
+                if (nodeListObj instanceof List) {
+                    nodeListSize = ((List<?>) nodeListObj).size();
+                }
+                return ApiResponse.success(graphDic, nodeListSize);
+
+            } finally {
+                closeSession(session);
+            }
+        } catch (Exception e) {
+            log.error("查找BTC N跳内地址失败: {}", address, e);
+            return ApiResponse.error(500, "查找地址失败: " + e.getMessage());
+        }
+    }
+
+    private List<Map<String, Object>> extractNodeData(Object rawNodeDataObj) {
+        List<Map<String, Object>> nodeData = new ArrayList<>();
+        if (rawNodeDataObj instanceof List) {
+            nodeData = (List<Map<String, Object>>) rawNodeDataObj;
+        } else if (rawNodeDataObj != null) {
+            if (rawNodeDataObj.getClass().isArray()) {
+                Object[] array = (Object[]) rawNodeDataObj;
+                for (Object obj : array) {
+                    if (obj instanceof Map) {
+                        nodeData.add((Map<String, Object>) obj);
+                    }
+                }
+            } else if (rawNodeDataObj instanceof Map) {
+                nodeData.add((Map<String, Object>) rawNodeDataObj);
+            }
+        }
+        return nodeData;
+    }
+
+    private List<Map<String, Object>> extractRelData(Object rawRelDataObj) {
+        List<Map<String, Object>> relData = new ArrayList<>();
+        if (rawRelDataObj instanceof List) {
+            relData = (List<Map<String, Object>>) rawRelDataObj;
+        } else if (rawRelDataObj != null) {
+            if (rawRelDataObj.getClass().isArray()) {
+                Object[] array = (Object[]) rawRelDataObj;
+                for (Object obj : array) {
+                    if (obj instanceof Map) {
+                        relData.add((Map<String, Object>) obj);
+                    }
+                }
+            } else if (rawRelDataObj instanceof Map) {
+                relData.add((Map<String, Object>) rawRelDataObj);
+            }
+        }
+        return relData;
+    }
+
+    private Map<String, Integer> calculateBTCNodeLayers(List<List<Map<String, Object>>> allPaths, List<String> allPathDirections, String centerAddress) {
+        Map<String, Integer> nodeLayers = new HashMap<>();
+        nodeLayers.put(centerAddress, 0);
+
+        for (int pathIdx = 0; pathIdx < allPaths.size(); pathIdx++) {
+            List<Map<String, Object>> nodeData = allPaths.get(pathIdx);
+            String direction = allPathDirections.get(pathIdx);
+
+            if ("income".equals(direction)) {
+                // 收入侧路径：[上游支出方, Transaction, 中心地址]
+                // layer分布：上游支出方=-2, Transaction=-1, 中心地址=0
+                for (int i = 0; i < nodeData.size(); i++) {
+                    Map<String, Object> nodeMap = nodeData.get(i);
+                    String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+
+                    int layer = -2 + i;
+
+                    if ("transaction".equals(nodeType)) {
+                        String txHash = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                        if (!txHash.isEmpty()) {
+                            nodeLayers.put(txHash, layer);
+                        }
+                    } else {
+                        String nodeAddress = nodeMap.get("address") != null ? nodeMap.get("address").toString() : "";
+                        if (!nodeAddress.isEmpty()) {
+                            if (nodeAddress.equals(centerAddress)) {
+                                nodeLayers.put(nodeAddress, 0);
+                            } else {
+                                nodeLayers.put(nodeAddress, layer);
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 支出侧路径：[中心地址, Transaction, 下游收入方]
+                // layer分布：中心地址=0, Transaction=1, 下游收入方=2
+                for (int i = 0; i < nodeData.size(); i++) {
+                    Map<String, Object> nodeMap = nodeData.get(i);
+                    String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+
+                    int layer = i;
+
+                    if ("transaction".equals(nodeType)) {
+                        String txHash = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                        if (!txHash.isEmpty()) {
+                            nodeLayers.put(txHash, layer);
+                        }
+                    } else {
+                        String nodeAddress = nodeMap.get("address") != null ? nodeMap.get("address").toString() : "";
+                        if (!nodeAddress.isEmpty()) {
+                            if (nodeAddress.equals(centerAddress)) {
+                                nodeLayers.put(nodeAddress, 0);
+                            } else {
+                                nodeLayers.put(nodeAddress, layer);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return nodeLayers;
+    }
+
+    @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
+    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress) {
+        try {
+            if (fromAddress == null || fromAddress.isEmpty() || toAddress == null || toAddress.isEmpty()) {
+                return ApiResponse.error(400, "起始地址和目标地址不能为空");
+            }
+
+            Session session = getSession();
+            try {
+                String pathQuery = "MATCH path = (from:Address {address: $fromAddress})" +
+                        "-[:SPENT|OUTPUT*1..10]->(to:Address {address: $toAddress}) " +
+                        "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
+                        "WITH [n IN nodeList | {" +
+                        "   address: coalesce(n.address, ''), " +
+                        "   txHash: coalesce(n.txHash, ''), " +
+                        "   type: CASE WHEN 'Transaction' IN labels(n) THEN 'transaction' ELSE 'address' END, " +
+                        "   risk_level: coalesce(n.risk_level, 0), " +
+                        "   blockHeight: coalesce(n.blockHeight, 0), " +
+                        "   time: coalesce(n.time, '') " +
+                        "}] AS nodeData, " +
+                        "     [r IN relList | {" +
+                        "   from: coalesce(startNode(r).address, startNode(r).txHash, ''), " +
+                        "   to: coalesce(endNode(r).address, endNode(r).txHash, ''), " +
+                        "   type: type(r), " +
+                        "   amount: coalesce(toFloat(r.amount), 0.0), " +
+                        "   time: coalesce(r.time, '')" +
+                        "}] AS relData " +
+                        "RETURN nodeData, relData LIMIT 50";
+
+                Map<String, Object> params = new HashMap<>();
+                params.put("fromAddress", fromAddress);
+                params.put("toAddress", toAddress);
+
+                Iterable<Map<String, Object>> queryResult;
+                try {
+                    queryResult = session.query(pathQuery, params);
+                } catch (Exception e) {
+                    log.error("执行BTC交易路径查询时发生错误: {}", e.getMessage(), e);
+                    return ApiResponse.error(500, "查询执行失败: " + e.getMessage());
+                }
+
+                Map<String, Object> graphDic = new HashMap<>();
+                List<Map<String, Object>> allNodeList = new ArrayList<>();
+                List<Map<String, Object>> allEdgeList = new ArrayList<>();
+                int totalTxCount = 0;
+                String firstTime = null;
+                String latestTime = null;
+
+                List<List<Map<String, Object>>> allPaths = new ArrayList<>();
+                List<List<Map<String, Object>>> allPathRels = new ArrayList<>();
+                List<List<String>> allPathTimes = new ArrayList<>();
+
+                for (Map<String, Object> result : queryResult) {
+                    List<Map<String, Object>> nodeData = extractNodeData(result.get("nodeData"));
+                    List<Map<String, Object>> relData = extractRelData(result.get("relData"));
+
+                    List<String> times = new ArrayList<>();
+                    for (Map<String, Object> nodeMap : nodeData) {
+                        String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+                        if ("transaction".equals(nodeType)) {
+                            Object timeObj = nodeMap.get("time");
+                            String time = timeObj != null ? timeObj.toString() : "";
+                            times.add(GraphFormatUtils.parseAndFormatTimestamp(time));
+                        }
+                    }
+
+                    allPaths.add(nodeData);
+                    allPathRels.add(relData);
+                    allPathTimes.add(times);
+
+                    totalTxCount += relData.size();
+                    for (String t : times) {
+                        if (t != null && !t.isEmpty()) {
+                            if (firstTime == null || t.compareTo(firstTime) < 0) {
+                                firstTime = t;
+                            }
+                            if (latestTime == null || t.compareTo(latestTime) > 0) {
+                                latestTime = t;
+                            }
+                        }
+                    }
+                }
+
+                if (allPaths.isEmpty()) {
+                    graphDic.put("node_list", new ArrayList<>());
+                    graphDic.put("edge_list", new ArrayList<>());
+                    graphDic.put("tx_count", 0);
+                    graphDic.put("first_tx_time", "");
+                    graphDic.put("latest_tx_time", "");
+                    graphDic.put("from_address", fromAddress);
+                    graphDic.put("to_address", toAddress);
+                    return ApiResponse.success(graphDic, 0L);
+                }
+
+                Map<String, Integer> nodeLayers = calculateBTCPathLayers(allPaths, fromAddress, toAddress);
+
+                for (List<Map<String, Object>> nodeData : allPaths) {
+                    for (int i = 0; i < nodeData.size(); i++) {
+                        Map<String, Object> nodeMap = nodeData.get(i);
+                        String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+
+                        if ("transaction".equals(nodeType)) {
+                            String txHash = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                            if (txHash.isEmpty()) continue;
+
+                            boolean exists = false;
+                            for (Map<String, Object> existingNode : allNodeList) {
+                                if ("transaction".equals(existingNode.get("type")) && txHash.equals(existingNode.get("txHash"))) {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+
+                            if (!exists) {
+                                Map<String, Object> txNodeItem = new HashMap<>();
+                                txNodeItem.put("id", txHash);
+                                txNodeItem.put("label", GraphFormatUtils.shortenAddress(txHash));
+                                txNodeItem.put("title", txHash);
+                                txNodeItem.put("type", "transaction");
+                                txNodeItem.put("txHash", txHash);
+                                txNodeItem.put("layer", nodeLayers.getOrDefault(txHash, 0));
+
+                                Object blockHeightObj = nodeMap.get("blockHeight");
+                                if (blockHeightObj != null) {
+                                    txNodeItem.put("blockHeight", blockHeightObj);
+                                }
+
+                                Object timeObj = nodeMap.get("time");
+                                if (timeObj != null && !timeObj.toString().isEmpty()) {
+                                    String txTime = GraphFormatUtils.parseAndFormatTimestamp(timeObj.toString());
+                                    txNodeItem.put("time", txTime);
+                                }
+
+                                allNodeList.add(txNodeItem);
+                            }
+                        } else {
+                            String nodeAddress = nodeMap.get("address") != null ? nodeMap.get("address").toString() : null;
+                            if (nodeAddress == null) {
+                                continue;
+                            }
+
+                            boolean exists = false;
+                            for (Map<String, Object> existingNode : allNodeList) {
+                                if (nodeAddress.equals(existingNode.get("addr"))) {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+
+                            if (!exists) {
+                                Object riskLevelObj = nodeMap.get("risk_level");
+                                Integer riskLevel = 0;
+                                if (riskLevelObj != null) {
+                                    if (riskLevelObj instanceof Integer) {
+                                        riskLevel = (Integer) riskLevelObj;
+                                    } else if (riskLevelObj instanceof Number) {
+                                        riskLevel = ((Number) riskLevelObj).intValue();
+                                    }
+                                }
+
+                                Map<String, Object> nodeItem = new HashMap<>();
+                                nodeItem.put("id", nodeAddress);
+                                nodeItem.put("label", GraphFormatUtils.shortenAddress(nodeAddress));
+                                nodeItem.put("title", nodeAddress);
+                                nodeItem.put("addr", nodeAddress);
+                                nodeItem.put("type", "address");
+                                nodeItem.put("layer", nodeLayers.getOrDefault(nodeAddress, 0));
+
+                                if (riskLevel > 0) {
+                                    nodeItem.put("malicious", riskLevel);
+                                }
+
+                                allNodeList.add(nodeItem);
+                            }
+                        }
+                    }
+                }
+
+                for (int pathIdx = 0; pathIdx < allPaths.size(); pathIdx++) {
+                    List<Map<String, Object>> nodeData = allPaths.get(pathIdx);
+                    List<Map<String, Object>> relData = allPathRels.get(pathIdx);
+
+                    for (int i = 0; i < nodeData.size() - 1 && i < relData.size(); i++) {
+                        Map<String, Object> fromNodeData = nodeData.get(i);
+                        Map<String, Object> toNodeData = nodeData.get(i + 1);
+                        Map<String, Object> relItem = relData.get(i);
+
+                        String fromId;
+                        String toId;
+                        String fromType = fromNodeData.get("type") != null ? fromNodeData.get("type").toString() : "address";
+                        String toType = toNodeData.get("type") != null ? toNodeData.get("type").toString() : "address";
+
+                        if ("transaction".equals(fromType)) {
+                            fromId = fromNodeData.get("txHash") != null ? fromNodeData.get("txHash").toString() : "";
+                        } else {
+                            fromId = fromNodeData.get("address") != null ? fromNodeData.get("address").toString() : "";
+                        }
+
+                        if ("transaction".equals(toType)) {
+                            toId = toNodeData.get("txHash") != null ? toNodeData.get("txHash").toString() : "";
+                        } else {
+                            toId = toNodeData.get("address") != null ? toNodeData.get("address").toString() : "";
+                        }
+
+                        if (fromId.isEmpty() || toId.isEmpty()) continue;
+
+                        boolean edgeExists = allEdgeList.stream()
+                            .anyMatch(edge -> fromId.equals(edge.get("from")) && toId.equals(edge.get("to")));
+
+                        if (!edgeExists) {
+                            Map<String, Object> linkItem = new HashMap<>();
+                            linkItem.put("from", fromId);
+                            linkItem.put("to", toId);
+
+                            Double amount = safeGetDouble(relItem.get("amount"));
+                            linkItem.put("label", GraphFormatUtils.formatAmountLabel(amount, "BTC"));
+                            linkItem.put("val", amount);
+
+                            String txTime = "";
+                            List<String> txHashList = new ArrayList<>();
+                            if ("transaction".equals(fromType)) {
+                                Object txTimeObj = fromNodeData.get("time");
+                                if (txTimeObj != null && !txTimeObj.toString().isEmpty()) {
+                                    txTime = GraphFormatUtils.parseAndFormatTimestamp(txTimeObj.toString());
+                                }
+                                String txHash = fromNodeData.get("txHash") != null ? fromNodeData.get("txHash").toString() : "";
+                                if (!txHash.isEmpty()) {
+                                    txHashList.add(txHash);
+                                }
+                            } else if ("transaction".equals(toType)) {
+                                Object txTimeObj = toNodeData.get("time");
+                                if (txTimeObj != null && !txTimeObj.toString().isEmpty()) {
+                                    txTime = GraphFormatUtils.parseAndFormatTimestamp(txTimeObj.toString());
+                                }
+                                String txHash = toNodeData.get("txHash") != null ? toNodeData.get("txHash").toString() : "";
+                                if (!txHash.isEmpty()) {
+                                    txHashList.add(txHash);
+                                }
+                            }
+                            linkItem.put("tx_time", txTime);
+                            linkItem.put("tx_hash_list", txHashList);
+
+                            allEdgeList.add(linkItem);
+                        }
+                    }
+                }
+
+                graphDic.put("node_list", allNodeList);
+                graphDic.put("edge_list", allEdgeList);
+                graphDic.put("tx_count", totalTxCount);
+                graphDic.put("first_tx_time", firstTime != null ? firstTime : "");
+                graphDic.put("latest_tx_time", latestTime != null ? latestTime : "");
+                graphDic.put("from_address", fromAddress);
+                graphDic.put("to_address", toAddress);
+
+                Object nodeListObj = graphDic.get("node_list");
+                long nodeListSize = 0;
+                if (nodeListObj instanceof List) {
+                    nodeListSize = ((List<?>) nodeListObj).size();
+                }
+                return ApiResponse.success(graphDic, nodeListSize);
+
+            } finally {
+                closeSession(session);
+            }
+        } catch (Exception e) {
+            log.error("查找BTC交易路径失败: {} -> {}", fromAddress, toAddress, e);
+            return ApiResponse.error(500, "查找交易路径失败: " + e.getMessage());
+        }
+    }
+
+    private Map<String, Integer> calculateBTCPathLayers(List<List<Map<String, Object>>> allPaths, String fromAddress, String toAddress) {
+        Map<String, Integer> nodeLayers = new HashMap<>();
+        nodeLayers.put(fromAddress, 0);
+
+        if (allPaths == null || allPaths.isEmpty()) {
+            nodeLayers.put(toAddress, 1);
+            return nodeLayers;
+        }
+
+        int maxLayer = 0;
+        for (List<Map<String, Object>> path : allPaths) {
+            int fromIndex = -1;
+            for (int i = 0; i < path.size(); i++) {
+                Map<String, Object> nodeMap = path.get(i);
+                String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+                String nodeId;
+
+                if ("transaction".equals(nodeType)) {
+                    nodeId = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                } else {
+                    nodeId = nodeMap.get("address") != null ? nodeMap.get("address").toString() : "";
+                }
+
+                if (nodeId.equals(fromAddress)) {
+                    fromIndex = i;
+                    break;
+                }
+            }
+
+            if (fromIndex != -1) {
+                for (int i = 0; i < path.size(); i++) {
+                    Map<String, Object> nodeMap = path.get(i);
+                    String nodeType = nodeMap.get("type") != null ? nodeMap.get("type").toString() : "address";
+                    String nodeId;
+
+                    if ("transaction".equals(nodeType)) {
+                        nodeId = nodeMap.get("txHash") != null ? nodeMap.get("txHash").toString() : "";
+                    } else {
+                        nodeId = nodeMap.get("address") != null ? nodeMap.get("address").toString() : "";
+                    }
+
+                    if (nodeId.isEmpty()) continue;
+
+                    int layer = i - fromIndex;
+                    if (Math.abs(layer) > maxLayer) {
+                        maxLayer = Math.abs(layer);
+                    }
+
+                    if (!nodeLayers.containsKey(nodeId) || Math.abs(layer) < Math.abs(nodeLayers.get(nodeId))) {
+                        nodeLayers.put(nodeId, layer);
+                    }
+                }
+            }
+        }
+
+        if (!nodeLayers.containsKey(toAddress)) {
+            nodeLayers.put(toAddress, maxLayer);
+        }
+
+        Set<Integer> uniqueLayers = new HashSet<>(nodeLayers.values());
+        List<Integer> sortedLayers = new ArrayList<>(uniqueLayers);
+        Collections.sort(sortedLayers);
+        Map<Integer, Integer> layerMap = new HashMap<>();
+        for (int i = 0; i < sortedLayers.size(); i++) {
+            layerMap.put(sortedLayers.get(i), i);
+        }
+
+        Map<String, Integer> remappedLayers = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : nodeLayers.entrySet()) {
+            remappedLayers.put(entry.getKey(), layerMap.get(entry.getValue()));
+        }
+
+        return remappedLayers;
+    }
 
 
 }

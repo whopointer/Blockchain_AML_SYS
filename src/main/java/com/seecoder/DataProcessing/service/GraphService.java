@@ -90,4 +90,10 @@ public interface GraphService {
 
     // 新增：高性能批量保存
     void saveTransactionsBatchToGraph(List<ChainTx> txs);
+
+    // BTC N跳查询接口
+    ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops);
+
+    // BTC 节点交易路径追踪接口（从起始地址到目标地址的路径）
+    ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress);
 }
