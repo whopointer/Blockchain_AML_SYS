@@ -271,7 +271,7 @@ const PathTracking: React.FC = () => {
     params.set("fromAddress", values.fromAddress);
     params.set("toAddress", values.toAddress);
 
-    navigate(`/path-tracking/${values.currency}?${params.toString()}`);
+    navigate(`/transaction-path/${values.currency}?${params.toString()}`);
 
     handleSearch(values.fromAddress, values.toAddress, values.currency);
   };
@@ -384,9 +384,9 @@ const PathTracking: React.FC = () => {
   };
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} style={{ marginTop: "20px" }}>
       <Helmet>
-        <title>路径追踪 - 区块链AML反洗钱系统</title>
+        <title>交易路径 - 区块链AML反洗钱系统</title>
       </Helmet>
       {/* 搜索框部分 - 当没有查询字符串时显示完整界面，否则只显示搜索框 */}
       {showSearchBoxOnly ? (
@@ -427,14 +427,14 @@ const PathTracking: React.FC = () => {
           <Card
             title={
               <Row style={{ width: "100%", alignItems: "center" }}>
-                <Col style={{ fontSize: 18 }}>路径追踪结果</Col>
+                <Col style={{ fontSize: 18 }}>交易路径结果</Col>
                 <Col style={{ marginLeft: 16 }}>
                   <GraphExportButton
                     nodes={graphData.nodes || []}
                     links={graphData.links || []}
                     graphElementId="tx-graph-container"
                     snapshot={{
-                      title: `路径追踪 - ${urlFromAddress || ""} → ${urlToAddress || ""}`,
+                      title: `交易路径 - ${urlFromAddress || ""} → ${urlToAddress || ""}`,
                       riskLevel: " - ",
                       createTime: new Date().toISOString(),
                       centerAddress: urlFromAddress || "",

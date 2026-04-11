@@ -91,13 +91,13 @@ const ResultSearchBar: React.FC<ResultSearchBarProps> = ({
     }
 
     navigate(
-      `/path-tracking/${currency.toLowerCase()}?fromAddress=${encodeURIComponent(fromAddress.trim())}&toAddress=${encodeURIComponent(toAddress.trim())}`,
+      `/transaction-path/${currency.toLowerCase()}?fromAddress=${encodeURIComponent(fromAddress.trim())}&toAddress=${encodeURIComponent(toAddress.trim())}`,
     );
   };
 
   return (
     <div style={{ margin: "0 auto", maxWidth: 1200 }}>
-      <Card title="🔍 路径追踪搜索" style={{ borderRadius: "8px" }}>
+      <Card title="🔍 交易路径搜索" style={{ borderRadius: "8px" }}>
         <Form
           form={form}
           layout="vertical"

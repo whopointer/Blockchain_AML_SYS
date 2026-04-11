@@ -90,11 +90,9 @@ function App() {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
               <CustomNavLink to="/dashboard">系统仪表板</CustomNavLink>
-              <CustomNavLink to="/prediction">交易检测</CustomNavLink>
               <CustomNavLink to="/address-detection">地址检测</CustomNavLink>
-              <CustomNavLink to="/batch">批量分析</CustomNavLink>
               <CustomNavLink to="/transaction-graph">交易图谱</CustomNavLink>
-              <CustomNavLink to="/path-tracking">路径追踪</CustomNavLink>
+              <CustomNavLink to="/transaction-path">交易路径</CustomNavLink>
               <CustomNavLink to="/case-details">案件中心</CustomNavLink>
             </Nav>
           </Navbar.Collapse>
@@ -177,7 +175,7 @@ function App() {
             }
           />
           <Route
-            path="/path-tracking"
+            path="/transaction-path"
             element={
               <Row className="justify-content-center">
                 <Col xl={10} lg={12} md={12}>
@@ -187,7 +185,7 @@ function App() {
             }
           />
           <Route
-            path="/path-tracking/:crypto"
+            path="/transaction-path/:crypto"
             element={
               <Row className="justify-content-center">
                 <Col xl={12} lg={12} md={12}>

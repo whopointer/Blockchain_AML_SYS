@@ -413,7 +413,7 @@ const TransactionGraph: React.FC = () => {
         <title>交易图谱 - 区块链AML反洗钱系统</title>
       </Helmet>
       {hasRouteParams ? (
-        <div ref={containerRef} style={{ padding: 16 }}>
+        <div ref={containerRef} style={{ padding: 16, marginTop: "20px" }}>
           {/* 搜索栏 */}
           <SearchBar
             defaultCrypto={currencySymbol}

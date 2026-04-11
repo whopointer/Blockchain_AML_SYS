@@ -62,7 +62,7 @@ export const transactionApi = {
       .get(`/neo4j/btc/hops?address=${address}&maxHops=${maxHops}`)
       .then((response) => response.data),
 
-  // BTC 路径追踪
+  // BTC 交易路径
   getBTCPath: (
     fromAddress: string,
     toAddress: string,

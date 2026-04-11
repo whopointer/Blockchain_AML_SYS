@@ -21,7 +21,7 @@ const PathTrackingSearch: React.FC<PathTrackingSearchProps> = ({
   return (
     <div className="dashboard" style={{ margin: "32px 0" }}>
       <div className="text-center mb-8" style={{ padding: "48px 0" }}>
-        <h2 className="mb-3">路径追踪查询</h2>
+        <h2 className="mb-3">交易路径查询</h2>
         <p className="text-secondary mb-6">
           通过起始地址和目标地址查询交易路径关系
         </p>
