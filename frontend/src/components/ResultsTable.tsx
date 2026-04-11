@@ -1,6 +1,6 @@
 import React from 'react';
 import { Table, Badge, Alert } from 'react-bootstrap';
-import { PredictionResponse } from '../services/api';
+import { PredictionResponse, getModelDisplayName, getModelColor } from '../services/api';
 
 interface ResultsTableProps {
   results: PredictionResponse | null;
@@ -24,33 +24,48 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ results }) => {
     return isSuspicious ? 'danger' : 'success';
   };
 
+  const modelColor = getModelColor(results.model_type || '');
+
   return (
     <div className="results-table">
       <div className="text-center mb-4">
         <h4>📊 检测结果分析</h4>
-        <p className="text-secondary">AI智能分析结果报告</p>
+        <p className="text-secondary">
+          DGI + GIN + Random Forest 智能分析结果报告
+        </p>
       </div>
       
-      <Alert variant="info" className="mb-4">
+      {/* 模型信息 */}
+      <Alert 
+        variant="info" 
+        className="mb-4"
+        style={{
+          border: `1px solid ${modelColor}40`,
+          background: `${modelColor}10`
+        }}
+      >
         <div className="d-flex align-items-center">
-          <div className="me-3">
-            <div style={{ 
-              width: '48px', 
-              height: '48px', 
+          <div 
+            className="me-3"
+            style={{
+              width: '48px',
+              height: '48px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: modelColor,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
               fontSize: '24px'
-            }}>
-              📈
-            </div>
+            }}
+          >
+            🤖
           </div>
           <div className="flex-grow-1">
-            <h6 className="mb-1">检测摘要</h6>
-            <div className="d-flex gap-4">
+            <h6 className="mb-1">
+              检测模型: {getModelDisplayName(results.model_type || '')}
+            </h6>
+            <div className="d-flex gap-4 flex-wrap">
               <span>
                 <strong>总交易数:</strong> {results.total_transactions}
               </span>

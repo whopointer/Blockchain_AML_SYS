@@ -13,6 +13,7 @@ import MoneyLaunderingTrace from "./components/MoneyLaunderingTrace";
 import TransactionGraph from "./components/TransactionGraph";
 import CaseDetails from "./components/CaseDetails";
 import PathTracking from "./components/PathTracking";
+import AddressDetectionForm from "./components/AddressDetectionForm";
 import { PredictionResponse } from "./services/api";
 
 // 自定义导航链接组件，用于激活状态样式
@@ -90,6 +91,7 @@ function App() {
             <Nav className="me-auto">
               <CustomNavLink to="/dashboard">系统仪表板</CustomNavLink>
               <CustomNavLink to="/prediction">交易检测</CustomNavLink>
+              <CustomNavLink to="/address-detection">地址检测</CustomNavLink>
               <CustomNavLink to="/batch">批量分析</CustomNavLink>
               <CustomNavLink to="/transaction-graph">交易图谱</CustomNavLink>
               <CustomNavLink to="/path-tracking">路径追踪</CustomNavLink>
@@ -139,6 +141,16 @@ function App() {
               <Row className="justify-content-center">
                 <Col xl={10} lg={11} md={12}>
                   <DashboardPage />
+                </Col>
+              </Row>
+            }
+          />
+          <Route
+            path="/address-detection"
+            element={
+              <Row className="justify-content-center">
+                <Col xl={10} lg={11} md={12}>
+                  <AddressDetectionForm />
                 </Col>
               </Row>
             }
