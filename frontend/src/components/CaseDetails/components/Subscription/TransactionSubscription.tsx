@@ -26,7 +26,7 @@ import { SubscribedTransaction, SubscriptionFilter } from "../../types";
 
 interface TransactionSubscriptionProps {
   transactions: SubscribedTransaction[];
-  allTags: string[];
+  allCryptoTypes: string[];
   loading?: boolean;
   onFilter: (filters: SubscriptionFilter) => void;
   onDelete: (id: string) => void;
@@ -37,7 +37,7 @@ interface TransactionSubscriptionProps {
 
 const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
   transactions,
-  allTags,
+  allCryptoTypes,
   loading = false,
   onFilter,
   onDelete,
@@ -49,7 +49,6 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
   const [filters, setFilters] = useState<SubscriptionFilter>({
     keyword: "",
     riskLevel: "",
-    tags: [],
     cryptoType: [],
     alertOnly: false,
   });
@@ -65,7 +64,6 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
     const resetFilters: SubscriptionFilter = {
       keyword: "",
       riskLevel: "",
-      tags: [],
       cryptoType: [],
       alertOnly: false,
     };
@@ -271,8 +269,11 @@ const TransactionSubscription: React.FC<TransactionSubscriptionProps> = ({
                   }
                   allowClear
                 >
-                  <Select.Option value="BTC">BTC</Select.Option>
-                  <Select.Option value="ETH">ETH</Select.Option>
+                  {allCryptoTypes.map((type) => (
+                    <Select.Option key={type} value={type}>
+                      {type}
+                    </Select.Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>

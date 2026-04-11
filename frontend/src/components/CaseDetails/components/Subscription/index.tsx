@@ -191,21 +191,6 @@ const Subscription: React.FC = () => {
     });
   }, [loadNodeSubscriptions, loadTransactionSubscriptions]);
 
-  // 统计数据
-  const nodeStats = {
-    total: nodes.length,
-    high: nodes.filter((n) => n.riskLevel === "HIGH").length,
-    alertEnabled: nodes.filter((n) => n.alertEnabled).length,
-  };
-
-  const txStats = {
-    total: transactions.length,
-    high: transactions.filter((t) => t.riskLevel === "HIGH").length,
-    alertEnabled: transactions.filter((t) => t.alertEnabled).length,
-  };
-
-  const currentStats = activeTab === "nodes" ? nodeStats : txStats;
-
   // 筛选处理
   const handleFilterNodes = useCallback(
     (filters: SubscriptionFilter) => {
@@ -225,9 +210,9 @@ const Subscription: React.FC = () => {
         filtered = filtered.filter((n) => n.riskLevel === filters.riskLevel);
       }
 
-      if (filters.tags && filters.tags.length > 0) {
+      if (filters.cryptoType && filters.cryptoType.length > 0) {
         filtered = filtered.filter((n) =>
-          filters.tags.some((tag) => n.tags.includes(tag)),
+          filters.cryptoType.some((type) => n.cryptoType === type),
         );
       }
 
@@ -257,12 +242,6 @@ const Subscription: React.FC = () => {
 
       if (filters.riskLevel) {
         filtered = filtered.filter((t) => t.riskLevel === filters.riskLevel);
-      }
-
-      if (filters.tags && filters.tags.length > 0) {
-        filtered = filtered.filter((t) =>
-          filters.tags.some((tag) => t.tags.includes(tag)),
-        );
       }
 
       if (filters.cryptoType && filters.cryptoType.length > 0) {
@@ -521,9 +500,21 @@ const Subscription: React.FC = () => {
     setDetailModalVisible(true);
   };
 
-  // 获取所有标签
-  const allNodeTags = Array.from(new Set(allNodes.flatMap((n) => n.tags)));
-  const allTxTags = Array.from(new Set(allTransactions.flatMap((t) => t.tags)));
+  // 获取所有货币类型
+  const allNodeCryptoTypes = Array.from(
+    new Set(
+      allNodes
+        .map((n) => n.cryptoType)
+        .filter((c): c is string => c !== undefined && c !== null),
+    ),
+  );
+  const allTxCryptoTypes = Array.from(
+    new Set(
+      allTransactions
+        .map((t) => t.cryptoType)
+        .filter((c): c is string => c !== undefined && c !== null),
+    ),
+  );
 
   const tabItems = [
     {
@@ -537,7 +528,7 @@ const Subscription: React.FC = () => {
       children: (
         <NodeSubscription
           nodes={nodes}
-          allTags={allNodeTags}
+          allCryptoTypes={allNodeCryptoTypes}
           loading={loading}
           onFilter={handleFilterNodes}
           onDelete={handleDeleteNode}
@@ -557,7 +548,7 @@ const Subscription: React.FC = () => {
       children: (
         <TransactionSubscription
           transactions={transactions}
-          allTags={allTxTags}
+          allCryptoTypes={allTxCryptoTypes}
           loading={loading}
           onFilter={handleFilterTransactions}
           onDelete={handleDeleteTransaction}

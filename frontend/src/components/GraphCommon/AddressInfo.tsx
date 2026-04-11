@@ -77,7 +77,7 @@ const AddressInfo: React.FC<AddressInfoProps> = ({
         message.success("节点订阅添加成功");
         setSubscriptionModalVisible(false);
       } else {
-        message.error(response.msg || "添加节点订阅失败");
+        message.error(response.message || response.msg || "添加节点订阅失败");
       }
     } catch (error) {
       console.error("添加订阅失败:", error);

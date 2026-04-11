@@ -276,7 +276,10 @@ const PathTracking: React.FC = () => {
     handleSearch(values.fromAddress, values.toAddress, values.currency);
   };
 
-  const mainNode = graphData.nodes?.find((node) => node.layer === 0);
+  const mainNode =
+    graphData.nodes?.find((node) => node.layer === 0) ||
+    graphData.nodes?.find((node) => node.addr === urlFromAddress) ||
+    graphData.nodes?.[0];
 
   const handleCreateSnapshot = async (snapshotData: any) => {
     try {
@@ -409,7 +412,7 @@ const PathTracking: React.FC = () => {
       )}
 
       {!showSearchBoxOnly && (
-        <div style={{ padding: "0 16px" }}>
+        <div style={{ padding: "16px" }}>
           {/* 地址基本信息 - 显示起始地址信息 */}
           {hasSearched && mainNode && (
             <AddressInfo

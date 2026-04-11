@@ -10,6 +10,18 @@ const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.response.use(
+  (response) => {
+    if (response.data && response.data.message !== undefined) {
+      response.data.msg = response.data.message;
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  },
+);
+
 // 案件管理 API
 export const caseApi = {
   // 创建案件

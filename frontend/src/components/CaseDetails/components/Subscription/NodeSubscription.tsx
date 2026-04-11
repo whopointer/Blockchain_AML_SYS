@@ -25,7 +25,7 @@ import { SubscribedNode, SubscriptionFilter } from "../../types";
 
 interface NodeSubscriptionProps {
   nodes: SubscribedNode[];
-  allTags: string[];
+  allCryptoTypes: string[];
   loading?: boolean;
   onFilter: (filters: SubscriptionFilter) => void;
   onDelete: (id: string) => void;
@@ -35,7 +35,7 @@ interface NodeSubscriptionProps {
 
 const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
   nodes,
-  allTags,
+  allCryptoTypes,
   loading = false,
   onFilter,
   onDelete,
@@ -47,7 +47,7 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
   const [filters, setFilters] = useState<SubscriptionFilter>({
     keyword: "",
     riskLevel: "",
-    tags: [],
+    cryptoType: [],
     alertOnly: false,
   });
 
@@ -62,7 +62,7 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
     const resetFilters: SubscriptionFilter = {
       keyword: "",
       riskLevel: "",
-      tags: [],
+      cryptoType: [],
       alertOnly: false,
     };
     setFilters(resetFilters);
@@ -228,18 +228,20 @@ const NodeSubscription: React.FC<NodeSubscriptionProps> = ({
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={5}>
-              <Form.Item label="标签" style={{ marginBottom: 0 }}>
+              <Form.Item label="货币类型" style={{ marginBottom: 0 }}>
                 <Select
                   mode="multiple"
-                  placeholder="选择标签"
-                  value={filters.tags}
-                  onChange={(value) => setFilters({ ...filters, tags: value })}
+                  placeholder="选择货币类型"
+                  value={filters.cryptoType}
+                  onChange={(value) =>
+                    setFilters({ ...filters, cryptoType: value })
+                  }
                   maxTagCount={1}
                   allowClear
                 >
-                  {allTags.map((tag) => (
-                    <Select.Option key={tag} value={tag}>
-                      {tag}
+                  {allCryptoTypes.map((type) => (
+                    <Select.Option key={type} value={type}>
+                      {type}
                     </Select.Option>
                   ))}
                 </Select>

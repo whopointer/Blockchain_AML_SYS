@@ -807,11 +807,11 @@ const TxDetail: React.FC<TxDetailProps> = ({
         </Modal.Header>
         <Modal.Body>
           {isBitcoin ? (
-            <div style={{ minHeight: 400 }}>
+            <div style={{ minHeight: 300 }}>
               {loading ? (
                 <div
                   style={{
-                    minHeight: 400,
+                    minHeight: 300,
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
@@ -834,11 +834,11 @@ const TxDetail: React.FC<TxDetailProps> = ({
                   style={{ width: "100%" }}
                 />
               </div>
-              <div style={{ minHeight: 400 }}>
+              <div style={{ minHeight: 300 }}>
                 {loading ? (
                   <div
                     style={{
-                      minHeight: 400,
+                      minHeight: 300,
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",

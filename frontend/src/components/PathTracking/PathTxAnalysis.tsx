@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { LinkItem, NodeItem } from "../GraphCommon/types";
 import { Input, Table, Typography, Space, Card } from "antd";
+import type { SortOrder } from "antd/es/table/interface";
 import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "../GraphCommon/TxDetail";
 
@@ -187,6 +188,7 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
       key: "count",
       width: 80,
       sorter: (a: AddressStat, b: AddressStat) => a.count - b.count,
+      sortDirections: ["descend", "ascend"] as SortOrder[],
       showSorterTooltip: false,
       render: (text: number, record: AddressStat) => (
         <a
@@ -203,6 +205,7 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
       key: "totalValue",
       width: 100,
       sorter: (a: AddressStat, b: AddressStat) => a.totalValue - b.totalValue,
+      sortDirections: ["descend", "ascend"] as SortOrder[],
       showSorterTooltip: false,
       render: (value: number) => {
         if (currencySymbol === "ETH") {
@@ -232,6 +235,7 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
       key: "count",
       width: 80,
       sorter: (a: AddressStat, b: AddressStat) => a.count - b.count,
+      sortDirections: ["descend", "ascend"] as SortOrder[],
       showSorterTooltip: false,
       render: (text: number, record: AddressStat) => (
         <a
@@ -251,6 +255,7 @@ const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
       key: "totalValue",
       width: 100,
       sorter: (a: AddressStat, b: AddressStat) => a.totalValue - b.totalValue,
+      sortDirections: ["descend", "ascend"] as SortOrder[],
       showSorterTooltip: false,
       render: (value: number) => {
         if (currencySymbol === "ETH") {

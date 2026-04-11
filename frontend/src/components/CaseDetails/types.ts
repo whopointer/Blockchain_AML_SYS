@@ -113,7 +113,6 @@ export interface SubscribedTransaction {
 export interface SubscriptionFilter {
   keyword: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "";
-  tags: string[];
   cryptoType: string[];
   alertOnly: boolean;
 }
