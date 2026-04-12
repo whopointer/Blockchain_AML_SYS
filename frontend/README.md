@@ -1,46 +1,69 @@
-# Getting Started with Create React App
+# Blockchain AML System - Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+区块链反洗钱系统前端，基于 React + TypeScript 构建。
 
-## Available Scripts
+## 环境配置
 
-In the project directory, you can run:
+### Node.js 版本要求
 
-### `npm start`
+- **Node.js**: 建议使用版本 >= 22.x
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+建议使用 nvm (Node Version Manager) 管理 Node.js 版本：
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```bash
+# 安装 nvm (如未安装)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-### `npm test`
+# 使用 nvm 安装 Node.js
+nvm install 22
+nvm use 22
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 项目依赖
 
-### `npm run build`
+首次 clone 项目后，需要安装依赖：
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm install
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 启动命令
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| 命令            | 说明                                        |
+| --------------- | ------------------------------------------- |
+| `npm start`     | 启动开发服务器 (默认 http://localhost:3000) |
+| `npm run build` | 构建生产环境版本 (输出到 `build/` 目录)     |
 
-### `npm run eject`
+### 生产构建
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+npm run build
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+构建产物将生成在 `build/` 目录下，可直接部署到静态服务器 (Nginx 等)。
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## 部署说明
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### 生产环境部署
 
-## Learn More
+本项目已配置自动化部署到生产服务器：
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+| 配置项     | 值                      |
+| ---------- | ----------------------- |
+| 部署位置   | `/var/www/html`         |
+| 监听端口   | 3000                    |
+| Nginx 配置 | `/etc/nginx/nginx.conf` |
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### 部署步骤
+
+```bash
+# 1. 构建生产版本
+npm run build
+
+# 2. 将构建产物上传到服务器
+scp -r build/* root@210.28.133.13:/var/www/html/
+
+# 3. 重启 Nginx 使配置生效
+ssh root@210.28.133.13 "sudo systemctl reload nginx"
+```
+

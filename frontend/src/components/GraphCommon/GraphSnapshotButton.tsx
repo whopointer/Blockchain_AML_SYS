@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  Button,
-  Modal,
-  Form,
-  Input,
-  Select,
-  message,
-} from "antd";
+import { Button, Modal, Form, Input, Select, Tag, message } from "antd";
 import { CameraOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -22,6 +15,7 @@ interface SnapshotData {
   description: string;
   date: dayjs.Dayjs;
   tags: string[];
+  riskLevel?: "LOW" | "MEDIUM" | "HIGH";
 }
 
 const GraphSnapshotButton: React.FC<GraphSnapshotButtonProps> = ({
@@ -36,6 +30,7 @@ const GraphSnapshotButton: React.FC<GraphSnapshotButtonProps> = ({
     setIsModalVisible(true);
     form.setFieldsValue({
       tags: [],
+      riskLevel: "LOW",
     });
     // 初始状态下表单无效，因为必填项未填写
     setFormValid(false);
@@ -64,6 +59,7 @@ const GraphSnapshotButton: React.FC<GraphSnapshotButtonProps> = ({
         description: values.description,
         date: dayjs(),
         tags: values.tags || [],
+        riskLevel: values.riskLevel,
       };
 
       // 调用父组件传递的回调函数
@@ -126,6 +122,24 @@ const GraphSnapshotButton: React.FC<GraphSnapshotButtonProps> = ({
             rules={[{ message: "请输入快照描述" }]}
           >
             <TextArea rows={4} placeholder="请输入快照描述信息" />
+          </Form.Item>
+
+          <Form.Item
+            name="riskLevel"
+            label="风险等级"
+            rules={[{ required: true, message: "请选择风险等级" }]}
+          >
+            <Select placeholder="请选择风险等级">
+              <Option value="LOW">
+                <Tag color="green">低风险</Tag>
+              </Option>
+              <Option value="MEDIUM">
+                <Tag color="orange">中风险</Tag>
+              </Option>
+              <Option value="HIGH">
+                <Tag color="red">高风险</Tag>
+              </Option>
+            </Select>
           </Form.Item>
 
           <Form.Item name="tags" label="标签">

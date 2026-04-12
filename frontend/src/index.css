@@ -123,7 +123,7 @@
 /* 超大屏设备优化 */
 @media (min-width: 1200px) {
   .container-fluid {
-    max-width: 1400px;
+    max-width: 1800px;
   }
 }
 

@@ -1,5 +1,3 @@
-import mockData from "./address_graph_analysis.json";
-
 export interface NodeItem {
   id: string;
   label: string;
@@ -17,6 +15,12 @@ export interface NodeItem {
   exg?: number;
   x?: number;
   y?: number;
+  fx?: number | null;
+  fy?: number | null;
+  type?: "address" | "transaction";
+  txHash?: string;
+  blockHeight?: number;
+  time?: string;
 }
 
 export interface LinkItem {
@@ -27,8 +31,3 @@ export interface LinkItem {
   tx_time: string;
   tx_hash_list: string[];
 }
-
-export const sampleData: { nodes: NodeItem[]; links: LinkItem[] } = {
-  nodes: mockData.graph_dic.node_list,
-  links: mockData.graph_dic.edge_list,
-};

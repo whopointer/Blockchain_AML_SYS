@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { LinkItem, NodeItem } from "../GraphCommon/types";
-import { Input, Table, Typography, Space, Card, Tooltip } from "antd";
+import { Input, Table, Typography, Space, Card } from "antd";
 import type { SortOrder } from "antd/es/table/interface";
-import { SearchOutlined, CopyOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import TxDetail from "../GraphCommon/TxDetail";
-import { message } from "antd";
 
 const { Text } = Typography;
 
-interface TxAnalysisProps {
+interface PathTxAnalysisProps {
   nodes?: NodeItem[];
   links?: LinkItem[];
   currencySymbol?: string;
@@ -20,7 +19,7 @@ interface AddressStat {
   totalValue: number;
 }
 
-const TxAnalysis: React.FC<TxAnalysisProps> = ({
+const PathTxAnalysis: React.FC<PathTxAnalysisProps> = ({
   nodes = [],
   links = [],
   currencySymbol,
@@ -51,53 +50,29 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
     // 搜索逻辑已移到useMemo中处理
   };
 
-  // 复制地址到剪贴板
-  const copyToClipboard = (address: string) => {
-    navigator.clipboard
-      .writeText(address)
-      .then(() => {
-        message.success("地址已复制");
-      })
-      .catch(() => {
-        message.error("复制失败");
-      });
-  };
-
   // 处理交易数点击
   const handleCountClick = (address: string, isOutgoing: boolean) => {
     if (!nodes.length || !links.length) return;
 
-    const centerNodeId = nodes[0]?.id;
+    // 找到所有符合条件的链接
     let foundLinks: LinkItem[] = [];
 
     if (isOutgoing) {
-      // 查找所有从指定地址发出的链接（排除中心节点和transaction类型节点）
+      // 查找从指定地址发出的所有链接
       const sourceNode = nodes.find(
-        (node) =>
-          (node.addr || node.title || node.id) === address &&
-          node.type !== "transaction",
+        (node) => (node.addr || node.title || node.id) === address,
       );
 
-      if (
-        sourceNode &&
-        sourceNode.id !== centerNodeId &&
-        sourceNode.type !== "transaction"
-      ) {
+      if (sourceNode) {
         foundLinks = links.filter((link) => link.from === sourceNode.id);
       }
     } else {
-      // 查找所有发送到指定地址的链接（排除中心节点和transaction类型节点）
+      // 查找发送到指定地址的所有链接
       const targetNode = nodes.find(
-        (node) =>
-          (node.addr || node.title || node.id) === address &&
-          node.type !== "transaction",
+        (node) => (node.addr || node.title || node.id) === address,
       );
 
-      if (
-        targetNode &&
-        targetNode.id !== centerNodeId &&
-        targetNode.type !== "transaction"
-      ) {
+      if (targetNode) {
         foundLinks = links.filter((link) => link.to === targetNode.id);
       }
     }
@@ -138,13 +113,9 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
     const centerNodeId = nodes[0]?.id;
 
     links.forEach((link) => {
-      // 发送地址统计：统计所有边的起点节点，但排除type为transaction的节点
+      // 发送地址统计：统计所有边的起点节点（排除中心节点）
       const sourceNode = nodes.find((node) => node.id === link.from);
-      if (
-        sourceNode &&
-        sourceNode.id !== centerNodeId &&
-        sourceNode.type !== "transaction"
-      ) {
+      if (sourceNode && sourceNode.id !== centerNodeId) {
         const sourceAddr = sourceNode.addr || sourceNode.title || sourceNode.id;
         if (!outgoingMap[sourceAddr]) {
           outgoingMap[sourceAddr] = {
@@ -158,13 +129,9 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
         outgoingMap[sourceAddr].totalValue += link.val || 0;
       }
 
-      // 接收地址统计：统计所有边的终点节点，但排除type为transaction的节点
+      // 接收地址统计：统计所有边的终点节点（排除中心节点）
       const targetNode = nodes.find((node) => node.id === link.to);
-      if (
-        targetNode &&
-        targetNode.id !== centerNodeId &&
-        targetNode.type !== "transaction"
-      ) {
+      if (targetNode && targetNode.id !== centerNodeId) {
         const targetAddr = targetNode.addr || targetNode.title || targetNode.id;
         if (!incomingMap[targetAddr]) {
           incomingMap[targetAddr] = {
@@ -210,17 +177,9 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
       key: "address",
       width: 150,
       render: (text: string) => (
-        <Space size={8} align="center">
-          <Text ellipsis={{ tooltip: text }} style={{ maxWidth: 120 }}>
-            {text}
-          </Text>
-          <Tooltip title="复制地址">
-            <CopyOutlined
-              style={{ cursor: "pointer", color: "#666" }}
-              onClick={() => copyToClipboard(text)}
-            />
-          </Tooltip>
-        </Space>
+        <Text ellipsis={{ tooltip: text }} style={{ width: 170 }}>
+          {text}
+        </Text>
       ),
     },
     {
@@ -265,17 +224,9 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
       key: "address",
       width: 150,
       render: (text: string) => (
-        <Space size={8} align="center">
-          <Text ellipsis={{ tooltip: text }} style={{ maxWidth: 120 }}>
-            {text}
-          </Text>
-          <Tooltip title="复制地址">
-            <CopyOutlined
-              style={{ cursor: "pointer", color: "#666" }}
-              onClick={() => copyToClipboard(text)}
-            />
-          </Tooltip>
-        </Space>
+        <Text ellipsis={{ tooltip: text }} style={{ width: 170 }}>
+          {text}
+        </Text>
       ),
     },
     {
@@ -334,48 +285,18 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
           fontWeight: 500,
         }}
       >
-        交易分析
+        路径交易分析
       </p>
-      {/* 当前节点 */}
-      <div
+      <p
         style={{
           marginTop: 0,
           marginBottom: 16,
           fontSize: 12,
           color: "#666",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
         }}
       >
-        <Tooltip
-          title={
-            nodes.length > 0
-              ? `${nodes[0].addr || nodes[0].title || nodes[0].id}`
-              : ""
-          }
-        >
-          <span
-            style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}
-          >
-            {nodes.length > 0
-              ? `${nodes[0].addr || nodes[0].title || nodes[0].id}`
-              : ""}
-          </span>
-        </Tooltip>
-        {nodes.length > 0 && (
-          <Tooltip title="复制地址">
-            <CopyOutlined
-              style={{ marginLeft: 8, cursor: "pointer", color: "#666" }}
-              onClick={() =>
-                copyToClipboard(nodes[0].addr || nodes[0].title || nodes[0].id)
-              }
-            />
-          </Tooltip>
-        )}
-      </div>
+        分析所有地址的交易情况
+      </p>
 
       <div style={{ marginBottom: 16 }}>
         <Space direction="vertical" style={{ width: "100%" }}>
@@ -426,4 +347,4 @@ const TxAnalysis: React.FC<TxAnalysisProps> = ({
   );
 };
 
-export default TxAnalysis;
+export default PathTxAnalysis;

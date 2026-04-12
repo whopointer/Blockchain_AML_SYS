@@ -1,7 +1,8 @@
 import React, { useMemo, useCallback, useRef, useEffect } from "react";
 import { Select, Row, Col, InputNumber, DatePicker, Slider, Space } from "antd";
 import dayjs, { Dayjs } from "dayjs";
-import graphAnalysisData from "./address_graph_analysis.json";
+import { Card } from "antd";
+import { LinkItem } from "./types";
 
 const { Option } = Select;
 
@@ -17,9 +18,18 @@ interface FilterValue {
 interface Props {
   value?: FilterValue;
   onChange?: (v: FilterValue) => void;
+  links?: LinkItem[];
+  firstTxTime?: Dayjs;
+  latestTxTime?: Dayjs;
 }
 
-const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
+const TxGraphFilter: React.FC<Props> = ({
+  value,
+  onChange,
+  links,
+  firstTxTime,
+  latestTxTime,
+}) => {
   const lastUpdateRef = useRef<{
     startDate?: dayjs.Dayjs | null;
     endDate?: dayjs.Dayjs | null;
@@ -27,21 +37,73 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const firstTxTime = useMemo(() => {
-    const timeStr = graphAnalysisData.graph_dic.first_tx_datetime;
-    return dayjs(timeStr + ":00");
-  }, []);
+  const parseLinkTimeSafely = (timeValue: any) => {
+    if (!timeValue) {
+      return dayjs();
+    }
 
-  const latestTxTime = useMemo(() => {
-    const timeStr = graphAnalysisData.graph_dic.latest_tx_datetime;
-    return dayjs(timeStr + ":00");
-  }, []);
-  const firstTxTimeMs = useMemo(() => firstTxTime.valueOf(), [firstTxTime]);
-  const latestTxTimeMs = useMemo(() => latestTxTime.valueOf(), [latestTxTime]);
+    if (typeof timeValue === "number") {
+      const strValue = Math.floor(timeValue).toString();
+      if (strValue.length === 10 || strValue.length === 13) {
+        return dayjs.unix(timeValue);
+      } else {
+        return dayjs(timeValue);
+      }
+    }
+
+    if (typeof timeValue === "string") {
+      // 处理 ISO 8601 和其他标准格式
+      if (timeValue.includes(" ")) {
+        const parsedDate = dayjs(timeValue, "YYYY-MM-DD HH:mm");
+        if (parsedDate.isValid()) {
+          return parsedDate;
+        }
+      }
+      // 尝试直接解析
+      const parsedDate = dayjs(timeValue);
+      if (parsedDate.isValid() && parsedDate.year() > 1970) {
+        return parsedDate;
+      }
+      return dayjs(timeValue);
+    }
+
+    return dayjs(timeValue);
+  };
+
+  const {
+    firstTxTime: calculatedFirstTxTime,
+    latestTxTime: calculatedLatestTxTime,
+  } = useMemo(() => {
+    // 优先使用传入的时间范围
+    if (firstTxTime && latestTxTime) {
+      return { firstTxTime, latestTxTime };
+    }
+
+    // 如果没有传入时间范围，则从链接中计算
+    if (links && links.length > 0) {
+      const times = links.map((l) => parseLinkTimeSafely(l.tx_time));
+      const sorted = times.sort((a, b) => a.valueOf() - b.valueOf());
+      return {
+        firstTxTime: sorted[0],
+        latestTxTime: sorted[sorted.length - 1],
+      };
+    }
+    const now = dayjs();
+    return { firstTxTime: now, latestTxTime: now };
+  }, [links, firstTxTime, latestTxTime]);
+
+  const firstTxTimeMs = useMemo(
+    () => calculatedFirstTxTime.valueOf(),
+    [calculatedFirstTxTime],
+  );
+  const latestTxTimeMs = useMemo(
+    () => calculatedLatestTxTime.valueOf(),
+    [calculatedLatestTxTime],
+  );
 
   const totalSeconds = useMemo(
     () => (latestTxTimeMs - firstTxTimeMs) / 1000,
-    [latestTxTimeMs, firstTxTimeMs]
+    [latestTxTimeMs, firstTxTimeMs],
   );
 
   const debouncedOnChange = useCallback(
@@ -57,7 +119,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         }, 5);
       }
     },
-    [onChange]
+    [onChange],
   );
 
   useEffect(() => {
@@ -77,7 +139,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
       startDate: null,
       endDate: null,
     }),
-    []
+    [],
   );
 
   const sliderValue = useMemo((): [number, number] => {
@@ -129,7 +191,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         endDate: newEndDate,
       };
     },
-    [debouncedOnChange, firstTxTimeMs, value, defaultValue]
+    [debouncedOnChange, firstTxTimeMs, value, defaultValue],
   );
 
   const handleStartDateChange = useCallback(
@@ -139,11 +201,15 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         debouncedOnChange({ ...currentFilterValue, startDate: null });
         return;
       }
-      const startOfDay = date.startOf("day");
       const currentFilterValue = value || defaultValue;
-      debouncedOnChange({ ...currentFilterValue, startDate: startOfDay });
+      // 保持原始时间，仅更新日期部分
+      const newDate = date
+        .hour(date.hour())
+        .minute(date.minute())
+        .second(date.second());
+      debouncedOnChange({ ...currentFilterValue, startDate: newDate });
     },
-    [value, defaultValue, debouncedOnChange]
+    [value, defaultValue, debouncedOnChange],
   );
 
   const handleEndDateChange = useCallback(
@@ -153,21 +219,24 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
         debouncedOnChange({ ...currentFilterValue, endDate: null });
         return;
       }
-      const endOfDay = date.endOf("day");
       const currentFilterValue = value || defaultValue;
-      debouncedOnChange({ ...currentFilterValue, endDate: endOfDay });
+      // 保持原始时间，仅更新日期部分
+      const newDate = date
+        .hour(date.hour())
+        .minute(date.minute())
+        .second(date.second());
+      debouncedOnChange({ ...currentFilterValue, endDate: newDate });
     },
-    [value, defaultValue, debouncedOnChange]
+    [value, defaultValue, debouncedOnChange],
   );
 
   return (
     <>
-      <div
+      <Card
         style={{
           backgroundColor: "white",
           color: "#222",
           borderRadius: 8,
-          padding: 16,
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -271,7 +340,8 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                     placeholder="起始日期"
                     value={value?.startDate || null}
                     onChange={handleStartDateChange}
-                    format="YYYY-MM-DD"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    showTime
                     style={{ width: "100%" }}
                   />
                 </Col>
@@ -280,7 +350,8 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                     placeholder="结束日期"
                     value={value?.endDate || null}
                     onChange={handleEndDateChange}
-                    format="YYYY-MM-DD"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    showTime
                     style={{ width: "100%" }}
                   />
                 </Col>
@@ -299,7 +370,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
                   formatter: (value) => {
                     if (value === undefined) return "";
                     return dayjs(firstTxTimeMs + value * 1000).format(
-                      "YYYY-MM-DD HH:mm:ss"
+                      "YYYY-MM-DD HH:mm:ss",
                     );
                   },
                 }}
@@ -307,7 +378,7 @@ const TxGraphFilter: React.FC<Props> = ({ value, onChange }) => {
             </Space>
           </Col>
         </Row>
-      </div>
+      </Card>
     </>
   );
 };
