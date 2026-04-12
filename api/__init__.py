@@ -1,83 +1,95 @@
 """
 区块链AML反洗钱系统API模块
 提供RESTful API服务用于交易异常检测
+
+支持模型：
+- gnn: DGI+GIN+RandomForest (PyTorch Geometric)
 """
 
-from flask import Flask
-from flask_cors import CORS
 import logging
 import os
+from contextlib import asynccontextmanager
 
-from .routes import register_routes
-from .facade import ServiceFacade
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 
-def create_app(config_name='development'):
-    """
-    创建Flask应用
+# 全局变量
+_facade = None
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    global _facade
+
+    logger.info("正在初始化服务...")
+    from .facade import ServiceFacade
+
+    # 从环境变量读取配置
+    checkpoint_dir = os.environ.get(
+        'CHECKPOINT_DIR',
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "checkpoints")
+    )
+    experiment_name = os.environ.get('EXPERIMENT_NAME', 'gnn_dgi_rf_experiment')
+
+    logger.info(f"初始化 DGI+GIN+RandomForest 模型...")
+
+    _facade = ServiceFacade(
+        checkpoint_dir=checkpoint_dir,
+        experiment_name=experiment_name
+    )
+    _facade.initialize()
+    logger.info("✅ 服务初始化成功")
+
+    yield
+
+    logger.info("服务已关闭")
+
+
+def create_app(config_name: str = "development") -> FastAPI:
+    """创建 FastAPI 应用
+    
     Args:
-        config_name: 配置名称
-
-    Returns:
-        Flask: 配置好的Flask应用
+        config_name: 配置名称 (development / production)
     """
-    app = Flask(__name__)
-
-    # 启用跨域支持
-    CORS(app)
-
-    # 配置日志
+    global logger
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.INFO if config_name == "development" else logging.WARNING,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     logger = logging.getLogger(__name__)
 
-    # 应用配置
-    if config_name == 'development':
-        app.config['DEBUG'] = True
-    elif config_name == 'production':
-        app.config['DEBUG'] = False
-
-    # 创建 ServiceFacade（依赖注入）
-    facade = ServiceFacade(
-        checkpoint_dir=os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "checkpoints"
-        ),
-        experiment_name="gnn_dgi_rf_experiment"
+    app = FastAPI(
+        title="Blockchain AML API",
+        description="区块链反洗钱交易异常检测系统 | DGI+GIN+RandomForest",
+        version="1.0.0",
+        lifespan=lifespan
     )
 
-    # 启动时初始化（加载模型 → 加载数据 → 构建缓存）
-    logger.info("正在初始化服务...")
-    initialized = facade.initialize()
-    if initialized:
-        logger.info("✅ 服务初始化成功")
-    else:
-        logger.warning("⚠️ 服务初始化失败，服务将继续运行")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if config_name == "development" else [],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-    # 将 facade 存入 app config，供路由使用
-    app.config['SERVICE_FACADE'] = facade
-
-    # 注册路由
-    register_routes(app)
+    # 延迟导入路由，避免循环导入
+    from .routes import api_router
+    app.include_router(api_router, prefix="/api/v1")
 
     return app
 
 
-def create_production_app():
-    """创建生产环境应用"""
-    return create_app('production')
+def get_facade():
+    """获取 facade 实例"""
+    from .facade import ServiceFacade
+    return _facade
 
 
-def create_development_app():
-    """创建开发环境应用"""
-    return create_app('development')
+__all__ = ['create_app', 'get_facade']
 
 
-__all__ = [
-    'create_app',
-    'create_production_app',
-    'create_development_app'
-]
+# 默认应用实例（供 uvicorn api:app 使用）
+app = create_app()

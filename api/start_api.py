@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 区块链AML系统API启动脚本
-用于启动REST API服务
+用于启动FastAPI REST API服务
 """
 
 import os
@@ -45,8 +45,13 @@ def parse_args():
     parser.add_argument(
         '--port',
         type=int,
-        default=5001,
-        help='服务器端口 (默认: 5001)'
+        default=8000,
+        help='服务器端口 (默认: 8000)'
+    )
+    parser.add_argument(
+        '--reload',
+        action='store_true',
+        help='启用热重载 (开发模式)'
     )
     parser.add_argument(
         '--debug',
@@ -69,58 +74,53 @@ def parse_args():
         '--workers',
         type=int,
         default=1,
-        help='工作进程数 (默认: 1)'
+        help='工作进程数 (生产模式，默认: 1)'
     )
     return parser.parse_args()
 
 
-def start_development_server(args):
-    """启动开发服务器"""
-    logger.info("启动开发服务器...")
+def start_server(args):
+    """启动服务器"""
+    import uvicorn
     
-    # 导入Flask应用
-    try:
-        from api.app import app
-    except ImportError as e:
-        logger.error(f"导入API应用失败: {e}")
-        logger.info("尝试从当前目录导入...")
-        import sys
-        import os
-        api_dir = os.path.join(os.getcwd(), 'api')
-        if api_dir not in sys.path:
-            sys.path.insert(0, api_dir)
-        from app import app
+    # 设置环境变量（供 facade 使用）
+    os.environ['CHECKPOINT_DIR'] = args.checkpoint_dir
+    os.environ['EXPERIMENT_NAME'] = args.experiment_name
     
-    # 设置配置
-    app.config['CHECKPOINT_DIR'] = args.checkpoint_dir
-    app.config['EXPERIMENT_NAME'] = args.experiment_name
-    
-    # 启动服务器
-    app.run(
+    config = uvicorn.Config(
+        "api:app",
         host=args.host,
         port=args.port,
-        debug=args.debug
+        reload=args.reload,
+        log_level="info",
+        access_log=True,
     )
+    
+    server = uvicorn.Server(config)
+    logger.info(f"启动服务器: http://{args.host}:{args.port}")
+    if args.reload:
+        logger.info("热重载已启用")
+    server.run()
 
 
 def start_production_server(args):
-    """启动生产服务器"""
-    logger.info("启动生产服务器...")
-    
+    """启动生产服务器 (使用 gunicorn + uvicorn workers)"""
     import subprocess
     
-    # 构建gunicorn命令
+    # 构建 gunicorn 命令
     cmd = [
         'gunicorn',
         '--bind', f'{args.host}:{args.port}',
         '--workers', str(args.workers),
+        '--worker-class', 'uvicorn.workers.UvicornWorker',
         '--timeout', '300',
         '--keep-alive', '5',
         '--max-requests', '1000',
         '--max-requests-jitter', '100',
         '--access-logfile', 'logs/api_access.log',
         '--error-logfile', 'logs/api_error.log',
-        'api.app:app'
+        '--capture-output',
+        'api:app'
     ]
     
     # 设置环境变量
@@ -128,7 +128,6 @@ def start_production_server(args):
     env['CHECKPOINT_DIR'] = args.checkpoint_dir
     env['EXPERIMENT_NAME'] = args.experiment_name
     
-    # 启动服务器
     try:
         logger.info(f"执行命令: {' '.join(cmd)}")
         result = subprocess.run(cmd, env=env, capture_output=True, text=True)
@@ -151,29 +150,33 @@ def main():
     create_directories()
     
     # 设置日志级别
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.getLogger().setLevel(log_level)
     
     logger.info("=" * 50)
-    logger.info("区块链AML系统API服务器")
+    logger.info("区块链AML系统 FastAPI 服务器")
     logger.info("=" * 50)
     logger.info(f"主机: {args.host}")
     logger.info(f"端口: {args.port}")
+    logger.info(f"热重载: {args.reload}")
     logger.info(f"调试模式: {args.debug}")
     logger.info(f"检查点目录: {args.checkpoint_dir}")
     logger.info(f"实验名称: {args.experiment_name}")
     logger.info("=" * 50)
+    logger.info("API 文档: http://localhost:8000/docs")
+    logger.info("=" * 50)
     
     try:
-        if args.debug:
-            start_development_server(args)
-        else:
+        if args.workers > 1 or args.debug:
             start_production_server(args)
+        else:
+            start_server(args)
     except KeyboardInterrupt:
         logger.info("服务器已停止")
     except Exception as e:
         logger.error(f"服务器启动失败: {e}")
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
