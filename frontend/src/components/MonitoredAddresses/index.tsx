@@ -26,7 +26,9 @@ import {
     EditOutlined,
     DeleteOutlined,
     EyeOutlined,
-    FilterOutlined
+    FilterOutlined,
+    FileTextOutlined,
+    LoadingOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -38,8 +40,8 @@ import {
     monitoredAddressApi,
     convertDTOToAddress,
     apiClient
-} from "../../services/monitoredAddress";
-import api from "../../services/api";
+} from "@/services/monitoredAddress";
+import { generateReport, previewReport } from "@/services/report"; // 导入报告API
 
 dayjs.locale("zh-cn");
 
@@ -75,7 +77,7 @@ const monitoringStatusOptions = [
     { value: "disabled", label: "已停用" }
 ];
 
-const AddressListPage: React.FC = () => {
+const MonitoredAddressList: React.FC = () => {
     // 状态管理
     const [addresses, setAddresses] = useState<MonitoredAddress[]>([]);
     const [filteredAddresses, setFilteredAddresses] = useState<MonitoredAddress[]>([]);
@@ -83,6 +85,7 @@ const AddressListPage: React.FC = () => {
     const [creating, setCreating] = useState<boolean>(false);
     const [updating, setUpdating] = useState<boolean>(false);
     const [deleting, setDeleting] = useState<boolean>(false);
+    const [generatingReport, setGeneratingReport] = useState<string | null>(null); // 生成报告的地址ID
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
     const [totalItems, setTotalItems] = useState<number>(0);
@@ -99,6 +102,15 @@ const AddressListPage: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState<boolean>(false);
     const [currentAddress, setCurrentAddress] = useState<MonitoredAddress | null>(null);
     const [form] = Form.useForm();
+
+    // 报告生成成功弹窗状态
+    const [reportSuccessModal, setReportSuccessModal] = useState<{
+        visible: boolean;
+        reportId?: number;
+        address?: string;
+    }>({
+        visible: false
+    });
 
     // 获取所有地址
     const fetchAddresses = useCallback(async () => {
@@ -212,6 +224,47 @@ const AddressListPage: React.FC = () => {
             return <Tag color="green">监控中</Tag>;
         } else {
             return <Tag color="red">已停用</Tag>;
+        }
+    };
+
+    // 生成报告处理函数
+    const handleGenerateReport = async (address: string, addressId: string) => {
+        if (generatingReport) {
+            message.warning("正在生成报告，请稍候...");
+            return;
+        }
+
+        setGeneratingReport(addressId);
+
+        try {
+            // 调用生成报告API
+            const result = await generateReport(address);
+
+            message.success("报告生成成功！");
+
+            // 显示成功弹窗
+            setReportSuccessModal({
+                visible: true,
+                reportId: result.report_id || result.id, // 根据API返回的结构调整
+                address: address
+            });
+
+        } catch (error: any) {
+            console.error("生成报告失败:", error);
+            message.error(`生成报告失败: ${error.message || "请稍后重试"}`);
+        } finally {
+            setGeneratingReport(null);
+        }
+    };
+
+    // 预览报告
+    const handlePreviewReport = async (reportId: number) => {
+        try {
+            await previewReport(reportId);
+            setReportSuccessModal({ visible: false });
+        } catch (error: any) {
+            console.error("预览报告失败:", error);
+            message.error(`预览报告失败: ${error.message || "请检查网络连接"}`);
         }
     };
 
@@ -454,7 +507,7 @@ const AddressListPage: React.FC = () => {
         {
             title: "操作",
             key: "action",
-            width: 150,
+            width: 200,
             render: (_: any, record: MonitoredAddress) => (
                 <Space size="small">
                     <Tooltip title="查看详情">
@@ -463,6 +516,16 @@ const AddressListPage: React.FC = () => {
                             size="small"
                             icon={<EyeOutlined />}
                             onClick={() => handleViewDetails(record)}
+                        />
+                    </Tooltip>
+                    <Tooltip title="生成报告">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={generatingReport === record.id ? <LoadingOutlined /> : <FileTextOutlined />}
+                            onClick={() => handleGenerateReport(record.address, record.id)}
+                            disabled={!!generatingReport}
+                            style={{ color: "#1890ff" }}
                         />
                     </Tooltip>
                     <Tooltip title="编辑">
@@ -747,6 +810,73 @@ const AddressListPage: React.FC = () => {
                     </Form.Item>
                 </Form>
             </Modal>
+
+            {/* 报告生成成功弹窗 */}
+            <Modal
+                title="报告生成成功"
+                open={reportSuccessModal.visible}
+                onCancel={() => setReportSuccessModal({ visible: false })}
+                footer={[
+                    <Button
+                        key="back"
+                        onClick={() => setReportSuccessModal({ visible: false })}
+                    >
+                        返回
+                    </Button>,
+                    <Button
+                        key="preview"
+                        type="primary"
+                        onClick={() => reportSuccessModal.reportId && handlePreviewReport(reportSuccessModal.reportId)}
+                    >
+                        预览报告
+                    </Button>
+                ]}
+                centered
+            >
+                <div style={{ padding: "20px 0" }}>
+                    <Row gutter={[16, 16]}>
+                        <Col span={24}>
+                            <div style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginBottom: 20
+                            }}>
+                                <FileTextOutlined style={{ fontSize: 48, color: "#52c41a", marginRight: 16 }} />
+                                <div>
+                                    <h3 style={{ marginBottom: 8 }}>报告已生成成功！</h3>
+                                    <p style={{ color: "#666", margin: 0 }}>
+                                        您可以选择预览报告或返回继续操作
+                                    </p>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col span={24}>
+                            <div style={{
+                                background: "#f6ffed",
+                                border: "1px solid #b7eb8f",
+                                borderRadius: 4,
+                                padding: 12
+                            }}>
+                                <Row gutter={[8, 8]}>
+                                    <Col span={8} style={{ fontWeight: 500 }}>报告ID:</Col>
+                                    <Col span={16}>{reportSuccessModal.reportId}</Col>
+                                    <Col span={8} style={{ fontWeight: 500 }}>目标地址:</Col>
+                                    <Col span={16}>
+                                        <div style={{
+                                            fontFamily: "monospace",
+                                            fontSize: "12px",
+                                            wordBreak: "break-all"
+                                        }}>
+                                            {reportSuccessModal.address}
+                                        </div>
+                                    </Col>
+                                </Row>
+                            </div>
+                        </Col>
+                    </Row>
+                </div>
+            </Modal>
         </div>
     );
 };
@@ -779,11 +909,22 @@ const styles = `
     font-size: 12px;
     padding: 0 8px;
   }
+  
+  /* 生成报告按钮样式 */
+  .ant-btn-text:not(.ant-btn-dangerous) {
+    color: #1890ff;
+  }
+  
+  .ant-btn-text:not(.ant-btn-dangerous):hover {
+    background-color: rgba(24, 144, 255, 0.1);
+  }
 `;
 
 // 在组件中注入样式
-const styleSheet = document.createElement("style");
-styleSheet.innerText = styles;
-document.head.appendChild(styleSheet);
+if (typeof document !== 'undefined') {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+}
 
-export default AddressListPage;
+export default MonitoredAddressList;

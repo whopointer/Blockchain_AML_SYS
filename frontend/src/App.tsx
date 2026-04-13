@@ -4,10 +4,86 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 
 import Dashboard from "./components/Dashboard";
+import PredictionForm from "./components/PredictionForm";
+import ResultsTable from "./components/ResultsTable";
+import BatchAnalysis from "./components/BatchAnalysis";
 import MoneyLaunderingTrace from "./components/MoneyLaunderingTrace";
 import AddressDetectionPanel from "./components/detection/AddressDetectionPanel";
 import TransactionGraph from "./components/TransactionGraph";
 import CaseDetails from "./components/CaseDetails";
+import PathTracking from "./components/PathTracking";
+import { PredictionResponse } from "./services/api";
+import MonitoredAddressList from "./components/MonitoredAddresses"
+import ReportList from "./components/Reports"
+import AlertList from  "./components/Alerts"
+
+// 自定义导航链接组件，用于激活状态样式
+const CustomNavLink = ({
+  children,
+  to,
+  ...props
+}: {
+  children: React.ReactNode;
+  to: string;
+  [key: string]: any;
+}) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <Nav.Link as={Link} to={to} className={isActive ? "active" : ""} {...props}>
+      {children}
+    </Nav.Link>
+  );
+};
+
+// Dashboard页面组件，包含Tabs
+const DashboardPage = () => {
+  const [predictionResults, setPredictionResults] =
+    useState<PredictionResponse | null>(null);
+
+  const handlePredictionComplete = (results: PredictionResponse) => {
+    setPredictionResults(results);
+  };
+
+  return (
+    <Tab.Container defaultActiveKey="dashboard">
+      <Helmet>
+        <title>系统仪表板 - 区块链AML反洗钱系统</title>
+      </Helmet>
+      <Tabs id="main-tabs" className="mb-4" fill justify>
+        <Tab eventKey="dashboard" title="🎯 系统仪表板">
+          <Dashboard />
+        </Tab>
+        <Tab eventKey="prediction" title="🔍 交易异常检测">
+          <Row>
+            <Col lg={5} className="mb-4">
+              <PredictionForm onPredictionComplete={handlePredictionComplete} />
+            </Col>
+            <Col lg={7}>
+              <ResultsTable results={predictionResults} />
+            </Col>
+          </Row>
+        </Tab>
+        <Tab eventKey="batch" title="📊 批量分析">
+          <BatchAnalysis />
+        </Tab>
+        <Tab eventKey="trace" title="🔗 洗钱路径追踪">
+          <MoneyLaunderingTrace />
+        </Tab>
+        <Tab eventKey="monitor" title="🔗 监控地址列表">
+          <MonitoredAddressList />
+        </Tab>
+        <Tab eventKey="reports" title="🔗 报告列表">
+          <ReportList />
+        </Tab>
+        <Tab eventKey="alerts" title="🔗 告警列表">
+          <AlertList />
+        </Tab>
+      </Tabs>
+    </Tab.Container>
+  );
+};
 
 function App() {
   const handleModelSwitch = (modelType: string) => {

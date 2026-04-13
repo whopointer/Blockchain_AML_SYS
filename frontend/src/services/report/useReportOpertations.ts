@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { generateReport, deleteReport, previewReport } from './reportApi';
+import { generateReport, deleteReport, previewReport } from './api';
 import { ReportResponse, DeleteReportResponse, ReportListItem } from './types';
 
 /**
