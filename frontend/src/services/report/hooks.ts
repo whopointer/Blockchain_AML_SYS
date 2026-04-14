@@ -1,235 +1,103 @@
-// src/api/hooks.ts
-/**
- * React Hooks for API operations
- */
+import { useState, useEffect, useCallback } from 'react';
+import {ReportAPI} from './api'
+import {ReportResponse, ReportStatus} from "@/services/report/types";
 
-import { useState, useCallback } from 'react';
-import {
-    generateReport,
-    getReportDownloadUrl,
-    downloadReportFile,
-    previewReport,
-    deleteReport,
-    getReportList,
-    getReportListPaginated,
-} from './api';
-import {
-    ReportResponse,
-    DownloadReportResponse,
-    DeleteReportResponse,
-    ReportListItem,
-} from './types';
+export function useReportGenerator(api: ReportAPI) {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [report, setReport] = useState<ReportResponse | null>(null);
+    const [status, setStatus] = useState<ReportStatus | null>(null);
 
-// 状态接口
-interface ApiState<T> {
-    data: T | null;
-    loading: boolean;
-    error: string | null;
+    const generate = useCallback(async (
+        address: string,
+        options?: { type?: 'basic' | 'enhanced' }
+    ) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const result = await api.generateReport(address, options);
+            setReport(result);
+            return result;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '未知错误');
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    }, [api]);
+
+    const pollStatus = useCallback(async (reportId: number) => {
+        try {
+            const status = await api.getReportStatus(reportId);
+            setStatus(status);
+            return status;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '获取状态失败');
+            throw err;
+        }
+    }, [api]);
+
+    return {
+        loading,
+        error,
+        report,
+        status,
+        generate,
+        pollStatus,
+    };
 }
 
-// 初始状态
-const initialApiState = <T>(): ApiState<T> => ({
-    data: null,
-    loading: false,
-    error: null,
-});
+// utils.ts - 工具函数
+export function validateAddress(address: string): boolean {
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
 
-/**
- * 生成报告hook
- */
-export const useGenerateReport = () => {
-    const [state, setState] = useState<ApiState<ReportResponse>>(initialApiState());
+export function formatReportDate(dateString: string): string {
+    return new Date(dateString).toLocaleString();
+}
 
-    const generate = useCallback(async (address: string) => {
-        setState(prev => ({ ...prev, loading: true, error: null }));
-
-        try {
-            const data = await generateReport(address);
-            setState({ data, loading: false, error: null });
-            return data;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '生成报告失败';
-            setState({ data: null, loading: false, error: errorMessage });
-            throw error;
-        }
-    }, []);
-
-    const reset = useCallback(() => {
-        setState(initialApiState());
-    }, []);
-
-    return {
-        ...state,
-        generate,
-        reset,
+export function getReportStatusColor(status: string): string {
+    const colors: Record<string, string> = {
+        pending: 'orange',
+        processing: 'blue',
+        completed: 'green',
+        failed: 'red',
     };
-};
+    return colors[status] || 'gray';
+}
 
-/**
- * 下载报告hook
- */
-export const useDownloadReport = () => {
-    const [state, setState] = useState<ApiState<DownloadReportResponse>>(initialApiState());
+// 使用示例
+async function exampleUsage() {
+    const api = new ReportAPI();
 
-    const download = useCallback(async (reportId: number) => {
-        setState(prev => ({ ...prev, loading: true, error: null }));
-
-        try {
-            const data = await getReportDownloadUrl(reportId);
-            setState({ data, loading: false, error: null });
-            return data;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '获取下载链接失败';
-            setState({ data: null, loading: false, error: errorMessage });
-            throw error;
-        }
-    }, []);
-
-    const reset = useCallback(() => {
-        setState(initialApiState());
-    }, []);
-
-    return {
-        ...state,
-        download,
-        reset,
-    };
-};
-
-/**
- * 删除报告hook
- */
-export const useDeleteReport = () => {
-    const [state, setState] = useState<ApiState<DeleteReportResponse>>(initialApiState());
-
-    const remove = useCallback(async (reportId: number) => {
-        setState(prev => ({ ...prev, loading: true, error: null }));
-
-        try {
-            const data = await deleteReport(reportId);
-            setState({ data, loading: false, error: null });
-            return data;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '删除报告失败';
-            setState({ data: null, loading: false, error: errorMessage });
-            throw error;
-        }
-    }, []);
-
-    const reset = useCallback(() => {
-        setState(initialApiState());
-    }, []);
-
-    return {
-        ...state,
-        delete: remove,
-        reset,
-    };
-};
-
-/**
- * 获取报告列表hook
- */
-export const useReportList = () => {
-    const [state, setState] = useState<ApiState<ReportListItem[]>>(initialApiState());
-
-    const fetch = useCallback(async () => {
-        setState(prev => ({ ...prev, loading: true, error: null }));
-
-        try {
-            const data = await getReportList();
-            setState({ data, loading: false, error: null });
-            return data;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '获取报告列表失败';
-            setState({ data: null, loading: false, error: errorMessage });
-            throw error;
-        }
-    }, []);
-
-    const reset = useCallback(() => {
-        setState(initialApiState());
-    }, []);
-
-    return {
-        ...state,
-        fetch,
-        reset,
-    };
-};
-
-/**
- * 分页获取报告列表hook
- */
-export const usePaginatedReportList = (initialPage: number = 1, initialPageSize: number = 10) => {
-    const [state, setState] = useState<{
-        data: ReportListItem[];
-        loading: boolean;
-        error: string | null;
-        page: number;
-        pageSize: number;
-        total: number;
-    }>({
-        data: [],
-        loading: false,
-        error: null,
-        page: initialPage,
-        pageSize: initialPageSize,
-        total: 0,
-    });
-
-    const fetch = useCallback(async (page?: number, pageSize?: number) => {
-        const targetPage = page ?? state.page;
-        const targetPageSize = pageSize ?? state.pageSize;
-
-        setState(prev => ({ ...prev, loading: true, error: null }));
-
-        try {
-            const result = await getReportListPaginated(targetPage, targetPageSize);
-            setState({
-                data: result.data,
-                loading: false,
-                error: null,
-                page: targetPage,
-                pageSize: targetPageSize,
-                total: result.total,
-            });
-            return result;
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '获取报告列表失败';
-            setState(prev => ({
-                ...prev,
-                loading: false,
-                error: errorMessage,
-            }));
-            throw error;
-        }
-    }, [state.page, state.pageSize]);
-
-    const goToPage = useCallback((page: number) => {
-        fetch(page, state.pageSize);
-    }, [fetch, state.pageSize]);
-
-    const changePageSize = useCallback((pageSize: number) => {
-        fetch(1, pageSize);
-    }, [fetch]);
-
-    const reset = useCallback(() => {
-        setState({
-            data: [],
-            loading: false,
-            error: null,
-            page: initialPage,
-            pageSize: initialPageSize,
-            total: 0,
+    try {
+        // 1. 生成报告
+        const report = await api.generateReport('0x1234...', {
+            type: 'enhanced',
+            includePredictions: true,
         });
-    }, [initialPage, initialPageSize]);
 
-    return {
-        ...state,
-        fetch,
-        goToPage,
-        changePageSize,
-        reset,
-    };
-};
+        console.log('报告已创建:', report.report_id);
+
+        // 2. 轮询状态
+        const status = await api.pollReportStatus(report.report_id);
+
+        if (status.status === 'completed') {
+            // 3. 下载报告
+            const { url, filename } = await api.downloadReport(report.report_id);
+
+            // 创建下载链接
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+
+            // 清理URL
+            URL.revokeObjectURL(url);
+        }
+
+    } catch (error) {
+        console.error('操作失败:', error);
+    }
+}

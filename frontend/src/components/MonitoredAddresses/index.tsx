@@ -41,7 +41,7 @@ import {
     convertDTOToAddress,
     apiClient
 } from "@/services/monitoredAddress";
-import { generateReport, previewReport } from "@/services/report"; // 导入报告API
+import { ReportAPI } from "../../services/report/api"; // 导入报告API
 
 dayjs.locale("zh-cn");
 
@@ -57,9 +57,8 @@ interface SearchParams {
 
 // 地址类型选项
 const addressTypeOptions = [
-    { value: "WALLET", label: "钱包" },
-    { value: "CONTRACT", label: "合约" },
-    { value: "EXCHANGE", label: "交易所" }
+    { value: "BITCOIN", label: "比特币" },
+    { value: 'ETHEREUM', label: '以太坊' }
 ];
 
 // 风险等级选项
@@ -111,6 +110,7 @@ const MonitoredAddressList: React.FC = () => {
     }>({
         visible: false
     });
+    const report_api = new ReportAPI('http://localhost:7999/api');
 
     // 获取所有地址
     const fetchAddresses = useCallback(async () => {
@@ -209,9 +209,8 @@ const MonitoredAddressList: React.FC = () => {
     // 获取地址类型标签
     const getAddressTypeTag = (addressType: string) => {
         const typeMap: Record<string, { color: string; label: string }> = {
-            "WALLET": { color: "blue", label: "钱包" },
-            "CONTRACT": { color: "purple", label: "合约" },
-            "EXCHANGE": { color: "cyan", label: "交易所" }
+            "BITCOIN": { color: "blue", label: "比特币" },
+            "ETHEREUM": { color: "purple", label: "以太坊" }
         };
 
         const typeInfo = typeMap[addressType] || { color: "default", label: addressType };
@@ -238,14 +237,17 @@ const MonitoredAddressList: React.FC = () => {
 
         try {
             // 调用生成报告API
-            const result = await generateReport(address);
+            const result = await report_api.generateReport(address, {
+                type: 'enhanced',
+                includePredictions: true
+            });
 
             message.success("报告生成成功！");
 
             // 显示成功弹窗
             setReportSuccessModal({
                 visible: true,
-                reportId: result.report_id || result.id, // 根据API返回的结构调整
+                reportId: result.report_id, // 根据API返回的结构调整
                 address: address
             });
 
@@ -258,13 +260,13 @@ const MonitoredAddressList: React.FC = () => {
     };
 
     // 预览报告
-    const handlePreviewReport = async (reportId: number) => {
+    const handleDownloadReport = async (reportId:number) => {
         try {
-            await previewReport(reportId);
+            await report_api.downloadReport(reportId);
             setReportSuccessModal({ visible: false });
         } catch (error: any) {
-            console.error("预览报告失败:", error);
-            message.error(`预览报告失败: ${error.message || "请检查网络连接"}`);
+            console.error("下载报告失败:", error);
+            message.error(`下载报告失败: ${error.message || "请检查网络连接"}`);
         }
     };
 
@@ -826,9 +828,9 @@ const MonitoredAddressList: React.FC = () => {
                     <Button
                         key="preview"
                         type="primary"
-                        onClick={() => reportSuccessModal.reportId && handlePreviewReport(reportSuccessModal.reportId)}
+                        onClick={() => reportSuccessModal.reportId && handleDownloadReport(reportSuccessModal.reportId)}
                     >
-                        预览报告
+                        下载报告
                     </Button>
                 ]}
                 centered
