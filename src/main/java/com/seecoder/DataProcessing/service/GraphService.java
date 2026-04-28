@@ -23,10 +23,10 @@ public interface GraphService {
     void saveTransactionsToGraph(List<ChainTx> chainTxs);
 
     // 查找交易路径
-    ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress);
+    ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit);
 
     // 查找地址N跳内的所有关联地址
-    ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops);
+    ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops, Integer limit);
 
     // 获取地址的转账统计
     ApiResponse<Map<String, Object>> getAddressTransferStats(String address);
@@ -92,8 +92,8 @@ public interface GraphService {
     void saveTransactionsBatchToGraph(List<ChainTx> txs);
 
     // BTC N跳查询接口
-    ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops);
+    ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops, Integer limit);
 
     // BTC 节点交易路径追踪接口（从起始地址到目标地址的路径）
-    ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress);
+    ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit);
 }

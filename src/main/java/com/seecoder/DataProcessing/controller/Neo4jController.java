@@ -33,8 +33,10 @@ public class Neo4jController {
     @ApiOperation("查找交易路径")
     public ApiResponse<Map<String, Object>> findTransactionPath(
             @RequestParam String fromAddress,
-            @RequestParam String toAddress) {
-        ApiResponse<Map<String, Object>> response = graphService.findNhopTransactionPath(fromAddress, toAddress);
+            @RequestParam String toAddress,
+            @RequestParam(required = false, defaultValue = "3") Integer maxHops,
+            @RequestParam(required = false, defaultValue = "100") Integer limit) {
+        ApiResponse<Map<String, Object>> response = graphService.findNhopTransactionPath(fromAddress, toAddress, maxHops, limit);
         
         if (response.getCode() != 200) {
             return ApiResponse.error(response.getCode(), response.getMessage());
@@ -62,24 +64,28 @@ public class Neo4jController {
     @ApiOperation("查找N跳内地址")
     public ApiResponse<Map<String, Object>> findAddressesWithinHops(
             @RequestParam String address,
-            @RequestParam(defaultValue = "1") Integer maxHops) {
-        return graphService.findAddressesWithinNHops(address, maxHops);
+            @RequestParam(required = false, defaultValue = "3") Integer maxHops,
+            @RequestParam(required = false, defaultValue = "100") Integer limit) {
+        return graphService.findAddressesWithinNHops(address, maxHops, limit);
     }
 
     @GetMapping("/btc/hops")
     @ApiOperation("查找BTC N跳内地址和交易")
     public ApiResponse<Map<String, Object>> findBTCHops(
             @RequestParam String address,
-            @RequestParam(defaultValue = "1") Integer maxHops) {
-        return graphService.findBTCAddressesWithinNHops(address, maxHops);
+            @RequestParam(required = false, defaultValue = "3") Integer maxHops,
+            @RequestParam(required = false, defaultValue = "100") Integer limit) {
+        return graphService.findBTCAddressesWithinNHops(address, maxHops, limit);
     }
 
     @GetMapping("/btc/path")
     @ApiOperation("查找BTC节点交易路径")
     public ApiResponse<Map<String, Object>> findBTCPath(
             @RequestParam String fromAddress,
-            @RequestParam String toAddress) {
-        return graphService.findBTCNhopTransactionPath(fromAddress, toAddress);
+            @RequestParam String toAddress,
+            @RequestParam(required = false, defaultValue = "3") Integer maxHops,
+            @RequestParam(required = false, defaultValue = "100") Integer limit) {
+        return graphService.findBTCNhopTransactionPath(fromAddress, toAddress, maxHops, limit);
     }
 
     @GetMapping("/address/stats")

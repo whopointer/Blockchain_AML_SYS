@@ -15,28 +15,116 @@ import java.util.*;
 @Service
 public class GraphAddressService extends AbstractGraphService {
 
+    private static final int DEFAULT_MAX_HOPS = 3;
+    private static final int MAX_ALLOWED_HOPS = 6;
+    private static final int DEFAULT_PATH_LIMIT = 50;
+    private static final int MAX_PATH_LIMIT = 100;
+    private static final int DEFAULT_NHOPS_LIMIT = 100;
+    private static final int MAX_NHOPS_LIMIT = 200;
+    private static final int QUERY_TIMEOUT_SECONDS = 30;
+    
+    // 按跳数动态调整结果限制：跳数越大，可返回路径数应越少
+    private static final Map<Integer, Integer> HOPS_TO_PATH_LIMIT;
+    private static final Map<Integer, Integer> HOPS_TO_NHOPS_LIMIT;
+    
+    static {
+        Map<Integer, Integer> pathMap = new HashMap<>();
+        pathMap.put(1, 100);   // 1跳：最多100条路径
+        pathMap.put(2, 80);    // 2跳：最多80条路径
+        pathMap.put(3, 50);    // 3跳：最多50条路径
+        pathMap.put(4, 30);    // 4跳：最多30条路径
+        pathMap.put(5, 20);    // 5跳：最多20条路径
+        pathMap.put(6, 10);    // 6跳：最多10条路径
+        HOPS_TO_PATH_LIMIT = Collections.unmodifiableMap(pathMap);
+        
+        Map<Integer, Integer> nhopsMap = new HashMap<>();
+        nhopsMap.put(1, 200);
+        nhopsMap.put(2, 150);
+        nhopsMap.put(3, 100);
+        nhopsMap.put(4, 50);
+        nhopsMap.put(5, 30);
+        nhopsMap.put(6, 20);
+        HOPS_TO_NHOPS_LIMIT = Collections.unmodifiableMap(nhopsMap);
+    }
+
+    private int getConfiguredMaxHops(Integer maxHops) {
+        if (maxHops == null || maxHops <= 0) {
+            return DEFAULT_MAX_HOPS;
+        }
+        // 限制范围为 [1, MAX_ALLOWED_HOPS]
+        int clamped = Math.max(1, Math.min(maxHops, MAX_ALLOWED_HOPS));
+        
+        // 记录实际使用的跳数，便于问题排查
+        if (maxHops != clamped) {
+            log.info("跳数参数 {} 被限制为 {} (最大允许: {})", maxHops, clamped, MAX_ALLOWED_HOPS);
+        }
+        return clamped;
+    }
+    
+    /**
+     * 根据跳数获取动态调整的路径限制
+     * 跳数越大，路径可能呈指数增长，因此需要更严格的限制
+     * @param maxHops 查询的跳数
+     * @return 建议的结果限制
+     */
+    private int getDynamicPathLimit(Integer maxHops) {
+        int hops = getConfiguredMaxHops(maxHops);
+        Integer dynamicLimit = HOPS_TO_PATH_LIMIT.get(hops);
+        return dynamicLimit != null ? dynamicLimit : DEFAULT_PATH_LIMIT;
+    }
+    
+    /**
+     * 根据跳数获取动态调整的N-hop限制
+     */
+    private int getDynamicNHopsLimit(Integer maxHops) {
+        int hops = getConfiguredMaxHops(maxHops);
+        Integer dynamicLimit = HOPS_TO_NHOPS_LIMIT.get(hops);
+        return dynamicLimit != null ? dynamicLimit : DEFAULT_NHOPS_LIMIT;
+    }
+
+    private int getConfiguredPathLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_PATH_LIMIT;
+        }
+        return Math.min(limit, MAX_PATH_LIMIT);
+    }
+
+    private int getConfiguredNHopsLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_NHOPS_LIMIT;
+        }
+        return Math.min(limit, MAX_NHOPS_LIMIT);
+    }
+
     /**
      * 查找两个地址之间的交易路径
      * @param fromAddress 起始地址
      * @param toAddress 目标地址
+     * @param maxHops 最大跳数，范围1-6，默认为3
+     * @param limit 返回路径数量限制，默认为50，最大100
      * @return 包含路径节点、边、交易信息的响应
      */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
-    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress) {
+    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit) {
         try {
             if (fromAddress == null || toAddress == null) {
                 return ApiResponse.error(400, "地址参数不能为空");
             }
 
+            int effectiveMaxHops = getConfiguredMaxHops(maxHops);
+            // 优先使用用户指定的 limit，否则使用动态限制
+            int effectiveLimit = (limit != null && limit > 0) 
+                ? getConfiguredPathLimit(limit) 
+                : getDynamicPathLimit(maxHops);
+
             Session session = getSession();
             try {
-                // 移除跳数限制，允许任意长度的路径
                 String pathQuery = "MATCH path = (a:Address {address: $fromAddress})" +
-                        "-[:TRANSFER*]->(b:Address {address: $toAddress}) " +
+                        "-[:TRANSFER*1.." + effectiveMaxHops + "]->(b:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC')} ] AS nodeData, " +
                         "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData LIMIT 50";
+                        "RETURN nodeData, relData LIMIT " + effectiveLimit;
 
                 Map<String, Object> params = new java.util.HashMap<>();
                 params.put("fromAddress", fromAddress);
@@ -288,36 +376,38 @@ public class GraphAddressService extends AbstractGraphService {
     /**
      * 查找指定地址N跳内的所有关联地址
      * @param address 中心地址
-     * @param maxHops 最大跳数，默认1，范围1-6
+     * @param maxHops 最大跳数，范围1-6，默认为3
+     * @param limit 返回路径数量限制，默认为100，最大200
      * @return 包含节点列表、边列表、交易计数等信息的响应
      */
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
-    public ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops) {
+    public ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops, Integer limit) {
         try {
             if (address == null || address.isEmpty()) {
                 return ApiResponse.error(400, "地址参数不能为空");
             }
 
-            if (maxHops == null || maxHops <= 0 || maxHops > 6) {
-                maxHops = 1; // 默认为1
-            }
+            int effectiveMaxHops = getConfiguredMaxHops(maxHops);
+            // 优先使用用户指定的 limit，否则使用动态限制
+            int effectiveLimit = (limit != null && limit > 0) 
+                ? getConfiguredNHopsLimit(limit) 
+                : getDynamicNHopsLimit(maxHops);
 
             Session session = getSession();
             try {
-                // 分别查询收入侧（入度）和支出侧（出度）的路径
-                String incomeQuery = "MATCH path = (start:Address {address: $address})<-[:TRANSFER*1.." + maxHops + "]-(income:Address) " +
+                String incomeQuery = "MATCH path = (start:Address {address: $address})<-[:TRANSFER*1.." + effectiveMaxHops + "]-(income:Address) " +
                         "WHERE start <> income " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
                         "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData, 'income' as direction LIMIT 50";
+                        "RETURN nodeData, relData, 'income' as direction LIMIT " + effectiveLimit;
 
-                String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:TRANSFER*1.." + maxHops + "]->(outcome:Address) " +
+                String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:TRANSFER*1.." + effectiveMaxHops + "]->(outcome:Address) " +
                         "WHERE start <> outcome " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, '')} ] AS nodeData, " +
                         "     [r IN relList | {txHash: coalesce(r.txHash, ''), amount: coalesce(toFloat(r.amount), 0.0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData, 'outcome' as direction LIMIT 50";
+                        "RETURN nodeData, relData, 'outcome' as direction LIMIT " + effectiveLimit;
 
                 Map<String, Object> params = new HashMap<>();
                 params.put("address", address);
@@ -1203,34 +1293,33 @@ public class GraphAddressService extends AbstractGraphService {
     }
 
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
-    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops) {
+    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops, Integer limit) {
         try {
             if (address == null || address.isEmpty()) {
                 return ApiResponse.error(400, "地址参数不能为空");
             }
 
-            if (maxHops == null || maxHops <= 0 || maxHops > 6) {
-                maxHops = 1;
-            }
+            int effectiveMaxHops = getConfiguredMaxHops(maxHops);
+            // 优先使用用户指定的 limit，否则使用动态限制
+            int effectiveLimit = (limit != null && limit > 0) 
+                ? getConfiguredNHopsLimit(limit) 
+                : getDynamicNHopsLimit(maxHops);
 
             Session session = getSession();
             try {
-                // BTC UTXO模型：
-                // - 支出侧(OUTCOME)：中心地址 --SPENT--> Transaction --OUTPUT--> 接收方地址
-                // - 收入侧(INCOME)：上游支出方地址 --SPENT--> Transaction --OUTPUT--> 中心地址
                 String incomeQuery = "MATCH path = (income:Address)-[:SPENT]->(tx:Transaction)-[:OUTPUT]->(start:Address {address: $address}) " +
                         "WHERE start <> income " +
                         "WITH path, nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | CASE WHEN 'Address' IN labels(n) THEN {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, ''), type: 'address'} ELSE {txHash: n.txHash, blockHeight: n.blockHeight, time: coalesce(n.time, ''), type: 'transaction'} END] AS nodeData, " +
                         "     [r IN relList | {amount: coalesce(toFloat(r.amount), 0.0), index: coalesce(r.index, 0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData, 'income' as direction LIMIT 50";
+                        "RETURN nodeData, relData, 'income' as direction LIMIT " + effectiveLimit;
 
                 String outcomeQuery = "MATCH path = (start:Address {address: $address})-[:SPENT]->(tx:Transaction)-[:OUTPUT]->(outcome:Address) " +
                         "WHERE start <> outcome " +
                         "WITH path, nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | CASE WHEN 'Address' IN labels(n) THEN {address: n.address, risk_level: coalesce(n.risk_level, 0), chain: coalesce(n.chain, 'BTC'), first_seen: coalesce(n.first_seen, ''), last_seen: coalesce(n.last_seen, ''), type: 'address'} ELSE {txHash: n.txHash, blockHeight: n.blockHeight, time: coalesce(n.time, ''), type: 'transaction'} END] AS nodeData, " +
                         "     [r IN relList | {amount: coalesce(toFloat(r.amount), 0.0), index: coalesce(r.index, 0), time: coalesce(r.time, '')}] AS relData " +
-                        "RETURN nodeData, relData, 'outcome' as direction LIMIT 50";
+                        "RETURN nodeData, relData, 'outcome' as direction LIMIT " + effectiveLimit;
 
                 Map<String, Object> params = new HashMap<>();
                 params.put("address", address);
@@ -1642,16 +1731,22 @@ public class GraphAddressService extends AbstractGraphService {
     }
 
     @Transactional(readOnly = true, transactionManager = "neo4jTransactionManager")
-    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress) {
+    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit) {
         try {
             if (fromAddress == null || fromAddress.isEmpty() || toAddress == null || toAddress.isEmpty()) {
                 return ApiResponse.error(400, "起始地址和目标地址不能为空");
             }
 
+            int effectiveMaxHops = getConfiguredMaxHops(maxHops);
+            // 优先使用用户指定的 limit，否则使用动态限制
+            int effectiveLimit = (limit != null && limit > 0) 
+                ? getConfiguredPathLimit(limit) 
+                : getDynamicPathLimit(maxHops);
+
             Session session = getSession();
             try {
                 String pathQuery = "MATCH path = (from:Address {address: $fromAddress})" +
-                        "-[:SPENT|OUTPUT*1..10]->(to:Address {address: $toAddress}) " +
+                        "-[:SPENT|OUTPUT*1.." + effectiveMaxHops + "]->(to:Address {address: $toAddress}) " +
                         "WITH nodes(path) AS nodeList, relationships(path) AS relList " +
                         "WITH [n IN nodeList | {" +
                         "   address: coalesce(n.address, ''), " +
@@ -1668,7 +1763,7 @@ public class GraphAddressService extends AbstractGraphService {
                         "   amount: coalesce(toFloat(r.amount), 0.0), " +
                         "   time: coalesce(r.time, '')" +
                         "}] AS relData " +
-                        "RETURN nodeData, relData LIMIT 50";
+                        "RETURN nodeData, relData LIMIT " + effectiveLimit;
 
                 Map<String, Object> params = new HashMap<>();
                 params.put("fromAddress", fromAddress);

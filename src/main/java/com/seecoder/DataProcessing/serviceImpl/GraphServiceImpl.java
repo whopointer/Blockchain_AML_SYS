@@ -42,14 +42,13 @@ public class GraphServiceImpl implements GraphService {
     }
 
     @Override
-    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress) {
-        // 调用GraphAddressService的实现
-        return addressService.findNhopTransactionPath(fromAddress, toAddress);
+    public ApiResponse<Map<String, Object>> findNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit) {
+        return addressService.findNhopTransactionPath(fromAddress, toAddress, maxHops, limit);
     }
 
     @Override
-    public ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops) {
-        return addressService.findAddressesWithinNHops(address, maxHops);
+    public ApiResponse<Map<String, Object>> findAddressesWithinNHops(String address, Integer maxHops, Integer limit) {
+        return addressService.findAddressesWithinNHops(address, maxHops, limit);
     }
 
     @Override
@@ -181,13 +180,13 @@ public class GraphServiceImpl implements GraphService {
     }
 
     @Override
-    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops) {
-        return addressService.findBTCAddressesWithinNHops(address, maxHops);
+    public ApiResponse<Map<String, Object>> findBTCAddressesWithinNHops(String address, Integer maxHops, Integer limit) {
+        return addressService.findBTCAddressesWithinNHops(address, maxHops, limit);
     }
 
     @Override
-    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress) {
-        return addressService.findBTCNhopTransactionPath(fromAddress, toAddress);
+    public ApiResponse<Map<String, Object>> findBTCNhopTransactionPath(String fromAddress, String toAddress, Integer maxHops, Integer limit) {
+        return addressService.findBTCNhopTransactionPath(fromAddress, toAddress, maxHops, limit);
     }
 
 }
